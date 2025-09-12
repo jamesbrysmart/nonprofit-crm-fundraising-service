@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import databaseConfig from './config/database.config';
@@ -17,7 +17,8 @@ import { Campaign } from './campaign/campaign.entity';
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService) => ({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
         ...configService.get('database'),
         entities: [Gift, Campaign],
       }),

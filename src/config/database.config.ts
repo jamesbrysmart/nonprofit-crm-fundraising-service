@@ -12,4 +12,6 @@ export default registerAs('database', (): TypeOrmModuleOptions => ({
   synchronize: false, // Set to false for production, use migrations
   migrationsRun: false,
   logging: true,
+  retryAttempts: 10,
+  retryDelay: 5000,
 }));
