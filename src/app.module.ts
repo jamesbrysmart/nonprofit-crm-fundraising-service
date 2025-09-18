@@ -8,6 +8,7 @@ import { AppService } from './app.service';
 import { HealthController } from './health/health.controller';
 import { Gift } from './gift/gift.entity';
 import { Campaign } from './campaign/campaign.entity';
+import { GiftModule } from './gift/gift.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { Campaign } from './campaign/campaign.entity';
         return new DataSource(options as any).initialize();
       },
     }),
+    GiftModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

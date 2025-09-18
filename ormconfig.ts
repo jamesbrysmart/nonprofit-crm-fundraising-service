@@ -9,8 +9,9 @@ const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   entities: [Gift, Campaign],
-  migrations: [__dirname + '/migrations/**/*.ts'],
+  migrations: [__dirname + '/src/migrations/*{.ts,.js}'],
   synchronize: false,
+  migrationsRun: true,
   logging: true,
 });
 

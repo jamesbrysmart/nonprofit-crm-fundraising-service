@@ -9,8 +9,9 @@ export default registerAs('database', (): TypeOrmModuleOptions => ({
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_NAME || 'fundraising',
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+  migrations: [__dirname + '/../migrations/*{.ts,.js}'],
   synchronize: false, // Set to false for production, use migrations
-  migrationsRun: false,
+  migrationsRun: true,
   logging: true,
   retryAttempts: 10,
   retryDelay: 5000,

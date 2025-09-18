@@ -1,19 +1,34 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('gift')
 export class Gift {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id: string;
 
-  @Column()
+  @Column({ name: 'contact_id', type: 'varchar' })
   contactId: string;
 
-  @Column()
-  campaignId: string;
+  @Column({ name: 'campaign_id', type: 'varchar', nullable: true })
+  campaignId: string | null;
 
-  @Column('decimal', { precision: 10, scale: 2 })
-  amount: number;
+  @Column({ name: 'amount_currency_code', type: 'varchar' })
+  amountCurrencyCode: string;
 
-  @Column('date')
-  date: Date;
+  @Column({ name: 'amount_value', type: 'numeric', precision: 10, scale: 2 })
+  amountValue: string;
+
+  @Column({ name: 'gift_date', type: 'date' })
+  date: string;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
 }
