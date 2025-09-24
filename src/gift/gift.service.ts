@@ -1,28 +1,11 @@
 import {
+  HttpException,
   Injectable,
-  InternalServerErrorException,
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CreateGiftDto } from './dto/create-gift.dto';
-import { GiftResponseDto } from './dto/gift-response.dto';
-
-type TwentyGift = {
-  id?: string | null;
-  contactId?: string | null;
-  campaignId?: string | null;
-  amount?: {
-    currencyCode?: string | null;
-    value?: unknown;
-  } | null;
-  date?: string | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-};
-
-type CreateGiftResponse = { data?: { createGift?: TwentyGift } };
-type ListGiftsResponse = { data?: { gifts?: TwentyGift[] } };
+import { URLSearchParams } from 'url';
 
 @Injectable()
 export class GiftService {
@@ -40,42 +23,34 @@ export class GiftService {
     this.twentyApiKey = this.configService.get<string>('TWENTY_API_KEY') ?? '';
   }
 
-  async createGift(dto: CreateGiftDto): Promise<GiftResponseDto> {
+  async createGift(payload: unknown): Promise<unknown> {
     this.ensureConfigured();
-
-    const payload = this.buildCreatePayload(dto);
-    const body = await this.callTwenty<CreateGiftResponse>('POST', '/gifts', payload);
-    const gift = body?.data?.createGift;
-
-    if (!gift) {
-      this.logger.error('Twenty API create response missing gift payload', {
-        body,
-      });
-      throw new InternalServerErrorException('Unexpected response from Twenty API');
-    }
-
-    return this.mapFromTwentyGift(gift, dto);
+    return this.callTwenty('POST', '/gifts', payload);
   }
 
-  async listGifts(): Promise<GiftResponseDto[]> {
+  async listGifts(query: Record<string, unknown>): Promise<unknown> {
     this.ensureConfigured();
+    const path = this.buildPath('/gifts', query);
+    return this.callTwenty('GET', path);
+  }
 
-    const body = await this.callTwenty<ListGiftsResponse>('GET', '/gifts');
-    const gifts = Array.isArray(body?.data?.gifts) ? body.data.gifts : [];
+  async getGift(id: string, query: Record<string, unknown>): Promise<unknown> {
+    this.ensureConfigured();
+    const basePath = `/gifts/${encodeURIComponent(id)}`;
+    const path = this.buildPath(basePath, query);
+    return this.callTwenty('GET', path);
+  }
 
-    return gifts.reduce<GiftResponseDto[]>((acc, gift) => {
-      try {
-        acc.push(this.mapFromTwentyGift(gift));
-      } catch (error) {
-        this.logger.warn(
-          `Skipping gift due to mapping error: ${
-            error instanceof Error ? error.message : JSON.stringify(error)
-          }`,
-        );
-      }
+  async updateGift(id: string, payload: unknown): Promise<unknown> {
+    this.ensureConfigured();
+    const path = `/gifts/${encodeURIComponent(id)}`;
+    return this.callTwenty('PATCH', path, payload);
+  }
 
-      return acc;
-    }, []);
+  async deleteGift(id: string): Promise<unknown> {
+    this.ensureConfigured();
+    const path = `/gifts/${encodeURIComponent(id)}`;
+    return this.callTwenty('DELETE', path);
   }
 
   private ensureConfigured(): void {
@@ -84,11 +59,38 @@ export class GiftService {
     }
   }
 
-  private async callTwenty<T>(
-    method: 'GET' | 'POST',
+  private buildPath(
+    basePath: string,
+    query: Record<string, unknown>,
+  ): string {
+    const params = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(query ?? {})) {
+      if (value === undefined || value === null) {
+        continue;
+      }
+
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          if (entry !== undefined && entry !== null) {
+            params.append(key, String(entry));
+          }
+        }
+        continue;
+      }
+
+      params.append(key, String(value));
+    }
+
+    const queryString = params.toString();
+    return queryString ? `${basePath}?${queryString}` : basePath;
+  }
+
+  private async callTwenty(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
     path: string,
     body?: unknown,
-  ): Promise<T> {
+  ): Promise<unknown> {
     const url = `${this.twentyApiBaseUrl}${path.startsWith('/') ? path : `/${path}`}`;
     const headers: Record<string, string> = {
       Accept: 'application/json',
@@ -107,6 +109,8 @@ export class GiftService {
 
     let response: Response;
 
+    this.logger.log(`Forwarding ${method} ${path} to Twenty`);
+
     try {
       response = await fetch(url, init);
     } catch (error) {
@@ -115,7 +119,7 @@ export class GiftService {
           error instanceof Error ? error.message : error
         }`,
       );
-      throw new InternalServerErrorException('Failed to reach Twenty API');
+      throw new HttpException('Failed to reach Twenty API', 502);
     }
 
     const rawBody = await response.text();
@@ -124,105 +128,25 @@ export class GiftService {
       this.logger.error(
         `Twenty API (${method} ${url}) responded with ${response.status}: ${rawBody}`,
       );
-      throw new InternalServerErrorException('Twenty API request failed');
+      throw new HttpException(
+        rawBody || 'Twenty API request failed',
+        response.status,
+      );
     }
 
     if (!rawBody) {
-      return {} as T;
+      return null;
     }
 
     try {
-      return JSON.parse(rawBody) as T;
+      return JSON.parse(rawBody);
     } catch (error) {
-      this.logger.error(
-        `Failed to parse Twenty API response for ${method} ${url}: ${
+      this.logger.warn(
+        `Returning raw response for ${method} ${url} due to JSON parse failure: ${
           error instanceof Error ? error.message : error
         }`,
       );
-      throw new InternalServerErrorException('Failed to parse Twenty API response');
+      return rawBody;
     }
-  }
-
-  private mapFromTwentyGift(gift: TwentyGift, fallback?: CreateGiftDto): GiftResponseDto {
-    if (!gift?.id) {
-      throw new InternalServerErrorException('Twenty gift payload missing id');
-    }
-
-    const currencyCode =
-      gift.amount?.currencyCode ?? fallback?.amountCurrencyCode ?? 'USD';
-    const amountValue = this.normalizeAmountValue(
-      gift.amount?.value,
-      fallback?.amountValue,
-    );
-
-    const contactId = gift.contactId ?? fallback?.contactId ?? '';
-    const date = gift.date ?? fallback?.date ?? new Date().toISOString().slice(0, 10);
-
-    if (!contactId) {
-      this.logger.warn(`Twenty gift ${gift.id} missing contactId; defaulting to empty string`);
-    }
-
-    return {
-      id: gift.id,
-      contactId,
-      campaignId: gift.campaignId ?? fallback?.campaignId ?? null,
-      amount: {
-        currencyCode,
-        value: amountValue,
-      },
-      date,
-      createdAt: this.ensureIsoString(gift.createdAt),
-      updatedAt: this.ensureIsoString(gift.updatedAt ?? gift.createdAt),
-    };
-  }
-
-  private buildCreatePayload(dto: CreateGiftDto): Record<string, unknown> {
-    const payload: Record<string, unknown> = {
-      amount: {
-        currencyCode: dto.amountCurrencyCode,
-        value: dto.amountValue,
-      },
-    };
-
-    if (dto.contactId) {
-      payload.contactId = dto.contactId;
-    }
-
-    if (dto.campaignId) {
-      payload.campaignId = dto.campaignId;
-    }
-
-    if (dto.date) {
-      payload.date = dto.date;
-    }
-
-    return payload;
-  }
-
-  private normalizeAmountValue(value: unknown, fallback?: string): string {
-    if (typeof value === 'number') {
-      return value.toFixed(2);
-    }
-
-    if (typeof value === 'string' && value.trim().length > 0) {
-      return value;
-    }
-
-    if (fallback && fallback.trim().length > 0) {
-      return fallback;
-    }
-
-    return '0';
-  }
-
-  private ensureIsoString(value?: string | null): string {
-    if (typeof value === 'string' && value.trim().length > 0) {
-      const date = new Date(value);
-      if (!Number.isNaN(date.valueOf())) {
-        return date.toISOString();
-      }
-    }
-
-    return new Date().toISOString();
   }
 }

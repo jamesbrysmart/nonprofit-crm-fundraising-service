@@ -22,55 +22,78 @@ console.log('Dotenv parsed object:', result.parsed);
 console.log(`TWENTY_API_KEY from process.env (after dotenv): ${process.env.TWENTY_API_KEY}`);
 // --- End Diagnostics ---
 
-const TWENTY_API_URL = 'http://localhost:3000/graphql';
+const TWENTY_REST_METADATA_URL = 'http://localhost:3000/rest/metadata'; // Changed to REST Metadata API
 const API_KEY = process.env.TWENTY_API_KEY;
 
-const CREATE_OBJECT_MUTATION = `
-  mutation CreateOneObjectMetadataItem($input: CreateOneObjectInput!) {
-    createOneObject(input: $input) {
-      id
-      nameSingular
-    }
-  }
-`;
+async function restCall(method, endpoint, payload) {
+  const url = `${TWENTY_REST_METADATA_URL}${endpoint}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${API_KEY}`,
+  };
 
-const CREATE_FIELD_MUTATION = `
-  mutation CreateOneFieldMetadataItem($input: CreateOneFieldInput!) {
-    createOneField(input: $input) {
-      id
-      name
-      label
-    }
-  }
-`;
+  const init = {
+    method: method,
+    headers: headers,
+    body: JSON.stringify(payload),
+  };
 
-async function callApi(query, variables = {}) {
-  const response = await fetch(TWENTY_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${API_KEY}`,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+  console.log(`Calling REST API: ${method} ${url} with payload:`, payload);
 
+  const response = await fetch(url, init);
   const result = await response.json();
 
-  if (result.errors) {
-    // If the error is that it already exists, we can consider it a success for idempotency
-    const alreadyExistsError = result.errors.find(e => e.message?.includes('already exists'));
-    if (alreadyExistsError) {
-      console.log(`Skipped: ${alreadyExistsError.message}`);
-      return result; 
-    }
-    
-    console.error('API call failed:');
-    console.error(JSON.stringify(result, null, 2));
-    throw new Error(`GraphQL API Error: ${result.errors?.[0]?.message || response.statusText}`);
+  if (!response.ok) {
+    const customError = new Error(`REST API Error: ${result.message || response.statusText}`);
+    customError.response = result; // Attach the full result for inspection
+    throw customError;
   }
 
-  console.log('Success:', JSON.stringify(result.data, null, 2), '\n');
+  console.log('Success:', JSON.stringify(result, null, 2), '\n');
   return result;
+}
+
+async function findObjectByNameSingular(nameSingular) {
+  const url = `${TWENTY_REST_METADATA_URL}/objects?filter[nameSingular]=${nameSingular}`;
+  const headers = {
+    'Authorization': `Bearer ${API_KEY}`,
+  };
+
+  console.log(`Finding object: ${nameSingular} via GET ${url}`);
+
+  const response = await fetch(url, { method: 'GET', headers });
+  const result = await response.json();
+
+  if (!response.ok) {
+    console.error(`Failed to find object ${nameSingular}:`);
+    console.error(JSON.stringify(result, null, 2));
+    throw new Error(`REST API Error: ${result.message || response.statusText}`);
+  }
+
+  if (result.data && result.data.objects && result.data.objects.length > 0) {
+    console.log(`Found object ${nameSingular} with ID: ${result.data.objects[0].id}`);
+    return result.data.objects[0].id;
+  }
+  return null;
+}
+
+async function createObject(objectData) {
+  console.log(`Creating object: ${objectData.nameSingular}`);
+  try {
+    const response = await restCall('POST', '/objects', objectData);
+    return response; // This will have the id if created
+  } catch (error) {
+    if (error.response && error.response.messages && error.response.messages.includes('Object already exists')) {
+      console.log(`Object ${objectData.nameSingular} already exists. Skipping field creation for this object.`);
+      return null; // Return null if object already exists
+    }
+    throw error;
+  }
+}
+
+async function createField(fieldData) {
+  console.log(`Creating field: ${fieldData.name} for object ID: ${fieldData.objectMetadataId}`);
+  return restCall('POST', '/fields', fieldData);
 }
 
 async function main() {
@@ -80,87 +103,72 @@ async function main() {
   }
 
   console.log('--- Setting up Campaign Object ---');
-  await callApi(CREATE_OBJECT_MUTATION, {
-    input: {
-      nameSingular: "Campaign",
-      namePlural: "Campaigns",
-      labelSingular: "Campaign",
-      labelPlural: "Campaigns",
-      icon: "IconTargetArrow",
-      description: "A fundraising campaign to raise money for a specific purpose."
-    }
+  const campaignObject = await createObject({
+    nameSingular: "campaign",
+    namePlural: "campaigns",
+    labelSingular: "Campaign",
+    labelPlural: "Campaigns",
+    icon: "IconTargetArrow",
+    description: "A fundraising campaign to raise money for a specific purpose."
   });
 
-  await callApi(CREATE_FIELD_MUTATION, {
-    input: {
-      object: { connect: { nameSingular: "Campaign" } },
+  if (campaignObject) { // Only create fields if object was created or found
+    const campaignObjectId = campaignObject.data.createOneObject.id;
+
+    await createField({
+      objectMetadataId: campaignObjectId,
       name: "StartDate",
       label: "Start Date",
       type: "DATE"
-    }
-  });
+    });
 
-  await callApi(CREATE_FIELD_MUTATION, {
-    input: {
-      object: { connect: { nameSingular: "Campaign" } },
+    await createField({
+      objectMetadataId: campaignObjectId,
       name: "EndDate",
       label: "End Date",
       type: "DATE"
-    }
-  });
+    });
+  } else {
+    console.log('Skipping field creation for Campaign as object already existed.');
+  }
 
   console.log('--- Setting up Gift Object ---');
-  await callApi(CREATE_OBJECT_MUTATION, {
-    input: {
-      nameSingular: "Gift",
-      namePlural: "Gifts",
-      labelSingular: "Gift",
-      labelPlural: "Gifts",
-      icon: "IconGift",
-      description: "A single donation made by a contact to a campaign."
-    }
+  const giftObject = await createObject({
+    nameSingular: "gift",
+    namePlural: "gifts",
+    labelSingular: "Gift",
+    labelPlural: "Gifts",
+    icon: "IconGift",
+    description: "A single donation made by a contact to a campaign."
   });
 
-  await callApi(CREATE_FIELD_MUTATION, {
-    input: {
-      object: { connect: { nameSingular: "Gift" } },
+  if (giftObject) { // Only create fields if object was created or found
+    const giftObjectId = giftObject.data.createOneObject.id;
+
+    await createField({
+      objectMetadataId: giftObjectId,
       name: "Amount",
       label: "Amount",
       type: "CURRENCY"
-    }
-  });
+    });
 
-  await callApi(CREATE_FIELD_MUTATION, {
-    input: {
-      object: { connect: { nameSingular: "Gift" } },
+    await createField({
+      objectMetadataId: giftObjectId,
       name: "Date",
       label: "Gift Date",
       type: "DATE"
-    }
-  });
+    });
+  } else {
+    console.log('Skipping field creation for Gift as object already existed.');
+  }
 
-  console.log('--- Linking Objects ---');
-  await callApi(CREATE_FIELD_MUTATION, {
-    input: {
-      object: { connect: { nameSingular: "Gift" } },
-      name: "Campaign",
-      label: "Campaign",
-      type: "LOOKUP",
-      lookup: { object: { connect: { nameSingular: "Campaign" } } }
-    }
-  });
+  console.log('--- Linking Objects (Manual Step Required) ---');
+  console.log('NOTE: RELATION/LOOKUP fields cannot be created via API at this time.');
+  console.log('Please create the following LOOKUP fields manually in the Twenty UI:');
+  console.log('- For Gift object: "Campaign" (linking to Campaign object)');
+  console.log('- For Gift object: "Contact" (linking to Person object)');
 
-  await callApi(CREATE_FIELD_MUTATION, {
-    input: {
-      object: { connect: { nameSingular: "Gift" } },
-      name: "Contact",
-      label: "Contact",
-      type: "LOOKUP",
-      lookup: { object: { connect: { nameSingular: "person" } } } // NOTE: The internal name for Contact is 'person'
-    }
-  });
-
-  console.log('✅ Twenty CRM custom objects and fields setup complete.');
+  console.log('✅ Twenty CRM custom objects and fields setup complete (manual steps for LOOKUP fields pending).');
 }
 
 main().catch(error => {
