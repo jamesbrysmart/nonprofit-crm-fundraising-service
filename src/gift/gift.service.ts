@@ -6,12 +6,24 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { URLSearchParams } from 'url';
+import {
+  ensureCreateGiftResponse,
+  ensureDeleteGiftResponse,
+  ensureGiftGetResponse,
+  ensureGiftListResponse,
+  ensureUpdateGiftResponse,
+  validateCreateGiftPayload,
+  validateUpdateGiftPayload,
+} from './gift.validation';
 
 @Injectable()
 export class GiftService {
   private readonly logger = new Logger(GiftService.name);
   private readonly twentyApiBaseUrl: string;
   private readonly twentyApiKey: string;
+  private readonly maxAttempts = 3;
+  private readonly retryStatusCodes = new Set([429, 500, 502, 503, 504]);
+  private readonly retryDelaysMs = [250, 500];
 
   constructor(private readonly configService: ConfigService) {
     const configuredBaseUrl =
@@ -25,32 +37,44 @@ export class GiftService {
 
   async createGift(payload: unknown): Promise<unknown> {
     this.ensureConfigured();
-    return this.callTwenty('POST', '/gifts', payload);
+    const sanitizedPayload = validateCreateGiftPayload(payload);
+    const response = await this.callTwenty('POST', '/gifts', sanitizedPayload);
+    ensureCreateGiftResponse(response);
+    return response;
   }
 
   async listGifts(query: Record<string, unknown>): Promise<unknown> {
     this.ensureConfigured();
     const path = this.buildPath('/gifts', query);
-    return this.callTwenty('GET', path);
+    const response = await this.callTwenty('GET', path);
+    ensureGiftListResponse(response);
+    return response;
   }
 
   async getGift(id: string, query: Record<string, unknown>): Promise<unknown> {
     this.ensureConfigured();
     const basePath = `/gifts/${encodeURIComponent(id)}`;
     const path = this.buildPath(basePath, query);
-    return this.callTwenty('GET', path);
+    const response = await this.callTwenty('GET', path);
+    ensureGiftGetResponse(response);
+    return response;
   }
 
   async updateGift(id: string, payload: unknown): Promise<unknown> {
     this.ensureConfigured();
     const path = `/gifts/${encodeURIComponent(id)}`;
-    return this.callTwenty('PATCH', path, payload);
+    const sanitizedPayload = validateUpdateGiftPayload(payload);
+    const response = await this.callTwenty('PATCH', path, sanitizedPayload);
+    ensureUpdateGiftResponse(response);
+    return response;
   }
 
   async deleteGift(id: string): Promise<unknown> {
     this.ensureConfigured();
     const path = `/gifts/${encodeURIComponent(id)}`;
-    return this.callTwenty('DELETE', path);
+    const response = await this.callTwenty('DELETE', path);
+    ensureDeleteGiftResponse(response);
+    return response;
   }
 
   private ensureConfigured(): void {
@@ -107,46 +131,98 @@ export class GiftService {
       init.body = JSON.stringify(body);
     }
 
-    let response: Response;
-
     this.logger.log(`Forwarding ${method} ${path} to Twenty`);
 
-    try {
-      response = await fetch(url, init);
-    } catch (error) {
-      this.logger.error(
-        `Failed to reach Twenty API (${method} ${url}): ${
-          error instanceof Error ? error.message : error
-        }`,
-      );
-      throw new HttpException('Failed to reach Twenty API', 502);
+    for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
+      let response: Response;
+
+      try {
+        response = await fetch(url, init);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `Attempt ${attempt}/${this.maxAttempts} failed to reach Twenty API (${method} ${url}): ${message}`,
+        );
+
+        if (attempt >= this.maxAttempts) {
+          throw new HttpException('Failed to reach Twenty API', 502);
+        }
+
+        await this.sleep(this.nextDelay(attempt));
+        continue;
+      }
+
+      const rawBody = await response.text();
+
+      if (!response.ok) {
+        const status = response.status;
+
+        if (this.shouldRetry(status) && attempt < this.maxAttempts) {
+          const delay = this.computeRetryDelay(response, attempt);
+          this.logger.warn(
+            `Twenty API (${method} ${url}) responded with ${status}. Retrying in ${delay}ms (attempt ${
+              attempt + 1
+            }/${this.maxAttempts}).`,
+          );
+          await this.sleep(delay);
+          continue;
+        }
+
+        this.logger.error(
+          `Twenty API (${method} ${url}) responded with ${status}: ${rawBody}`,
+        );
+        throw new HttpException(
+          rawBody || 'Twenty API request failed',
+          status,
+        );
+      }
+
+      if (!rawBody) {
+        return null;
+      }
+
+      try {
+        return JSON.parse(rawBody);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `Failed to parse Twenty API response (${method} ${url}): ${message}`,
+        );
+        throw new HttpException('Failed to parse Twenty API response', 502);
+      }
     }
 
-    const rawBody = await response.text();
+    throw new HttpException('Failed to reach Twenty API', 502);
+  }
 
-    if (!response.ok) {
-      this.logger.error(
-        `Twenty API (${method} ${url}) responded with ${response.status}: ${rawBody}`,
-      );
-      throw new HttpException(
-        rawBody || 'Twenty API request failed',
-        response.status,
-      );
+  private shouldRetry(status: number): boolean {
+    return this.retryStatusCodes.has(status);
+  }
+
+  private computeRetryDelay(response: Response, attempt: number): number {
+    const retryAfter = response.headers.get('retry-after');
+    if (retryAfter) {
+      const parsed = Number.parseFloat(retryAfter);
+      if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+        return Math.max(parsed, 0) * 1000;
+      }
     }
 
-    if (!rawBody) {
-      return null;
+    return this.nextDelay(attempt);
+  }
+
+  private nextDelay(attempt: number): number {
+    const index = attempt - 1;
+    return this.retryDelaysMs[index] ?? this.retryDelaysMs[this.retryDelaysMs.length - 1] ?? 0;
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    if (ms <= 0) {
+      return;
     }
 
-    try {
-      return JSON.parse(rawBody);
-    } catch (error) {
-      this.logger.warn(
-        `Returning raw response for ${method} ${url} due to JSON parse failure: ${
-          error instanceof Error ? error.message : error
-        }`,
-      );
-      return rawBody;
-    }
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

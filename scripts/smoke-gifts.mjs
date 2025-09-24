@@ -68,6 +68,25 @@ async function main() {
   assert(deletedGift?.id === createdGift.id, 'delete response id mismatch');
 
   console.log('✅ Smoke test succeeded');
+
+  console.log('\nCreating a persistent gift for UI verification');
+  const persistentCreateResponse = await curlJson('POST', '/gifts', {
+    amount: { currencyCode: 'EUR', value: 99 },
+    name: 'Persistent Smoke Test Gift',
+  });
+
+  const persistentGift = persistentCreateResponse?.data?.createGift;
+  if (!persistentGift) {
+    console.error(
+      'Persistent gift create response:',
+      JSON.stringify(persistentCreateResponse, null, 2),
+    );
+    throw new Error('persistent createGift payload missing');
+  }
+  assert(uuidPattern.test(persistentGift.id), 'persistent gift id not a UUID');
+
+  console.log(`Persistent gift created with id ${persistentGift.id}`);
+  console.log('Please verify this gift in the Twenty UI.');
 }
 
 main().catch((error) => {
