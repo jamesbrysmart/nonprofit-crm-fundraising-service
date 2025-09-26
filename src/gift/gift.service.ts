@@ -1,11 +1,11 @@
 import {
   HttpException,
   Injectable,
-  Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { URLSearchParams } from 'url';
+import { StructuredLoggerService } from '../logging/structured-logger.service';
 import {
   ensureCreateGiftResponse,
   ensureDeleteGiftResponse,
@@ -18,14 +18,17 @@ import {
 
 @Injectable()
 export class GiftService {
-  private readonly logger = new Logger(GiftService.name);
+  private readonly logContext = GiftService.name;
   private readonly twentyApiBaseUrl: string;
   private readonly twentyApiKey: string;
   private readonly maxAttempts = 3;
   private readonly retryStatusCodes = new Set([429, 500, 502, 503, 504]);
   private readonly retryDelaysMs = [250, 500];
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly logger: StructuredLoggerService,
+  ) {
     const configuredBaseUrl =
       this.configService.get<string>('TWENTY_API_BASE_URL') ??
       this.configService.get<string>('TWENTY_REST_BASE_URL') ??
@@ -131,69 +134,160 @@ export class GiftService {
       init.body = JSON.stringify(body);
     }
 
-    this.logger.log(`Forwarding ${method} ${path} to Twenty`);
-
     for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
+      const attemptDetails = {
+        method,
+        path,
+        url,
+        attempt,
+        maxAttempts: this.maxAttempts,
+      } as const;
+      const startedAt = Date.now();
+
+      this.logger.debug(
+        'Forwarding request to Twenty',
+        {
+          ...attemptDetails,
+          event: 'twenty_proxy_attempt',
+        },
+        this.logContext,
+      );
+
       let response: Response;
 
       try {
         response = await fetch(url, init);
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const durationMs = Date.now() - startedAt;
         this.logger.error(
-          `Attempt ${attempt}/${this.maxAttempts} failed to reach Twenty API (${method} ${url}): ${message}`,
+          'Network error contacting Twenty API',
+          {
+            ...attemptDetails,
+            event: 'twenty_proxy_network_error',
+            durationMs,
+          },
+          this.logContext,
+          error instanceof Error ? error : undefined,
         );
 
         if (attempt >= this.maxAttempts) {
           throw new HttpException('Failed to reach Twenty API', 502);
         }
 
-        await this.sleep(this.nextDelay(attempt));
+        const delayMs = this.nextDelay(attempt);
+        this.logger.warn(
+          'Retrying after network failure',
+          {
+            ...attemptDetails,
+            event: 'twenty_proxy_retry',
+            delayMs,
+            durationMs,
+          },
+          this.logContext,
+        );
+        await this.sleep(delayMs);
         continue;
       }
 
       const rawBody = await response.text();
+      const durationMs = Date.now() - startedAt;
+      const baseMetadata = {
+        ...attemptDetails,
+        status: response.status,
+        durationMs,
+      };
 
       if (!response.ok) {
-        const status = response.status;
+        const bodyPreview = rawBody
+          ? this.formatBodyForLogs(rawBody)
+          : undefined;
 
-        if (this.shouldRetry(status) && attempt < this.maxAttempts) {
-          const delay = this.computeRetryDelay(response, attempt);
+        if (this.shouldRetry(response.status) && attempt < this.maxAttempts) {
+          const delayMs = this.computeRetryDelay(response, attempt);
           this.logger.warn(
-            `Twenty API (${method} ${url}) responded with ${status}. Retrying in ${delay}ms (attempt ${
-              attempt + 1
-            }/${this.maxAttempts}).`,
+            'Retrying after error response from Twenty API',
+            {
+              ...baseMetadata,
+              event: 'twenty_proxy_retry',
+              delayMs,
+              responseBody: bodyPreview,
+            },
+            this.logContext,
           );
-          await this.sleep(delay);
+          await this.sleep(delayMs);
           continue;
         }
 
         this.logger.error(
-          `Twenty API (${method} ${url}) responded with ${status}: ${rawBody}`,
+          'Twenty API responded with an error status',
+          {
+            ...baseMetadata,
+            event: 'twenty_proxy_http_error',
+            responseBody: bodyPreview,
+          },
+          this.logContext,
         );
         throw new HttpException(
           rawBody || 'Twenty API request failed',
-          status,
+          response.status,
         );
       }
 
       if (!rawBody) {
+        if (attempt > 1) {
+          this.logger.info(
+            'Twenty API request succeeded after retries',
+            {
+              ...baseMetadata,
+              event: 'twenty_proxy_success',
+            },
+            this.logContext,
+          );
+        }
         return null;
       }
 
       try {
-        return JSON.parse(rawBody);
+        const parsed = JSON.parse(rawBody);
+
+        if (attempt > 1) {
+          this.logger.info(
+            'Twenty API request succeeded after retries',
+            {
+              ...baseMetadata,
+              event: 'twenty_proxy_success',
+            },
+            this.logContext,
+          );
+        }
+
+        return parsed;
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
         this.logger.error(
-          `Failed to parse Twenty API response (${method} ${url}): ${message}`,
+          'Failed to parse Twenty API response body',
+          {
+            ...baseMetadata,
+            event: 'twenty_proxy_parse_error',
+            responseBody: this.formatBodyForLogs(rawBody),
+          },
+          this.logContext,
+          error instanceof Error ? error : undefined,
         );
         throw new HttpException('Failed to parse Twenty API response', 502);
       }
     }
 
+    this.logger.error(
+      'Exhausted retries contacting Twenty API',
+      {
+        method,
+        path,
+        url,
+        event: 'twenty_proxy_exhausted_retries',
+        maxAttempts: this.maxAttempts,
+      },
+      this.logContext,
+    );
     throw new HttpException('Failed to reach Twenty API', 502);
   }
 
@@ -224,5 +318,14 @@ export class GiftService {
     }
 
     await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private formatBodyForLogs(body: string): string {
+    const maxLength = 2000;
+    if (body.length <= maxLength) {
+      return body;
+    }
+
+    return `${body.slice(0, maxLength)}... (truncated)`;
   }
 }
