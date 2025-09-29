@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   HttpException,
   Injectable,
   ServiceUnavailableException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { URLSearchParams } from 'url';
@@ -25,6 +27,8 @@ export class GiftService {
   private readonly retryStatusCodes = new Set([429, 500, 502, 503, 504]);
   private readonly retryDelaysMs = [250, 500];
 
+  private readonly loggerInstance = new Logger(GiftService.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly logger: StructuredLoggerService,
@@ -41,7 +45,8 @@ export class GiftService {
   async createGift(payload: unknown): Promise<unknown> {
     this.ensureConfigured();
     const sanitizedPayload = validateCreateGiftPayload(payload);
-    const response = await this.callTwenty('POST', '/gifts', sanitizedPayload);
+    const preparedPayload = await this.prepareGiftPayload(sanitizedPayload);
+    const response = await this.callTwenty('POST', '/gifts', preparedPayload);
     ensureCreateGiftResponse(response);
     return response;
   }
@@ -84,6 +89,93 @@ export class GiftService {
     if (!this.twentyApiKey) {
       throw new ServiceUnavailableException('TWENTY_API_KEY not configured');
     }
+  }
+
+  private async prepareGiftPayload(
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const prepared: Record<string, unknown> = { ...payload };
+
+    if (prepared.contact && typeof prepared.contact === 'object') {
+      const contactInput = prepared.contact as Record<string, unknown>;
+      delete prepared.contact;
+
+      const personId = await this.createPerson(contactInput);
+      prepared.donorId = personId;
+    }
+
+    return prepared;
+  }
+
+  private async createPerson(contact: Record<string, unknown>): Promise<string> {
+    const firstName =
+      typeof contact.firstName === 'string' ? contact.firstName.trim() : undefined;
+    const lastName =
+      typeof contact.lastName === 'string' ? contact.lastName.trim() : undefined;
+    const email =
+      typeof contact.email === 'string' && contact.email.trim().length > 0
+        ? contact.email.trim()
+        : undefined;
+
+    if (!firstName || !lastName) {
+      throw new BadRequestException('contact.firstName and contact.lastName must be provided');
+    }
+
+    const personPayload: Record<string, unknown> = {
+      name: {
+        firstName,
+        lastName,
+      },
+    };
+
+    if (email) {
+      personPayload.emails = {
+        primaryEmail: email,
+      };
+    }
+
+    const response = await this.callTwenty('POST', '/people', personPayload);
+    const personId = this.extractPersonId(response);
+    if (typeof personId !== 'string' || personId.length === 0) {
+      this.loggerInstance.error('Failed to create contact in Twenty', {
+        event: 'twenty_create_person_missing_id',
+        response,
+      });
+      throw new HttpException('Failed to create contact in Twenty', 502);
+    }
+
+    return personId;
+  }
+
+  private extractPersonId(response: unknown): string | undefined {
+    if (!response || typeof response !== 'object') {
+      return undefined;
+    }
+
+    const data = (response as Record<string, unknown>).data;
+    if (!data || typeof data !== 'object') {
+      return undefined;
+    }
+
+    const createPerson = (data as Record<string, unknown>).createPerson;
+    if (!createPerson || typeof createPerson !== 'object') {
+      return undefined;
+    }
+
+    const directId = (createPerson as Record<string, unknown>).id;
+    if (typeof directId === 'string' && directId.length > 0) {
+      return directId;
+    }
+
+    const nestedPerson = (createPerson as Record<string, unknown>).person;
+    if (nestedPerson && typeof nestedPerson === 'object') {
+      const nestedId = (nestedPerson as Record<string, unknown>).id;
+      if (typeof nestedId === 'string' && nestedId.length > 0) {
+        return nestedId;
+      }
+    }
+
+    return undefined;
   }
 
   private buildPath(
