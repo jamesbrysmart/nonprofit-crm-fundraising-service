@@ -1,11 +1,11 @@
 import {
+  BadRequestException,
   HttpException,
   Injectable,
   Logger,
-  ServiceUnavailableException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { URLSearchParams } from 'url';
+import { TwentyApiService } from '../twenty/twenty-api.service';
 import {
   ensureCreateGiftResponse,
   ensureDeleteGiftResponse,
@@ -18,69 +18,164 @@ import {
 
 @Injectable()
 export class GiftService {
-  private readonly logger = new Logger(GiftService.name);
-  private readonly twentyApiBaseUrl: string;
-  private readonly twentyApiKey: string;
-  private readonly maxAttempts = 3;
-  private readonly retryStatusCodes = new Set([429, 500, 502, 503, 504]);
-  private readonly retryDelaysMs = [250, 500];
+  private readonly logContext = GiftService.name;
 
-  constructor(private readonly configService: ConfigService) {
-    const configuredBaseUrl =
-      this.configService.get<string>('TWENTY_API_BASE_URL') ??
-      this.configService.get<string>('TWENTY_REST_BASE_URL') ??
-      'http://server:3000/rest';
+  private readonly loggerInstance = new Logger(GiftService.name);
 
-    this.twentyApiBaseUrl = configuredBaseUrl.replace(/\/$/, '');
-    this.twentyApiKey = this.configService.get<string>('TWENTY_API_KEY') ?? '';
-  }
+  constructor(private readonly twentyApiService: TwentyApiService) {}
 
   async createGift(payload: unknown): Promise<unknown> {
-    this.ensureConfigured();
     const sanitizedPayload = validateCreateGiftPayload(payload);
-    const response = await this.callTwenty('POST', '/gifts', sanitizedPayload);
+    const preparedPayload = await this.prepareGiftPayload(sanitizedPayload);
+    const response = await this.twentyApiService.request(
+      'POST',
+      '/gifts',
+      preparedPayload,
+      this.logContext,
+    );
     ensureCreateGiftResponse(response);
     return response;
   }
 
   async listGifts(query: Record<string, unknown>): Promise<unknown> {
-    this.ensureConfigured();
     const path = this.buildPath('/gifts', query);
-    const response = await this.callTwenty('GET', path);
+    const response = await this.twentyApiService.request('GET', path, undefined, this.logContext);
     ensureGiftListResponse(response);
     return response;
   }
 
   async getGift(id: string, query: Record<string, unknown>): Promise<unknown> {
-    this.ensureConfigured();
     const basePath = `/gifts/${encodeURIComponent(id)}`;
     const path = this.buildPath(basePath, query);
-    const response = await this.callTwenty('GET', path);
+    const response = await this.twentyApiService.request('GET', path, undefined, this.logContext);
     ensureGiftGetResponse(response);
     return response;
   }
 
   async updateGift(id: string, payload: unknown): Promise<unknown> {
-    this.ensureConfigured();
     const path = `/gifts/${encodeURIComponent(id)}`;
     const sanitizedPayload = validateUpdateGiftPayload(payload);
-    const response = await this.callTwenty('PATCH', path, sanitizedPayload);
+    const response = await this.twentyApiService.request(
+      'PATCH',
+      path,
+      sanitizedPayload,
+      this.logContext,
+    );
     ensureUpdateGiftResponse(response);
     return response;
   }
 
   async deleteGift(id: string): Promise<unknown> {
-    this.ensureConfigured();
     const path = `/gifts/${encodeURIComponent(id)}`;
-    const response = await this.callTwenty('DELETE', path);
+    const response = await this.twentyApiService.request(
+      'DELETE',
+      path,
+      undefined,
+      this.logContext,
+    );
     ensureDeleteGiftResponse(response);
     return response;
   }
 
-  private ensureConfigured(): void {
-    if (!this.twentyApiKey) {
-      throw new ServiceUnavailableException('TWENTY_API_KEY not configured');
+  private async prepareGiftPayload(
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const prepared: Record<string, unknown> = { ...payload };
+
+    if (prepared.contact && typeof prepared.contact === 'object') {
+      const contactInput = prepared.contact as Record<string, unknown>;
+      delete prepared.contact;
+
+      const personId = await this.createPerson(contactInput);
+      prepared.donorId = personId;
     }
+
+    if (
+      typeof prepared.contactId === 'string' &&
+      prepared.contactId.trim().length > 0 &&
+      typeof prepared.donorId !== 'string'
+    ) {
+      prepared.donorId = prepared.contactId.trim();
+      delete prepared.contactId;
+    }
+
+    return prepared;
+  }
+
+  private async createPerson(contact: Record<string, unknown>): Promise<string> {
+    const firstName =
+      typeof contact.firstName === 'string' ? contact.firstName.trim() : undefined;
+    const lastName =
+      typeof contact.lastName === 'string' ? contact.lastName.trim() : undefined;
+    const email =
+      typeof contact.email === 'string' && contact.email.trim().length > 0
+        ? contact.email.trim()
+        : undefined;
+
+    if (!firstName || !lastName) {
+      throw new BadRequestException('contact.firstName and contact.lastName must be provided');
+    }
+
+    const personPayload: Record<string, unknown> = {
+      name: {
+        firstName,
+        lastName,
+      },
+    };
+
+    if (email) {
+      personPayload.emails = {
+        primaryEmail: email,
+      };
+    }
+
+    const response = await this.twentyApiService.request(
+      'POST',
+      '/people',
+      personPayload,
+      this.logContext,
+    );
+    const personId = this.extractPersonId(response);
+    if (typeof personId !== 'string' || personId.length === 0) {
+      this.loggerInstance.error('Failed to create contact in Twenty', {
+        event: 'twenty_create_person_missing_id',
+        response,
+      });
+      throw new HttpException('Failed to create contact in Twenty', 502);
+    }
+
+    return personId;
+  }
+
+  private extractPersonId(response: unknown): string | undefined {
+    if (!response || typeof response !== 'object') {
+      return undefined;
+    }
+
+    const data = (response as Record<string, unknown>).data;
+    if (!data || typeof data !== 'object') {
+      return undefined;
+    }
+
+    const createPerson = (data as Record<string, unknown>).createPerson;
+    if (!createPerson || typeof createPerson !== 'object') {
+      return undefined;
+    }
+
+    const directId = (createPerson as Record<string, unknown>).id;
+    if (typeof directId === 'string' && directId.length > 0) {
+      return directId;
+    }
+
+    const nestedPerson = (createPerson as Record<string, unknown>).person;
+    if (nestedPerson && typeof nestedPerson === 'object') {
+      const nestedId = (nestedPerson as Record<string, unknown>).id;
+      if (typeof nestedId === 'string' && nestedId.length > 0) {
+        return nestedId;
+      }
+    }
+
+    return undefined;
   }
 
   private buildPath(
@@ -110,119 +205,4 @@ export class GiftService {
     return queryString ? `${basePath}?${queryString}` : basePath;
   }
 
-  private async callTwenty(
-    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
-    path: string,
-    body?: unknown,
-  ): Promise<unknown> {
-    const url = `${this.twentyApiBaseUrl}${path.startsWith('/') ? path : `/${path}`}`;
-    const headers: Record<string, string> = {
-      Accept: 'application/json',
-      Authorization: `Bearer ${this.twentyApiKey}`,
-    };
-
-    const init: RequestInit = {
-      method,
-      headers,
-    };
-
-    if (body !== undefined) {
-      headers['Content-Type'] = 'application/json';
-      init.body = JSON.stringify(body);
-    }
-
-    this.logger.log(`Forwarding ${method} ${path} to Twenty`);
-
-    for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
-      let response: Response;
-
-      try {
-        response = await fetch(url, init);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
-        this.logger.error(
-          `Attempt ${attempt}/${this.maxAttempts} failed to reach Twenty API (${method} ${url}): ${message}`,
-        );
-
-        if (attempt >= this.maxAttempts) {
-          throw new HttpException('Failed to reach Twenty API', 502);
-        }
-
-        await this.sleep(this.nextDelay(attempt));
-        continue;
-      }
-
-      const rawBody = await response.text();
-
-      if (!response.ok) {
-        const status = response.status;
-
-        if (this.shouldRetry(status) && attempt < this.maxAttempts) {
-          const delay = this.computeRetryDelay(response, attempt);
-          this.logger.warn(
-            `Twenty API (${method} ${url}) responded with ${status}. Retrying in ${delay}ms (attempt ${
-              attempt + 1
-            }/${this.maxAttempts}).`,
-          );
-          await this.sleep(delay);
-          continue;
-        }
-
-        this.logger.error(
-          `Twenty API (${method} ${url}) responded with ${status}: ${rawBody}`,
-        );
-        throw new HttpException(
-          rawBody || 'Twenty API request failed',
-          status,
-        );
-      }
-
-      if (!rawBody) {
-        return null;
-      }
-
-      try {
-        return JSON.parse(rawBody);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
-        this.logger.error(
-          `Failed to parse Twenty API response (${method} ${url}): ${message}`,
-        );
-        throw new HttpException('Failed to parse Twenty API response', 502);
-      }
-    }
-
-    throw new HttpException('Failed to reach Twenty API', 502);
-  }
-
-  private shouldRetry(status: number): boolean {
-    return this.retryStatusCodes.has(status);
-  }
-
-  private computeRetryDelay(response: Response, attempt: number): number {
-    const retryAfter = response.headers.get('retry-after');
-    if (retryAfter) {
-      const parsed = Number.parseFloat(retryAfter);
-      if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
-        return Math.max(parsed, 0) * 1000;
-      }
-    }
-
-    return this.nextDelay(attempt);
-  }
-
-  private nextDelay(attempt: number): number {
-    const index = attempt - 1;
-    return this.retryDelaysMs[index] ?? this.retryDelaysMs[this.retryDelaysMs.length - 1] ?? 0;
-  }
-
-  private async sleep(ms: number): Promise<void> {
-    if (ms <= 0) {
-      return;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, ms));
-  }
 }

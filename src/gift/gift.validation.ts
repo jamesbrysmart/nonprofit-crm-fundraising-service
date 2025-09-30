@@ -4,6 +4,7 @@ const ALLOWED_STRING_FIELDS = new Set([
   'contactId',
   'campaignId',
   'date',
+  'giftDate',
   'name',
   'description',
   'notes',
@@ -98,7 +99,14 @@ const collectAllowedFields = (
 
   for (const [key, value] of Object.entries(source)) {
     if (key === 'amount') {
-      // handled separately
+      continue;
+    }
+
+    if (key === 'contact' && isPlainObject(value)) {
+      const contact = normalizeContact(value, context);
+      if (contact) {
+        result.contact = contact;
+      }
       continue;
     }
 
@@ -112,14 +120,44 @@ const collectAllowedFields = (
       continue;
     }
 
-    // Allow other keys through as-is for forward compatibility, but only in update payloads
     if (context === 'update') {
       result[key] = value;
-      continue;
     }
   }
 
   return result;
+};
+
+const normalizeContact = (
+  payload: Record<string, unknown>,
+  context: 'create' | 'update',
+): Record<string, string> | undefined => {
+  const { firstName, lastName } = payload;
+  const normalized: Record<string, string> = {};
+
+  const normalizedFirstName =
+    typeof firstName === 'string' && firstName.trim().length > 0
+      ? firstName.trim()
+      : undefined;
+  const normalizedLastName =
+    typeof lastName === 'string' && lastName.trim().length > 0
+      ? lastName.trim()
+      : undefined;
+
+  if (normalizedFirstName) {
+    normalized.firstName = normalizedFirstName;
+  }
+  if (normalizedLastName) {
+    normalized.lastName = normalizedLastName;
+  }
+
+  if (context === 'create' && (!normalizedFirstName || !normalizedLastName)) {
+    throw new BadRequestException(
+      'contact.firstName and contact.lastName are required when creating a gift contact',
+    );
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
 };
 
 export const validateCreateGiftPayload = (
