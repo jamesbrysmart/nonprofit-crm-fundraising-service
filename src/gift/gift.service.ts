@@ -90,6 +90,15 @@ export class GiftService {
       prepared.donorId = personId;
     }
 
+    if (
+      typeof prepared.contactId === 'string' &&
+      prepared.contactId.trim().length > 0 &&
+      typeof prepared.donorId !== 'string'
+    ) {
+      prepared.donorId = prepared.contactId.trim();
+      delete prepared.contactId;
+    }
+
     return prepared;
   }
 
