@@ -145,6 +145,82 @@ form {
   text-decoration: underline;
 }
 
+.duplicate-panel {
+  margin-top: 2rem;
+  border: 1px solid #cbd5f5;
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  background-color: #f8fafc;
+  box-shadow: inset 0 1px 0 rgba(15, 23, 42, 0.08);
+}
+
+.duplicate-panel h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.duplicate-list {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.duplicate-item label {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  font-size: 0.95rem;
+  color: #1e293b;
+}
+
+.duplicate-item span {
+  line-height: 1.4;
+}
+
+.duplicate-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.duplicate-actions button {
+  padding: 0.6rem 1.2rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.15s ease;
+}
+
+.duplicate-actions button:not(:disabled) {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+.duplicate-actions button:disabled {
+  background-color: #cbd5f5;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.duplicate-actions .secondary-button {
+  background-color: #e2e8f0;
+  color: #1e293b;
+}
+
+.duplicate-actions .secondary-button:not(:disabled):hover {
+  background-color: #cbd5f5;
+}
+
+.duplicate-actions button:not(:disabled):hover {
+  background-color: #1d4ed8;
+}
+
 @media (max-width: 640px) {
   main {
     padding: 2.5rem 1rem 4rem;
@@ -165,5 +241,9 @@ form {
 
   .form-actions button {
     width: 100%;
+  }
+
+  .duplicate-actions {
+    flex-direction: column;
   }
 }
