@@ -132,7 +132,7 @@ const normalizeContact = (
   payload: Record<string, unknown>,
   context: 'create' | 'update',
 ): Record<string, string> | undefined => {
-  const { firstName, lastName } = payload;
+  const { firstName, lastName, email } = payload;
   const normalized: Record<string, string> = {};
 
   const normalizedFirstName =
@@ -143,12 +143,22 @@ const normalizeContact = (
     typeof lastName === 'string' && lastName.trim().length > 0
       ? lastName.trim()
       : undefined;
+  const normalizedEmail =
+    typeof email === 'string' && email.trim().length > 0
+      ? email.trim()
+      : undefined;
 
   if (normalizedFirstName) {
     normalized.firstName = normalizedFirstName;
   }
   if (normalizedLastName) {
     normalized.lastName = normalizedLastName;
+  }
+  if (email !== undefined && normalizedEmail === undefined) {
+    throw new BadRequestException('contact.email, if provided, must be a non-empty string');
+  }
+  if (normalizedEmail) {
+    normalized.email = normalizedEmail;
   }
 
   if (context === 'create' && (!normalizedFirstName || !normalizedLastName)) {

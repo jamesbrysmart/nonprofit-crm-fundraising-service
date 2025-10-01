@@ -1,13 +1,16 @@
 import dotenv from 'dotenv';
 import fetch from 'node-fetch';
-import path from 'path'; // Need path for resolve
-import { fileURLToPath } from 'url'; // Need for __filename, __dirname
-import { dirname } from 'path'; // Need for dirname
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 // --- Start Diagnostics ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const envFilePath = path.join(__dirname, '..', '..', '..', '..', '.env'); // Corrected path from script to dev-stack root
+const defaultEnvPath = path.resolve(__dirname, '..', '..', '..', '.env');
+const envFilePath = process.env.TWENTY_ENV_PATH
+  ? path.resolve(process.env.TWENTY_ENV_PATH)
+  : defaultEnvPath;
 console.log(`Script execution started.`);
 console.log(`Script's absolute path: ${__filename}`);
 console.log(`Script's dirname: ${__dirname}`);
@@ -22,7 +25,9 @@ console.log('Dotenv parsed object:', result.parsed);
 console.log(`TWENTY_API_KEY from process.env (after dotenv): ${process.env.TWENTY_API_KEY}`);
 // --- End Diagnostics ---
 
-const TWENTY_REST_METADATA_URL = 'http://localhost:3000/rest/metadata'; // Changed to REST Metadata API
+const TWENTY_REST_METADATA_URL = process.env.TWENTY_METADATA_BASE_URL
+  ? process.env.TWENTY_METADATA_BASE_URL.replace(/\/$/, '')
+  : 'http://localhost:3000/rest/metadata';
 const API_KEY = process.env.TWENTY_API_KEY;
 
 async function restCall(method, endpoint, payload) {
@@ -33,28 +38,41 @@ async function restCall(method, endpoint, payload) {
   };
 
   const init = {
-    method: method,
-    headers: headers,
-    body: JSON.stringify(payload),
+    method,
+    headers,
   };
+
+  if (payload !== undefined) {
+    init.body = JSON.stringify(payload);
+  }
 
   console.log(`Calling REST API: ${method} ${url} with payload:`, payload);
 
   const response = await fetch(url, init);
-  const result = await response.json();
+  const resultText = await response.text();
+  let parsed;
+
+  try {
+    parsed = resultText ? JSON.parse(resultText) : {};
+  } catch (parseError) {
+    console.error('Failed to parse response body:', resultText);
+    throw parseError;
+  }
 
   if (!response.ok) {
-    const customError = new Error(`REST API Error: ${result.message || response.statusText}`);
-    customError.response = result; // Attach the full result for inspection
+    const messages = parsed?.messages || parsed?.message;
+    const errorDetails = Array.isArray(messages) ? messages.join(', ') : messages;
+    const customError = new Error(`REST API Error: ${errorDetails || response.statusText}`);
+    customError.response = parsed;
     throw customError;
   }
 
-  console.log('Success:', JSON.stringify(result, null, 2), '\n');
-  return result;
+  console.log('Success:', JSON.stringify(parsed, null, 2), '\n');
+  return parsed;
 }
 
 async function findObjectByNameSingular(nameSingular) {
-  const url = `${TWENTY_REST_METADATA_URL}/objects?filter[nameSingular]=${nameSingular}`;
+  const url = `${TWENTY_REST_METADATA_URL}/objects?filter[nameSingular]=${encodeURIComponent(nameSingular)}`;
   const headers = {
     'Authorization': `Bearer ${API_KEY}`,
   };
@@ -67,7 +85,8 @@ async function findObjectByNameSingular(nameSingular) {
   if (!response.ok) {
     console.error(`Failed to find object ${nameSingular}:`);
     console.error(JSON.stringify(result, null, 2));
-    throw new Error(`REST API Error: ${result.message || response.statusText}`);
+    const messages = result?.messages || result?.message;
+    throw new Error(`REST API Error: ${messages || response.statusText}`);
   }
 
   if (result.data && result.data.objects && result.data.objects.length > 0) {
@@ -77,23 +96,39 @@ async function findObjectByNameSingular(nameSingular) {
   return null;
 }
 
-async function createObject(objectData) {
-  console.log(`Creating object: ${objectData.nameSingular}`);
-  try {
-    const response = await restCall('POST', '/objects', objectData);
-    return response; // This will have the id if created
-  } catch (error) {
-    if (error.response && error.response.messages && error.response.messages.includes('Object already exists')) {
-      console.log(`Object ${objectData.nameSingular} already exists. Skipping field creation for this object.`);
-      return null; // Return null if object already exists
-    }
-    throw error;
+async function ensureObject(objectData) {
+  const existingId = await findObjectByNameSingular(objectData.nameSingular);
+  if (existingId) {
+    console.log(`Object ${objectData.nameSingular} already exists. Using ID ${existingId}.`);
+    return existingId;
   }
+
+  console.log(`Creating object: ${objectData.nameSingular}`);
+  const response = await restCall('POST', '/objects', objectData);
+  const createdId = response?.data?.createOneObject?.id;
+  if (!createdId) {
+    throw new Error(`Failed to create object ${objectData.nameSingular}; missing id in response`);
+  }
+  return createdId;
 }
 
 async function createField(fieldData) {
   console.log(`Creating field: ${fieldData.name} for object ID: ${fieldData.objectMetadataId}`);
-  return restCall('POST', '/fields', fieldData);
+  try {
+    return await restCall('POST', '/fields', fieldData);
+  } catch (error) {
+    const messages = error.response?.messages;
+    const messageList = Array.isArray(messages)
+      ? messages
+      : typeof messages === 'string'
+        ? [messages]
+        : [];
+    if (messageList.includes('Field already exists')) {
+      console.log(`Field ${fieldData.name} already exists. Skipping.`);
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function main() {
@@ -103,7 +138,7 @@ async function main() {
   }
 
   console.log('--- Setting up Campaign Object ---');
-  const campaignObject = await createObject({
+  const campaignObjectId = await ensureObject({
     nameSingular: "campaign",
     namePlural: "campaigns",
     labelSingular: "Campaign",
@@ -112,28 +147,22 @@ async function main() {
     description: "A fundraising campaign to raise money for a specific purpose."
   });
 
-  if (campaignObject) { // Only create fields if object was created or found
-    const campaignObjectId = campaignObject.data.createOneObject.id;
+  await createField({
+    objectMetadataId: campaignObjectId,
+    name: "StartDate",
+    label: "Start Date",
+    type: "DATE"
+  });
 
-    await createField({
-      objectMetadataId: campaignObjectId,
-      name: "StartDate",
-      label: "Start Date",
-      type: "DATE"
-    });
-
-    await createField({
-      objectMetadataId: campaignObjectId,
-      name: "EndDate",
-      label: "End Date",
-      type: "DATE"
-    });
-  } else {
-    console.log('Skipping field creation for Campaign as object already existed.');
-  }
+  await createField({
+    objectMetadataId: campaignObjectId,
+    name: "EndDate",
+    label: "End Date",
+    type: "DATE"
+  });
 
   console.log('--- Setting up Gift Object ---');
-  const giftObject = await createObject({
+  const giftObjectId = await ensureObject({
     nameSingular: "gift",
     namePlural: "gifts",
     labelSingular: "Gift",
@@ -142,25 +171,19 @@ async function main() {
     description: "A single donation made by a contact to a campaign."
   });
 
-  if (giftObject) { // Only create fields if object was created or found
-    const giftObjectId = giftObject.data.createOneObject.id;
+  await createField({
+    objectMetadataId: giftObjectId,
+    name: "Amount",
+    label: "Amount",
+    type: "CURRENCY"
+  });
 
-    await createField({
-      objectMetadataId: giftObjectId,
-      name: "Amount",
-      label: "Amount",
-      type: "CURRENCY"
-    });
-
-    await createField({
-      objectMetadataId: giftObjectId,
-      name: "Date",
-      label: "Gift Date",
-      type: "DATE"
-    });
-  } else {
-    console.log('Skipping field creation for Gift as object already existed.');
-  }
+  await createField({
+    objectMetadataId: giftObjectId,
+    name: "Date",
+    label: "Gift Date",
+    type: "DATE"
+  });
 
   console.log('--- Linking Objects (Manual Step Required) ---');
   console.log('NOTE: RELATION/LOOKUP fields cannot be created via API at this time.');
