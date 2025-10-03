@@ -111,7 +111,9 @@ const collectAllowedFields = (
     }
 
     if (ALLOWED_STRING_FIELDS.has(key)) {
-      normalizeStringField(result, key, value);
+      if (value !== undefined) {
+        normalizeStringField(result, key, value);
+      }
       continue;
     }
 

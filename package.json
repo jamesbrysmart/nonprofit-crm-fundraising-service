@@ -30,8 +30,6 @@
     "migration:revert": "npm run typeorm migration:revert"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
@@ -40,8 +38,11 @@
     "dotenv": "^16.5.0",
     "node-fetch": "^3.3.2",
     "pg": "^8.16.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "stripe": "^19.0.0",
     "typeorm": "^0.3.25"
   },
   "devDependencies": {
@@ -58,6 +59,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/supertest": "^6.0.2",
+    "@vitejs/plugin-react": "^5.0.4",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
@@ -72,7 +74,6 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0",
-    "@vitejs/plugin-react": "^5.0.4",
     "vite": "^5.4.10"
   },
   "jest": {

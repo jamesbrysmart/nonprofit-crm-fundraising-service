@@ -5,6 +5,7 @@ import { HealthController } from './health/health.controller';
 import { LoggingModule } from './logging/logging.module';
 import { PeopleModule } from './people/people.module';
 import { TwentyModule } from './twenty/twenty.module';
+import { StripeModule } from './stripe/stripe.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { TwentyModule } from './twenty/twenty.module';
     TwentyModule,
     GiftModule,
     PeopleModule,
+    StripeModule,
   ],
   controllers: [HealthController],
   providers: [],
