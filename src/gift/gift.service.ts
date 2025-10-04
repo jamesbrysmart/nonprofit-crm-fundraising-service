@@ -187,11 +187,21 @@ export class GiftService {
       ],
     };
 
+    this.loggerInstance.log(
+      `Checking for existing person via /people/duplicates (email=${email})`,
+      this.logContext,
+    );
+
     try {
       const response = await this.twentyApiService.request(
         'POST',
         '/people/duplicates?depth=0',
         requestBody,
+        this.logContext,
+      );
+
+      this.loggerInstance.log(
+        `Duplicate lookup response: ${this.previewResponse(response)}`,
         this.logContext,
       );
 
@@ -272,6 +282,18 @@ export class GiftService {
     }
 
     return undefined;
+  }
+
+  private previewResponse(response: unknown): string {
+    try {
+      const serialized = JSON.stringify(response);
+      if (!serialized) {
+        return '[empty response]';
+      }
+      return serialized.length > 500 ? `${serialized.slice(0, 500)}…` : serialized;
+    } catch (error) {
+      return `[unserializable response: ${error instanceof Error ? error.message : error}]`;
+    }
   }
 
   private extractPersonId(response: unknown): string | undefined {
