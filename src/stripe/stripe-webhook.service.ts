@@ -90,7 +90,6 @@ export class StripeWebhookService {
 
     const amountTotal = session.amount_total ?? 0;
     const currency = session.currency ?? 'usd';
-    const customerDetails = session.customer_details;
     const metadata = session.metadata ?? {};
 
     const giftPayload: Record<string, unknown> = {
@@ -99,10 +98,6 @@ export class StripeWebhookService {
         value: this.convertAmountToMajorUnits(amountTotal),
       },
       giftDate: this.formatEventDate(event.created),
-      name: metadata.giftName ?? 'Stripe Checkout Donation',
-      description: metadata.description ?? session.client_reference_id ?? undefined,
-      externalId: session.id,
-      notes: metadata.notes,
     };
 
     const contact = this.buildContact(session, metadata);
@@ -147,6 +142,10 @@ export class StripeWebhookService {
 
   private convertAmountToMajorUnits(amountMinor: number): number {
     return amountMinor / 100;
+  }
+
+  private buildSessionNote(): undefined {
+    return undefined;
   }
 
   private extractPaymentIntentId(session: Stripe.Checkout.Session): string | undefined {

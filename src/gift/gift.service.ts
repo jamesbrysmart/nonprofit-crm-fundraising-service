@@ -86,8 +86,18 @@ export class GiftService {
       const contactInput = prepared.contact as Record<string, unknown>;
       delete prepared.contact;
 
-      const personId = await this.createPerson(contactInput);
-      prepared.donorId = personId;
+      const existingPersonId = await this.findExistingPersonId(contactInput);
+
+      if (existingPersonId) {
+        this.loggerInstance.log(
+          `Reusing existing person ${existingPersonId} for gift contact`,
+          this.logContext,
+        );
+        prepared.donorId = existingPersonId;
+      } else {
+        const personId = await this.createPerson(contactInput);
+        prepared.donorId = personId;
+      }
     }
 
     if (
@@ -145,6 +155,123 @@ export class GiftService {
     }
 
     return personId;
+  }
+
+  private async findExistingPersonId(
+    contact: Record<string, unknown>,
+  ): Promise<string | undefined> {
+    const firstName =
+      typeof contact.firstName === 'string' ? contact.firstName.trim() : undefined;
+    const lastName =
+      typeof contact.lastName === 'string' ? contact.lastName.trim() : undefined;
+    const email =
+      typeof contact.email === 'string' && contact.email.trim().length > 0
+        ? contact.email.trim()
+        : undefined;
+
+    if (!firstName || !lastName || !email) {
+      return undefined;
+    }
+
+    const requestBody: Record<string, unknown> = {
+      data: [
+        {
+          name: {
+            firstName,
+            lastName,
+          },
+          emails: {
+            primaryEmail: email,
+          },
+        },
+      ],
+    };
+
+    try {
+      const response = await this.twentyApiService.request(
+        'POST',
+        '/people/duplicates?depth=0',
+        requestBody,
+        this.logContext,
+      );
+
+      const duplicateId = this.extractDuplicatePersonId(response, email);
+      if (duplicateId) {
+        return duplicateId;
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'unknown error resolving existing person';
+      this.loggerInstance.warn(
+        `Failed to query duplicates for contact email=${email}: ${message}`,
+        this.logContext,
+      );
+    }
+
+    return undefined;
+  }
+
+  private extractDuplicatePersonId(
+    response: unknown,
+    email?: string,
+  ): string | undefined {
+    if (!response || typeof response !== 'object') {
+      return undefined;
+    }
+
+    const data = (response as Record<string, unknown>).data;
+    if (!Array.isArray(data) || data.length === 0) {
+      return undefined;
+    }
+
+    const normalizedEmail = email?.trim().toLowerCase();
+
+    for (const entry of data) {
+      if (!entry || typeof entry !== 'object') {
+        continue;
+      }
+
+      const duplicates = (entry as Record<string, unknown>).personDuplicates;
+      if (!Array.isArray(duplicates) || duplicates.length === 0) {
+        continue;
+      }
+
+      let fallbackId: string | undefined;
+
+      for (const duplicate of duplicates) {
+        if (!duplicate || typeof duplicate !== 'object') {
+          continue;
+        }
+
+        const duplicateId = (duplicate as Record<string, unknown>).id;
+        if (typeof duplicateId !== 'string' || duplicateId.length === 0) {
+          continue;
+        }
+
+        if (normalizedEmail) {
+          const emails = (duplicate as Record<string, unknown>).emails;
+          if (emails && typeof emails === 'object') {
+            const primaryEmail = (emails as Record<string, unknown>).primaryEmail;
+            if (
+              typeof primaryEmail === 'string' &&
+              primaryEmail.trim().toLowerCase() === normalizedEmail
+            ) {
+              return duplicateId;
+            }
+          }
+        }
+
+        if (!fallbackId) {
+          fallbackId = duplicateId;
+        }
+      }
+
+      if (fallbackId) {
+        return fallbackId;
+      }
+    }
+
+    return undefined;
   }
 
   private extractPersonId(response: unknown): string | undefined {
