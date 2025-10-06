@@ -3,15 +3,23 @@ import { BadRequestException } from '@nestjs/common';
 const ALLOWED_STRING_FIELDS = new Set([
   'contactId',
   'campaignId',
+  'appealId',
+  'appealSegmentId',
+  'trackingCodeId',
+  'fundId',
   'date',
   'giftDate',
   'name',
   'description',
   'notes',
   'externalId',
+  'paymentMethod',
+  'giftBatchId',
 ]);
 
-const ALLOWED_NUMBER_FIELDS = new Set(['amountMicros']);
+const ALLOWED_NUMBER_FIELDS = new Set(['amountMicros', 'amountMinor']);
+
+const ALLOWED_BOOLEAN_FIELDS = new Set(['giftAidEligible']);
 
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
 
@@ -24,7 +32,10 @@ export type GiftCreatePayload = Writable<
   {
     amount: GiftAmount;
   } & Record<string, unknown>
->;
+> & {
+  amountMinor?: number;
+  currency?: string;
+};
 
 export type GiftUpdatePayload = Partial<GiftCreatePayload>;
 
@@ -91,6 +102,18 @@ const normalizeNumberField = (
   payload[key] = value;
 };
 
+const normalizeBooleanField = (
+  payload: Record<string, unknown>,
+  key: string,
+  value: unknown,
+) => {
+  if (typeof value !== 'boolean') {
+    throw new BadRequestException(`${key} must be a boolean`);
+  }
+
+  payload[key] = value;
+};
+
 const collectAllowedFields = (
   source: Record<string, unknown>,
   context: 'create' | 'update',
@@ -110,6 +133,11 @@ const collectAllowedFields = (
       continue;
     }
 
+    if (key === 'campaignId' && typeof value === 'string') {
+      normalizeStringField(result, 'appealId', value);
+      continue;
+    }
+
     if (ALLOWED_STRING_FIELDS.has(key)) {
       if (value !== undefined) {
         normalizeStringField(result, key, value);
@@ -119,6 +147,11 @@ const collectAllowedFields = (
 
     if (ALLOWED_NUMBER_FIELDS.has(key)) {
       normalizeNumberField(result, key, value);
+      continue;
+    }
+
+    if (ALLOWED_BOOLEAN_FIELDS.has(key)) {
+      normalizeBooleanField(result, key, value);
       continue;
     }
 
@@ -188,7 +221,16 @@ export const validateCreateGiftPayload = (
     'create',
   );
 
-  sanitized.amount = parseAmount(body.amount, 'create');
+  const parsedAmount = parseAmount(body.amount, 'create');
+  sanitized.amount = parsedAmount;
+
+  if (typeof sanitized.amountMinor !== 'number') {
+    sanitized.amountMinor = Math.round(parsedAmount.value * 100);
+  }
+
+  if (typeof sanitized.currency !== 'string') {
+    sanitized.currency = parsedAmount.currencyCode;
+  }
 
   return sanitized as GiftCreatePayload;
 };
@@ -210,7 +252,10 @@ export const validateUpdateGiftPayload = (
   );
 
   if (body.amount !== undefined) {
-    sanitized.amount = parseAmount(body.amount, 'update');
+    const parsedAmount = parseAmount(body.amount, 'update');
+    sanitized.amount = parsedAmount;
+    sanitized.amountMinor = Math.round(parsedAmount.value * 100);
+    sanitized.currency = parsedAmount.currencyCode;
   }
 
   if (Object.keys(sanitized).length === 0) {

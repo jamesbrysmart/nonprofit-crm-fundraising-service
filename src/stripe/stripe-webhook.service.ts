@@ -91,13 +91,18 @@ export class StripeWebhookService {
     const amountTotal = session.amount_total ?? 0;
     const currency = session.currency ?? 'usd';
     const metadata = session.metadata ?? {};
+    const paymentIntentId = this.extractPaymentIntentId(session);
 
     const giftPayload: Record<string, unknown> = {
       amount: {
         currencyCode: currency.toUpperCase(),
         value: this.convertAmountToMajorUnits(amountTotal),
       },
+      amountMinor: amountTotal,
+      currency: currency.toUpperCase(),
       giftDate: this.formatEventDate(event.created),
+      paymentMethod: 'card',
+      externalId: paymentIntentId ?? session.id,
     };
 
     const contact = this.buildContact(session, metadata);
@@ -108,7 +113,7 @@ export class StripeWebhookService {
     this.logger.info('Forwarding Stripe checkout session to fundraising proxy', {
       event: 'stripe_checkout_session_forward',
       stripeSessionId: session.id,
-      paymentIntentId: this.extractPaymentIntentId(session),
+      paymentIntentId,
     });
 
     try {

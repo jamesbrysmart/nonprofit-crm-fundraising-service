@@ -15,6 +15,9 @@ import {
   validateCreateGiftPayload,
   validateUpdateGiftPayload,
 } from './gift.validation';
+import type { GiftCreatePayload } from './gift.validation';
+import { GiftStagingService } from '../gift-staging/gift-staging.service';
+import { GiftStagingRecord, NormalizedGiftCreatePayload } from './gift.types';
 
 @Injectable()
 export class GiftService {
@@ -22,18 +25,32 @@ export class GiftService {
 
   private readonly loggerInstance = new Logger(GiftService.name);
 
-  constructor(private readonly twentyApiService: TwentyApiService) {}
+  constructor(
+    private readonly twentyApiService: TwentyApiService,
+    private readonly giftStagingService: GiftStagingService,
+  ) {}
 
   async createGift(payload: unknown): Promise<unknown> {
     const sanitizedPayload = validateCreateGiftPayload(payload);
     const preparedPayload = await this.prepareGiftPayload(sanitizedPayload);
-    const response = await this.twentyApiService.request(
-      'POST',
-      '/gifts',
-      preparedPayload,
-      this.logContext,
-    );
+
+    let stagingRecord: GiftStagingRecord | undefined;
+    try {
+      stagingRecord = await this.giftStagingService.stageGift(preparedPayload);
+    } catch (error) {
+      this.loggerInstance.warn(
+        `Failed to stage gift payload: ${error instanceof Error ? error.message : error}`,
+      );
+    }
+
+    const response = await this.createGiftInTwenty(preparedPayload);
     ensureCreateGiftResponse(response);
+
+    const giftId = this.extractGiftIdFromResponse(response);
+    if (giftId) {
+      await this.giftStagingService.markCommitted(stagingRecord, giftId);
+    }
+
     return response;
   }
 
@@ -78,9 +95,19 @@ export class GiftService {
   }
 
   private async prepareGiftPayload(
-    payload: Record<string, unknown>,
-  ): Promise<Record<string, unknown>> {
-    const prepared: Record<string, unknown> = { ...payload };
+    payload: GiftCreatePayload,
+  ): Promise<NormalizedGiftCreatePayload> {
+    const prepared: NormalizedGiftCreatePayload = {
+      ...payload,
+      currency:
+        typeof payload.currency === 'string'
+          ? payload.currency
+          : payload.amount?.currencyCode ?? 'GBP',
+      amountMinor:
+        typeof payload.amountMinor === 'number'
+          ? payload.amountMinor
+          : Math.round((payload.amount?.value ?? 0) * 100),
+    };
 
     if (prepared.contact && typeof prepared.contact === 'object') {
       const contactInput = prepared.contact as Record<string, unknown>;
@@ -107,6 +134,18 @@ export class GiftService {
     ) {
       prepared.donorId = prepared.contactId.trim();
       delete prepared.contactId;
+    }
+
+    if (typeof prepared.giftDate === 'string' && typeof prepared.dateReceived !== 'string') {
+      prepared.dateReceived = prepared.giftDate;
+    }
+
+    if (typeof prepared.externalId === 'string') {
+      prepared.externalId = prepared.externalId.trim();
+    }
+
+    if (typeof prepared.paymentMethod === 'string') {
+      prepared.paymentMethod = prepared.paymentMethod.trim();
     }
 
     return prepared;
@@ -321,6 +360,58 @@ export class GiftService {
       const nestedId = (nestedPerson as Record<string, unknown>).id;
       if (typeof nestedId === 'string' && nestedId.length > 0) {
         return nestedId;
+      }
+    }
+
+    return undefined;
+  }
+
+  private async createGiftInTwenty(payload: NormalizedGiftCreatePayload): Promise<unknown> {
+    const requestBody = this.buildTwentyGiftPayload(payload);
+    return this.twentyApiService.request('POST', '/gifts', requestBody, this.logContext);
+  }
+
+  private buildTwentyGiftPayload(payload: NormalizedGiftCreatePayload): Record<string, unknown> {
+    const body: Record<string, unknown> = {
+      ...payload,
+    };
+
+    delete body.amountMinor;
+    delete body.currency;
+    delete body.dateReceived;
+    delete body.giftBatchId;
+
+    if (!body.giftDate && typeof payload.dateReceived === 'string') {
+      body.giftDate = payload.dateReceived;
+    }
+
+    if (payload.appealId && !body.campaignId) {
+      body.campaignId = payload.appealId;
+    }
+
+    delete body.appealId;
+    delete body.appealSegmentId;
+    delete body.trackingCodeId;
+    delete body.fundId;
+
+    return body;
+  }
+
+  private extractGiftIdFromResponse(response: unknown): string | undefined {
+    if (!response || typeof response !== 'object') {
+      return undefined;
+    }
+
+    const data = (response as Record<string, unknown>).data;
+    if (!data || typeof data !== 'object') {
+      return undefined;
+    }
+
+    const createGift = (data as Record<string, unknown>).createGift;
+    if (createGift && typeof createGift === 'object') {
+      const id = (createGift as Record<string, unknown>).id;
+      if (typeof id === 'string') {
+        return id;
       }
     }
 
