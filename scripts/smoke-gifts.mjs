@@ -51,7 +51,7 @@ async function httpJson(method, path, body) {
 }
 
 async function main() {
-  console.log('--- Gift staging manual promotion flow ---');
+  console.log('--- Gift staging manual processing flow ---');
   const uniqueSuffix = Date.now();
   const stagedResponse = await httpJson('POST', '/gifts', {
     amount: { currencyCode: 'GBP', value: 15.5 },
@@ -76,7 +76,7 @@ async function main() {
     console.warn('Smoke test: staging response missing raw payload, continuing');
   }
 
-  console.log('Marking staging row ready for manual promotion');
+  console.log('Marking staging row ready for manual processing');
   await httpJson('PATCH', `/gift-staging/${stagedGift.id}/status`, {
     promotionStatus: 'ready_for_commit',
     validationStatus: 'passed',
@@ -84,22 +84,22 @@ async function main() {
     rawPayload: rawPayloadString,
   });
 
-  const promoteResponse = await httpJson('POST', `/gift-staging/${stagedGift.id}/promote`);
-  console.log('Promotion response:', promoteResponse);
-  assert(promoteResponse?.status === 'committed', 'promotion did not commit gift');
-  assert(promoteResponse?.giftId, 'promotion response missing giftId');
+  const processResponse = await httpJson('POST', `/gift-staging/${stagedGift.id}/process`);
+  console.log('Processing response:', processResponse);
+  assert(processResponse?.status === 'committed', 'processing did not commit gift');
+  assert(processResponse?.giftId, 'processing response missing giftId');
 
-  const promotedGiftId = promoteResponse.giftId;
-  console.log(`Promotion committed gift ${promotedGiftId}`);
+  const processedGiftId = processResponse.giftId;
+  console.log(`Processing committed gift ${processedGiftId}`);
 
-  const promotedGiftResponse = await httpJson('GET', `/gifts/${promotedGiftId}`);
-  const promotedGift = promotedGiftResponse?.data?.gift;
-  assert(promotedGift?.id === promotedGiftId, 'promoted gift not retrievable');
+  const processedGiftResponse = await httpJson('GET', `/gifts/${processedGiftId}`);
+  const processedGift = processedGiftResponse?.data?.gift;
+  assert(processedGift?.id === processedGiftId, 'processed gift not retrievable');
 
   console.log('Cleaning up promoted gift');
-  await httpJson('DELETE', `/gifts/${promotedGiftId}`);
+  await httpJson('DELETE', `/gifts/${processedGiftId}`);
 
-  console.log('✅ Staging promotion smoke test succeeded');
+  console.log('✅ Staging processing smoke test succeeded');
 
   console.log('\n--- Gift proxy CRUD flow ---');
   console.log('Creating gift via fundraising-service → Twenty proxy');

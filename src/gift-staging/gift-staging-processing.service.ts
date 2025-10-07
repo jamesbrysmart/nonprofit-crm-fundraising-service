@@ -1,27 +1,31 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { StructuredLoggerService } from '../logging/structured-logger.service';
-import { GiftStagingService, GiftStagingEntity } from './gift-staging.service';
+import {
+  GiftStagingService,
+  GiftStagingEntity,
+  GiftStagingStatusUpdate,
+} from './gift-staging.service';
 import { TwentyApiService } from '../twenty/twenty-api.service';
 import { buildTwentyGiftPayload, extractCreateGiftId } from '../gift/gift-payload.util';
 import { ensureCreateGiftResponse } from '../gift/gift.validation';
 import type { NormalizedGiftCreatePayload } from '../gift/gift.types';
 
-export interface PromoteGiftArgs {
+export interface ProcessGiftArgs {
   stagingId: string;
 }
 
-export type PromoteGiftDeferredReason = 'not_ready' | 'locked' | 'missing_payload';
+export type ProcessGiftDeferredReason = 'not_ready' | 'locked' | 'missing_payload';
 
-export type PromoteGiftErrorReason = 'fetch_failed' | 'payload_invalid' | 'gift_api_failed';
+export type ProcessGiftErrorReason = 'fetch_failed' | 'payload_invalid' | 'gift_api_failed';
 
-export type PromoteGiftResult =
+export type ProcessGiftResult =
   | { status: 'committed'; giftId: string; stagingId: string }
-  | { status: 'deferred'; stagingId: string; reason: PromoteGiftDeferredReason }
-  | { status: 'error'; stagingId: string; error: PromoteGiftErrorReason };
+  | { status: 'deferred'; stagingId: string; reason: ProcessGiftDeferredReason }
+  | { status: 'error'; stagingId: string; error: ProcessGiftErrorReason };
 
 @Injectable()
-export class GiftStagingPromotionService {
-  private readonly logContext = GiftStagingPromotionService.name;
+export class GiftStagingProcessingService {
+  private readonly logContext = GiftStagingProcessingService.name;
 
   constructor(
     private readonly giftStagingService: GiftStagingService,
@@ -29,7 +33,7 @@ export class GiftStagingPromotionService {
     private readonly structuredLogger: StructuredLoggerService,
   ) {}
 
-  async promoteGift(args: PromoteGiftArgs): Promise<PromoteGiftResult> {
+  async processGift(args: ProcessGiftArgs): Promise<ProcessGiftResult> {
     if (!args || typeof args.stagingId !== 'string' || args.stagingId.trim().length === 0) {
       throw new BadRequestException('stagingId is required');
     }
@@ -41,7 +45,7 @@ export class GiftStagingPromotionService {
       this.structuredLogger.warn(
         'Gift staging record not found or fetch failed',
         {
-          event: 'gift_staging_promote_missing',
+          event: 'gift_staging_process_missing',
           stagingId,
         },
         this.logContext,
@@ -60,9 +64,9 @@ export class GiftStagingPromotionService {
 
     if (stagingRecord.promotionStatus === 'committing') {
       this.structuredLogger.info(
-        'Staging record locked by active promotion',
+        'Staging record locked by active processing',
         {
-          event: 'gift_staging_promote_locked',
+          event: 'gift_staging_process_locked',
           stagingId,
         },
         this.logContext,
@@ -74,11 +78,11 @@ export class GiftStagingPromotionService {
       };
     }
 
-    if (!this.canPromote(stagingRecord)) {
+    if (!this.canProcess(stagingRecord)) {
       this.structuredLogger.info(
-        'Staging record not ready for promotion',
+        'Staging record not ready for processing',
         {
-          event: 'gift_staging_promote_not_ready',
+          event: 'gift_staging_process_not_ready',
           stagingId,
           promotionStatus: stagingRecord.promotionStatus,
           validationStatus: stagingRecord.validationStatus,
@@ -97,11 +101,12 @@ export class GiftStagingPromotionService {
       this.structuredLogger.warn(
         'Staging record missing raw payload',
         {
-          event: 'gift_staging_promote_missing_payload',
+          event: 'gift_staging_process_missing_payload',
           stagingId,
         },
         this.logContext,
       );
+      await this.setProcessingError(stagingId, 'Staging record missing raw payload');
       return {
         status: 'deferred',
         stagingId,
@@ -114,11 +119,12 @@ export class GiftStagingPromotionService {
       this.structuredLogger.warn(
         'Failed to parse staging raw payload',
         {
-          event: 'gift_staging_promote_payload_parse_failed',
+          event: 'gift_staging_process_payload_parse_failed',
           stagingId,
         },
         this.logContext,
       );
+      await this.setProcessingError(stagingId, 'Failed to parse staging raw payload');
       return {
         status: 'deferred',
         stagingId,
@@ -130,10 +136,14 @@ export class GiftStagingPromotionService {
       this.structuredLogger.warn(
         'Parsed staging payload missing required fields',
         {
-          event: 'gift_staging_promote_payload_invalid',
+          event: 'gift_staging_process_payload_invalid',
           stagingId,
         },
         this.logContext,
+      );
+      await this.setProcessingError(
+        stagingId,
+        'Staging payload missing required fields for gift creation',
       );
       return {
         status: 'error',
@@ -142,6 +152,8 @@ export class GiftStagingPromotionService {
       };
     }
 
+    await this.updateProcessingStatus(stagingId, { promotionStatus: 'committing' });
+
     const requestBody = buildTwentyGiftPayload(parsedPayload);
 
     let createGiftResponse: unknown;
@@ -149,7 +161,7 @@ export class GiftStagingPromotionService {
       this.structuredLogger.info(
         'Creating gift from staging record',
         {
-          event: 'gift_staging_promote_call_create',
+          event: 'gift_staging_process_call_create',
           stagingId,
           giftBatchId: stagingRecord.giftBatchId,
         },
@@ -163,10 +175,12 @@ export class GiftStagingPromotionService {
         this.logContext,
       );
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await this.setProcessingError(stagingId, message || 'Failed to create gift in Twenty');
       this.structuredLogger.error(
-        'Failed to create gift in Twenty during promotion',
+        'Failed to create gift in Twenty during processing',
         {
-          event: 'gift_staging_promote_create_failed',
+          event: 'gift_staging_process_create_failed',
           stagingId,
         },
         this.logContext,
@@ -182,10 +196,13 @@ export class GiftStagingPromotionService {
     try {
       ensureCreateGiftResponse(createGiftResponse);
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Create gift response failed validation';
+      await this.setProcessingError(stagingId, message);
       this.structuredLogger.warn(
         'Create gift response failed validation',
         {
-          event: 'gift_staging_promote_create_response_invalid',
+          event: 'gift_staging_process_create_response_invalid',
           stagingId,
         },
         this.logContext,
@@ -202,11 +219,12 @@ export class GiftStagingPromotionService {
       this.structuredLogger.warn(
         'Create gift response missing gift id',
         {
-          event: 'gift_staging_promote_missing_gift_id',
+          event: 'gift_staging_process_missing_gift_id',
           stagingId,
         },
         this.logContext,
       );
+      await this.setProcessingError(stagingId, 'Create gift response missing gift id');
       return {
         status: 'error',
         stagingId,
@@ -234,7 +252,7 @@ export class GiftStagingPromotionService {
       this.structuredLogger.info(
         'Staging record already committed',
         {
-          event: 'gift_staging_promote_already_committed',
+          event: 'gift_staging_process_already_committed',
           stagingId: stagingRecord.id,
           giftId: stagingRecord.giftId,
         },
@@ -249,7 +267,7 @@ export class GiftStagingPromotionService {
     this.structuredLogger.warn(
       'Staging record marked committed but missing gift id',
       {
-        event: 'gift_staging_promote_committed_missing_gift',
+        event: 'gift_staging_process_committed_missing_gift',
         stagingId: stagingRecord.id,
       },
       this.logContext,
@@ -257,7 +275,34 @@ export class GiftStagingPromotionService {
     return undefined;
   }
 
-  private canPromote(stagingRecord: GiftStagingEntity): boolean {
+  private async setProcessingError(stagingId: string, errorDetail: string): Promise<void> {
+    await this.updateProcessingStatus(stagingId, {
+      promotionStatus: 'commit_failed',
+      errorDetail,
+    });
+  }
+
+  private async updateProcessingStatus(
+    stagingId: string,
+    updates: GiftStagingStatusUpdate,
+  ): Promise<void> {
+    try {
+      await this.giftStagingService.updateStatusById(stagingId, updates);
+    } catch (error) {
+      this.structuredLogger.warn(
+        'Failed to update gift staging status',
+        {
+          event: 'gift_staging_process_status_update_failed',
+          stagingId,
+          updates,
+          message: error instanceof Error ? error.message : String(error),
+        },
+        this.logContext,
+      );
+    }
+  }
+
+  private canProcess(stagingRecord: GiftStagingEntity): boolean {
     const promotionStatus = stagingRecord.promotionStatus ?? 'pending';
     const eligibleStatuses = new Set(['ready_for_commit', 'commit_failed']);
 

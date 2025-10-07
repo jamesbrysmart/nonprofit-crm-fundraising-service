@@ -13,6 +13,22 @@ export interface GiftStagingEntity {
   giftId?: string;
   autoPromote?: boolean;
   giftBatchId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  amountMinor?: number;
+  currency?: string;
+  intakeSource?: string;
+  sourceFingerprint?: string;
+  externalId?: string;
+  paymentMethod?: string;
+  dateReceived?: string;
+  giftAidEligible?: boolean;
+  donorId?: string;
+  fundId?: string;
+  appealId?: string;
+  appealSegmentId?: string;
+  trackingCodeId?: string;
+  errorDetail?: string;
 }
 
 export interface GiftStagingStatusUpdate {
@@ -22,6 +38,49 @@ export interface GiftStagingStatusUpdate {
   errorDetail?: string;
   rawPayload?: string;
   giftBatchId?: string;
+}
+
+export interface GiftStagingListQuery {
+  statuses?: string[];
+  intakeSources?: string[];
+  search?: string;
+  cursor?: string;
+  limit?: number;
+  sort?: string;
+}
+
+export interface GiftStagingListItem {
+  id: string;
+  createdAt?: string;
+  updatedAt?: string;
+  processingStatus?: string;
+  validationStatus?: string;
+  dedupeStatus?: string;
+  errorDetail?: string;
+  intakeSource?: string;
+  sourceFingerprint?: string;
+  externalId?: string;
+  giftBatchId?: string;
+  autoPromote: boolean;
+  amountMinor?: number;
+  currency?: string;
+  dateReceived?: string;
+  paymentMethod?: string;
+  giftAidEligible: boolean;
+  donorId?: string;
+  fundId?: string;
+  appealId?: string;
+  appealSegmentId?: string;
+  trackingCodeId?: string;
+  rawPayloadAvailable: boolean;
+}
+
+export interface GiftStagingListResult {
+  data: GiftStagingListItem[];
+  meta: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
 }
 
 interface GiftStagingCreateResponse {
@@ -172,6 +231,50 @@ export class GiftStagingService {
     }
   }
 
+  async listGiftStaging(query: GiftStagingListQuery): Promise<GiftStagingListResult> {
+    if (!this.enabled) {
+      return {
+        data: [],
+        meta: {
+          hasMore: false,
+        },
+      };
+    }
+
+    const limit = this.normalizeLimit(query.limit);
+    const sanitizedQuery = {
+      statuses: this.normalizeStringArray(query.statuses),
+      intakeSources: this.normalizeStringArray(query.intakeSources),
+      search: this.normalizeSearch(query.search),
+      cursor: query.cursor?.trim() || undefined,
+      limit,
+      sort: this.normalizeSort(query.sort),
+    };
+
+    const path = this.buildPath('/giftStagings', this.buildListQueryParams(sanitizedQuery));
+
+    const response = await this.twentyApiService.request(
+      'GET',
+      path,
+      undefined,
+      GiftStagingService.name,
+    );
+
+    const extracted = this.extractGiftStagingListResponse(response);
+
+    const filtered = this.applyListFilters(extracted.records, sanitizedQuery);
+    const sorted = this.applySort(filtered, sanitizedQuery.sort);
+    const summaries = sorted.map((entity) => this.toListItem(entity));
+
+    return {
+      data: summaries,
+      meta: {
+        nextCursor: extracted.nextCursor,
+        hasMore: extracted.hasMore,
+      },
+    };
+  }
+
   async markCommitted(record: GiftStagingRecord | undefined, giftId: string): Promise<void> {
     if (!this.enabled || !record?.id) {
       return;
@@ -288,57 +391,7 @@ export class GiftStagingService {
       return undefined;
     }
 
-    const giftStaging = (data as Record<string, unknown>).giftStaging;
-    if (!this.isPlainObject(giftStaging)) {
-      return undefined;
-    }
-
-    const record = giftStaging as Record<string, unknown>;
-    const id = record.id;
-    if (typeof id !== 'string' || id.trim().length === 0) {
-      return undefined;
-    }
-
-    const entity: GiftStagingEntity = {
-      id,
-    };
-
-    if (typeof record.promotionStatus === 'string') {
-      entity.promotionStatus = record.promotionStatus;
-    }
-    if (typeof record.validationStatus === 'string') {
-      entity.validationStatus = record.validationStatus;
-    }
-    if (typeof record.dedupeStatus === 'string') {
-      entity.dedupeStatus = record.dedupeStatus;
-    }
-    if (typeof record.rawPayload === 'string') {
-      entity.rawPayload = record.rawPayload;
-    } else if (record.rawPayload && typeof record.rawPayload === 'object') {
-      try {
-        entity.rawPayload = JSON.stringify(record.rawPayload);
-      } catch (error) {
-        this.structuredLogger.warn(
-          'Failed to stringify rawPayload when extracting gift staging',
-          {
-            event: 'gift_staging_extract_raw_payload_failed',
-            stagingId: id,
-          },
-          GiftStagingService.name,
-        );
-      }
-    }
-    if (typeof record.giftId === 'string') {
-      entity.giftId = record.giftId;
-    }
-    if (typeof record.autoPromote === 'boolean') {
-      entity.autoPromote = record.autoPromote;
-    }
-    if (typeof record.giftBatchId === 'string') {
-      entity.giftBatchId = record.giftBatchId;
-    }
-
-    return entity;
+    return this.parseGiftStagingRecord((data as Record<string, unknown>).giftStaging);
   }
 
   private isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -402,5 +455,300 @@ export class GiftStagingService {
       );
       return '{}';
     }
+  }
+
+  private parseGiftStagingRecord(record: unknown): GiftStagingEntity | undefined {
+    if (!this.isPlainObject(record)) {
+      return undefined;
+    }
+
+    const id = record.id;
+    if (typeof id !== 'string' || id.trim().length === 0) {
+      return undefined;
+    }
+
+    const entity: GiftStagingEntity = {
+      id,
+      promotionStatus:
+        typeof record.promotionStatus === 'string' ? record.promotionStatus : undefined,
+      validationStatus:
+        typeof record.validationStatus === 'string' ? record.validationStatus : undefined,
+      dedupeStatus: typeof record.dedupeStatus === 'string' ? record.dedupeStatus : undefined,
+      giftId: typeof record.giftId === 'string' ? record.giftId : undefined,
+      autoPromote: typeof record.autoPromote === 'boolean' ? record.autoPromote : undefined,
+      giftBatchId: typeof record.giftBatchId === 'string' ? record.giftBatchId : undefined,
+      createdAt: typeof record.createdAt === 'string' ? record.createdAt : undefined,
+      updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : undefined,
+      amountMinor:
+        typeof record.amountMinor === 'number' && Number.isFinite(record.amountMinor)
+          ? record.amountMinor
+          : undefined,
+      currency: typeof record.currency === 'string' ? record.currency : undefined,
+      intakeSource: typeof record.intakeSource === 'string' ? record.intakeSource : undefined,
+      sourceFingerprint:
+        typeof record.sourceFingerprint === 'string' ? record.sourceFingerprint : undefined,
+      externalId: typeof record.externalId === 'string' ? record.externalId : undefined,
+      paymentMethod: typeof record.paymentMethod === 'string' ? record.paymentMethod : undefined,
+      dateReceived: typeof record.dateReceived === 'string' ? record.dateReceived : undefined,
+      giftAidEligible:
+        typeof record.giftAidEligible === 'boolean' ? record.giftAidEligible : undefined,
+      donorId: typeof record.donorId === 'string' ? record.donorId : undefined,
+      fundId: typeof record.fundId === 'string' ? record.fundId : undefined,
+      appealId: typeof record.appealId === 'string' ? record.appealId : undefined,
+      appealSegmentId:
+        typeof record.appealSegmentId === 'string' ? record.appealSegmentId : undefined,
+      trackingCodeId:
+        typeof record.trackingCodeId === 'string' ? record.trackingCodeId : undefined,
+      errorDetail: typeof record.errorDetail === 'string' ? record.errorDetail : undefined,
+    };
+
+    if (typeof record.rawPayload === 'string') {
+      entity.rawPayload = record.rawPayload;
+    } else if (this.isPlainObject(record.rawPayload)) {
+      try {
+        entity.rawPayload = JSON.stringify(record.rawPayload);
+      } catch (error) {
+        this.structuredLogger.warn(
+          'Failed to stringify rawPayload when extracting gift staging',
+          {
+            event: 'gift_staging_extract_raw_payload_failed',
+            stagingId: id,
+          },
+          GiftStagingService.name,
+        );
+      }
+    }
+
+    return entity;
+  }
+
+  private extractGiftStagingListResponse(response: unknown): {
+    records: GiftStagingEntity[];
+    hasMore: boolean;
+    nextCursor?: string;
+  } {
+    if (!this.isPlainObject(response)) {
+      return { records: [], hasMore: false };
+    }
+
+    const data = response.data;
+    if (!this.isPlainObject(data)) {
+      return { records: [], hasMore: false };
+    }
+
+    const giftStagings = (data as Record<string, unknown>).giftStagings;
+
+    const records: GiftStagingEntity[] = Array.isArray(giftStagings)
+      ? giftStagings
+          .map((entry) => this.parseGiftStagingRecord(entry))
+          .filter((entry): entry is GiftStagingEntity => Boolean(entry))
+      : [];
+
+    const pageInfo = this.isPlainObject((data as Record<string, unknown>).pageInfo)
+      ? ((data as Record<string, unknown>).pageInfo as Record<string, unknown>)
+      : undefined;
+
+    const hasMore =
+      typeof pageInfo?.hasNextPage === 'boolean'
+        ? pageInfo.hasNextPage
+        : Boolean(pageInfo?.hasMore);
+
+    const nextCursor =
+      typeof pageInfo?.endCursor === 'string'
+        ? pageInfo.endCursor
+        : typeof pageInfo?.nextCursor === 'string'
+          ? pageInfo.nextCursor
+          : undefined;
+
+    return { records, hasMore, nextCursor };
+  }
+
+  private buildListQueryParams(query: {
+    limit: number;
+    cursor?: string;
+  }): Record<string, string> {
+    const params: Record<string, string> = {};
+    if (query.limit) {
+      params.limit = query.limit.toString();
+    }
+    if (query.cursor) {
+      params.cursor = query.cursor;
+    }
+    return params;
+  }
+
+  private applyListFilters(
+    records: GiftStagingEntity[],
+    query: {
+      statuses?: string[];
+      intakeSources?: string[];
+      search?: string;
+    },
+  ): GiftStagingEntity[] {
+    return records.filter((record) => {
+      if (query.statuses && query.statuses.length > 0) {
+        const status = record.promotionStatus ?? '';
+        if (!query.statuses.includes(status)) {
+          return false;
+        }
+      }
+
+      if (query.intakeSources && query.intakeSources.length > 0) {
+        const source = record.intakeSource ?? '';
+        if (!query.intakeSources.includes(source)) {
+          return false;
+        }
+      }
+
+      if (query.search) {
+        const needle = query.search;
+        const haystacks = [
+          record.id,
+          record.externalId,
+          record.sourceFingerprint,
+          record.giftBatchId,
+          record.giftId,
+        ]
+          .filter(Boolean)
+          .map((value) => value!.toLowerCase());
+        if (!haystacks.some((value) => value.includes(needle))) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  private applySort(records: GiftStagingEntity[], sort?: string): GiftStagingEntity[] {
+    if (records.length <= 1) {
+      return records;
+    }
+
+    const [field, direction] = (sort ?? 'createdAt:desc').split(':');
+    const dir = direction === 'asc' ? 1 : -1;
+
+    const sorted = [...records];
+    sorted.sort((a, b) => {
+      const aValue = this.getSortableValue(a, field);
+      const bValue = this.getSortableValue(b, field);
+
+      if (aValue === undefined && bValue === undefined) {
+        return 0;
+      }
+      if (aValue === undefined) {
+        return 1;
+      }
+      if (bValue === undefined) {
+        return -1;
+      }
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return (aValue - bValue) * dir;
+      }
+
+      const aString = String(aValue);
+      const bString = String(bValue);
+      return aString.localeCompare(bString) * dir;
+    });
+
+    return sorted;
+  }
+
+  private getSortableValue(entity: GiftStagingEntity, field?: string): string | number | undefined {
+    switch (field) {
+      case 'amountMinor':
+        return entity.amountMinor;
+      case 'updatedAt':
+        return entity.updatedAt;
+      case 'createdAt':
+      default:
+        return entity.createdAt;
+    }
+  }
+
+  private toListItem(entity: GiftStagingEntity): GiftStagingListItem {
+    return {
+      id: entity.id,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+      processingStatus: entity.promotionStatus,
+      validationStatus: entity.validationStatus,
+      dedupeStatus: entity.dedupeStatus,
+      errorDetail: entity.errorDetail,
+      intakeSource: entity.intakeSource,
+      sourceFingerprint: entity.sourceFingerprint,
+      externalId: entity.externalId,
+      giftBatchId: entity.giftBatchId,
+      autoPromote: entity.autoPromote ?? false,
+      amountMinor: entity.amountMinor,
+      currency: entity.currency,
+      dateReceived: entity.dateReceived,
+      paymentMethod: entity.paymentMethod,
+      giftAidEligible: entity.giftAidEligible ?? false,
+      donorId: entity.donorId,
+      fundId: entity.fundId,
+      appealId: entity.appealId,
+      appealSegmentId: entity.appealSegmentId,
+      trackingCodeId: entity.trackingCodeId,
+      rawPayloadAvailable: Boolean(entity.rawPayload && entity.rawPayload.length > 0),
+    };
+  }
+
+  private normalizeLimit(limit?: number): number {
+    if (!limit || !Number.isFinite(limit)) {
+      return 25;
+    }
+    return Math.max(1, Math.min(100, Math.floor(limit)));
+  }
+
+  private normalizeStringArray(values?: string[]): string[] | undefined {
+    if (!values) {
+      return undefined;
+    }
+    const normalized = values
+      .map((value) => value?.trim())
+      .filter((value): value is string => Boolean(value));
+    return normalized.length > 0 ? normalized : undefined;
+  }
+
+  private normalizeSearch(search?: string): string | undefined {
+    if (typeof search !== 'string') {
+      return undefined;
+    }
+    const trimmed = search.trim().toLowerCase();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  private normalizeSort(sort?: string): string | undefined {
+    if (typeof sort !== 'string') {
+      return undefined;
+    }
+    const trimmed = sort.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const [field, direction] = trimmed.split(':');
+    const normalizedField = ['createdAt', 'updatedAt', 'amountMinor'].includes(field)
+      ? field
+      : 'createdAt';
+    const normalizedDirection = direction === 'asc' ? 'asc' : 'desc';
+    return `${normalizedField}:${normalizedDirection}`;
+  }
+
+  private buildPath(basePath: string, params: Record<string, string>): string {
+    if (!params || Object.keys(params).length === 0) {
+      return basePath;
+    }
+
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, value);
+      }
+    });
+
+    const queryString = searchParams.toString();
+    return queryString ? `${basePath}?${queryString}` : basePath;
   }
 }

@@ -1,61 +1,100 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { GiftStagingController } from './gift-staging.controller';
-import { GiftStagingService } from './gift-staging.service';
+import { GiftStagingService, GiftStagingListResult } from './gift-staging.service';
 import {
-  GiftStagingPromotionService,
-  PromoteGiftResult,
-} from './gift-staging-promotion.service';
+  GiftStagingProcessingService,
+  ProcessGiftResult,
+} from './gift-staging-processing.service';
 
 describe('GiftStagingController', () => {
   let controller: GiftStagingController;
   let giftStagingService: jest.Mocked<GiftStagingService>;
-  let giftStagingPromotionService: jest.Mocked<GiftStagingPromotionService>;
+  let giftStagingProcessingService: jest.Mocked<GiftStagingProcessingService>;
 
   beforeEach(() => {
     giftStagingService = {
       isEnabled: jest.fn(),
+      listGiftStaging: jest.fn(),
       updateStatusById: jest.fn(),
     } as unknown as jest.Mocked<GiftStagingService>;
 
-    giftStagingPromotionService = {
-      promoteGift: jest.fn(),
-    } as unknown as jest.Mocked<GiftStagingPromotionService>;
+    giftStagingProcessingService = {
+      processGift: jest.fn(),
+    } as unknown as jest.Mocked<GiftStagingProcessingService>;
 
     controller = new GiftStagingController(
       giftStagingService,
-      giftStagingPromotionService,
+      giftStagingProcessingService,
     );
   });
 
   it('throws ServiceUnavailableException when staging is disabled', async () => {
     giftStagingService.isEnabled.mockReturnValue(false);
 
-    await expect(controller.promoteGift('stg-123')).rejects.toBeInstanceOf(
+    await expect(controller.processGift('stg-123')).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
-    expect(giftStagingPromotionService.promoteGift).not.toHaveBeenCalled();
+    expect(giftStagingProcessingService.processGift).not.toHaveBeenCalled();
   });
 
-  it('delegates to promotion service when enabled', async () => {
+  it('throws when listing and staging is disabled', async () => {
+    giftStagingService.isEnabled.mockReturnValue(false);
+
+    await expect(controller.listGiftStaging({})).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(giftStagingService.listGiftStaging).not.toHaveBeenCalled();
+  });
+
+  it('delegates listing to service with normalized params', async () => {
     giftStagingService.isEnabled.mockReturnValue(true);
-    const result: PromoteGiftResult = {
+    const result: GiftStagingListResult = {
+      data: [],
+      meta: { hasMore: false },
+    };
+    giftStagingService.listGiftStaging.mockResolvedValue(result);
+
+    await expect(
+      controller.listGiftStaging({
+        status: ['ready_for_commit', 'commit_failed'],
+        intakeSource: 'manual_ui,stripe_webhook',
+        search: 'ABC',
+        cursor: 'cursor123',
+        limit: '50',
+        sort: 'updatedAt:asc',
+      }),
+    ).resolves.toEqual(result);
+
+    expect(giftStagingService.listGiftStaging).toHaveBeenCalledWith({
+      statuses: ['ready_for_commit', 'commit_failed'],
+      intakeSources: ['manual_ui', 'stripe_webhook'],
+      search: 'ABC',
+      cursor: 'cursor123',
+      limit: 50,
+      sort: 'updatedAt:asc',
+    });
+  });
+
+  it('delegates to processing service when enabled', async () => {
+    giftStagingService.isEnabled.mockReturnValue(true);
+    const result: ProcessGiftResult = {
       status: 'committed',
       stagingId: 'stg-123',
       giftId: 'gift-456',
     };
-    giftStagingPromotionService.promoteGift.mockResolvedValue(result);
+    giftStagingProcessingService.processGift.mockResolvedValue(result);
 
-    await expect(controller.promoteGift('stg-123')).resolves.toEqual(result);
+    await expect(controller.processGift('stg-123')).resolves.toEqual(result);
 
-    expect(giftStagingPromotionService.promoteGift).toHaveBeenCalledWith({ stagingId: 'stg-123' });
+    expect(giftStagingProcessingService.processGift).toHaveBeenCalledWith({ stagingId: 'stg-123' });
   });
 
-  it('propagates errors from the promotion service', async () => {
+  it('propagates errors from the processing service', async () => {
     giftStagingService.isEnabled.mockReturnValue(true);
     const error = new ServiceUnavailableException('failed');
-    giftStagingPromotionService.promoteGift.mockRejectedValue(error);
+    giftStagingProcessingService.processGift.mockRejectedValue(error);
 
-    await expect(controller.promoteGift('stg-123')).rejects.toThrow('failed');
+    await expect(controller.processGift('stg-123')).rejects.toThrow('failed');
   });
 
   it('updates status when staging is enabled', async () => {
