@@ -4,6 +4,26 @@ import { StructuredLoggerService } from '../logging/structured-logger.service';
 import { TwentyApiService } from '../twenty/twenty-api.service';
 import { GiftStagingRecord, NormalizedGiftCreatePayload } from '../gift/gift.types';
 
+export interface GiftStagingEntity {
+  id: string;
+  promotionStatus?: string;
+  validationStatus?: string;
+  dedupeStatus?: string;
+  rawPayload?: string;
+  giftId?: string;
+  autoPromote?: boolean;
+  giftBatchId?: string;
+}
+
+export interface GiftStagingStatusUpdate {
+  promotionStatus?: string;
+  validationStatus?: string;
+  dedupeStatus?: string;
+  errorDetail?: string;
+  rawPayload?: string;
+  giftBatchId?: string;
+}
+
 interface GiftStagingCreateResponse {
   data?: {
     createGiftStaging?: {
@@ -60,6 +80,12 @@ export class GiftStagingService {
       const stagingId = created?.id;
       const resolvedAutoPromote =
         typeof created?.autoPromote === 'boolean' ? created.autoPromote : autoPromote;
+      const resolvedPromotionStatus =
+        typeof created?.promotionStatus === 'string' && created.promotionStatus.trim().length > 0
+          ? created.promotionStatus
+          : resolvedAutoPromote
+            ? 'committing'
+            : 'pending';
 
       if (!stagingId) {
         this.structuredLogger.warn(
@@ -79,7 +105,7 @@ export class GiftStagingService {
           event: 'gift_staging_stage',
           stagingId,
           autoPromote: resolvedAutoPromote,
-          promotionStatus: created?.promotionStatus,
+          promotionStatus: resolvedPromotionStatus,
           source: requestBody.intakeSource,
           externalId: requestBody.externalId,
         },
@@ -89,6 +115,7 @@ export class GiftStagingService {
       return {
         id: stagingId,
         autoPromote: resolvedAutoPromote,
+        promotionStatus: resolvedPromotionStatus,
         payload,
       };
     } catch (error) {
@@ -104,15 +131,106 @@ export class GiftStagingService {
     }
   }
 
+  async getGiftStagingById(stagingId: string): Promise<GiftStagingEntity | undefined> {
+    if (typeof stagingId !== 'string' || stagingId.trim().length === 0) {
+      return undefined;
+    }
+
+    try {
+      const response = await this.twentyApiService.request(
+        'GET',
+        `/giftStagings/${encodeURIComponent(stagingId)}`,
+        undefined,
+        GiftStagingService.name,
+      );
+
+      const entity = this.extractGiftStagingFromResponse(response);
+      if (!entity) {
+        this.structuredLogger.warn(
+          'Gift staging get response missing giftStaging',
+          {
+            event: 'gift_staging_get_missing',
+            stagingId,
+          },
+          GiftStagingService.name,
+        );
+        return undefined;
+      }
+
+      return entity;
+    } catch (error) {
+      this.structuredLogger.warn(
+        'Failed to fetch gift staging record',
+        {
+          event: 'gift_staging_get_failed',
+          stagingId,
+          message: error instanceof Error ? error.message : String(error),
+        },
+        GiftStagingService.name,
+      );
+      return undefined;
+    }
+  }
+
   async markCommitted(record: GiftStagingRecord | undefined, giftId: string): Promise<void> {
     if (!this.enabled || !record?.id) {
       return;
     }
 
+    await this.markCommittedById(record.id, giftId);
+  }
+
+  async markCommittedById(stagingId: string, giftId: string): Promise<void> {
+    if (!this.enabled || typeof stagingId !== 'string' || stagingId.trim().length === 0) {
+      return;
+    }
+
+    await this.patchCommitted(stagingId, giftId);
+  }
+
+  async updateStatusById(
+    stagingId: string,
+    updates: GiftStagingStatusUpdate,
+  ): Promise<void> {
+    if (!this.enabled || typeof stagingId !== 'string' || stagingId.trim().length === 0) {
+      return;
+    }
+
+    let resolvedUpdates = { ...updates };
+
+    if (resolvedUpdates.rawPayload === undefined) {
+      const existing = await this.getGiftStagingById(stagingId);
+      if (existing?.rawPayload) {
+        resolvedUpdates.rawPayload = existing.rawPayload;
+      }
+    }
+
+    const payload = this.pruneUndefinedValues({
+      promotionStatus: resolvedUpdates.promotionStatus,
+      validationStatus: resolvedUpdates.validationStatus,
+      dedupeStatus: resolvedUpdates.dedupeStatus,
+      errorDetail: resolvedUpdates.errorDetail,
+      rawPayload: resolvedUpdates.rawPayload,
+      giftBatchId: resolvedUpdates.giftBatchId,
+    });
+
+    if (Object.keys(payload).length === 0) {
+      return;
+    }
+
+    await this.twentyApiService.request(
+      'PATCH',
+      `/giftStagings/${encodeURIComponent(stagingId)}`,
+      payload,
+      GiftStagingService.name,
+    );
+  }
+
+  private async patchCommitted(stagingId: string, giftId: string): Promise<void> {
     try {
       await this.twentyApiService.request(
         'PATCH',
-        `/giftStagings/${encodeURIComponent(record.id)}`,
+        `/giftStagings/${encodeURIComponent(stagingId)}`,
         {
           promotionStatus: 'committed',
           validationStatus: 'passed',
@@ -126,7 +244,7 @@ export class GiftStagingService {
         'Gift staging record committed',
         {
           event: 'gift_staging_committed',
-          stagingId: record.id,
+          stagingId,
           giftId,
         },
         GiftStagingService.name,
@@ -136,7 +254,7 @@ export class GiftStagingService {
         'Failed to update gift staging record after commit',
         {
           event: 'gift_staging_commit_failed',
-          stagingId: record.id,
+          stagingId,
           giftId,
           message: error instanceof Error ? error.message : String(error),
         },
@@ -158,6 +276,73 @@ export class GiftStagingService {
       return false;
     }
     return fallback;
+  }
+
+  private extractGiftStagingFromResponse(response: unknown): GiftStagingEntity | undefined {
+    if (!this.isPlainObject(response)) {
+      return undefined;
+    }
+
+    const data = response.data;
+    if (!this.isPlainObject(data)) {
+      return undefined;
+    }
+
+    const giftStaging = (data as Record<string, unknown>).giftStaging;
+    if (!this.isPlainObject(giftStaging)) {
+      return undefined;
+    }
+
+    const record = giftStaging as Record<string, unknown>;
+    const id = record.id;
+    if (typeof id !== 'string' || id.trim().length === 0) {
+      return undefined;
+    }
+
+    const entity: GiftStagingEntity = {
+      id,
+    };
+
+    if (typeof record.promotionStatus === 'string') {
+      entity.promotionStatus = record.promotionStatus;
+    }
+    if (typeof record.validationStatus === 'string') {
+      entity.validationStatus = record.validationStatus;
+    }
+    if (typeof record.dedupeStatus === 'string') {
+      entity.dedupeStatus = record.dedupeStatus;
+    }
+    if (typeof record.rawPayload === 'string') {
+      entity.rawPayload = record.rawPayload;
+    } else if (record.rawPayload && typeof record.rawPayload === 'object') {
+      try {
+        entity.rawPayload = JSON.stringify(record.rawPayload);
+      } catch (error) {
+        this.structuredLogger.warn(
+          'Failed to stringify rawPayload when extracting gift staging',
+          {
+            event: 'gift_staging_extract_raw_payload_failed',
+            stagingId: id,
+          },
+          GiftStagingService.name,
+        );
+      }
+    }
+    if (typeof record.giftId === 'string') {
+      entity.giftId = record.giftId;
+    }
+    if (typeof record.autoPromote === 'boolean') {
+      entity.autoPromote = record.autoPromote;
+    }
+    if (typeof record.giftBatchId === 'string') {
+      entity.giftBatchId = record.giftBatchId;
+    }
+
+    return entity;
+  }
+
+  private isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
   private buildCreatePayload(

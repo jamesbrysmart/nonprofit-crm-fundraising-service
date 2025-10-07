@@ -17,6 +17,7 @@ import {
 } from './gift.validation';
 import type { GiftCreatePayload } from './gift.validation';
 import { GiftStagingService } from '../gift-staging/gift-staging.service';
+import { buildTwentyGiftPayload, extractCreateGiftId } from './gift-payload.util';
 import { GiftStagingRecord, NormalizedGiftCreatePayload } from './gift.types';
 
 @Injectable()
@@ -35,18 +36,30 @@ export class GiftService {
     const preparedPayload = await this.prepareGiftPayload(sanitizedPayload);
 
     let stagingRecord: GiftStagingRecord | undefined;
+    let shouldPromoteImmediately = true;
     try {
       stagingRecord = await this.giftStagingService.stageGift(preparedPayload);
+      if (this.giftStagingService.isEnabled() && stagingRecord && !stagingRecord.autoPromote) {
+        shouldPromoteImmediately = false;
+      }
     } catch (error) {
       this.loggerInstance.warn(
         `Failed to stage gift payload: ${error instanceof Error ? error.message : error}`,
       );
     }
 
+    if (!shouldPromoteImmediately && stagingRecord) {
+      this.loggerInstance.log(
+        `Gift staged without auto-promote; returning acknowledgement for stagingId=${stagingRecord.id}`,
+        this.logContext,
+      );
+      return this.buildStagingAcknowledgementResponse(stagingRecord);
+    }
+
     const response = await this.createGiftInTwenty(preparedPayload);
     ensureCreateGiftResponse(response);
 
-    const giftId = this.extractGiftIdFromResponse(response);
+    const giftId = extractCreateGiftId(response);
     if (giftId) {
       await this.giftStagingService.markCommitted(stagingRecord, giftId);
     }
@@ -391,55 +404,8 @@ export class GiftService {
   }
 
   private async createGiftInTwenty(payload: NormalizedGiftCreatePayload): Promise<unknown> {
-    const requestBody = this.buildTwentyGiftPayload(payload);
+    const requestBody = buildTwentyGiftPayload(payload);
     return this.twentyApiService.request('POST', '/gifts', requestBody, this.logContext);
-  }
-
-  private buildTwentyGiftPayload(payload: NormalizedGiftCreatePayload): Record<string, unknown> {
-    const body: Record<string, unknown> = {
-      ...payload,
-    };
-
-    delete body.amountMinor;
-    delete body.currency;
-    delete body.dateReceived;
-    delete body.giftBatchId;
-    delete body.intakeSource;
-    delete body.sourceFingerprint;
-    delete body.autoPromote;
-    delete body.giftAidEligible;
-
-    if (!body.giftDate && typeof payload.dateReceived === 'string') {
-      body.giftDate = payload.dateReceived;
-    }
-
-    delete body.appealId;
-    delete body.appealSegmentId;
-    delete body.trackingCodeId;
-    delete body.fundId;
-
-    return body;
-  }
-
-  private extractGiftIdFromResponse(response: unknown): string | undefined {
-    if (!response || typeof response !== 'object') {
-      return undefined;
-    }
-
-    const data = (response as Record<string, unknown>).data;
-    if (!data || typeof data !== 'object') {
-      return undefined;
-    }
-
-    const createGift = (data as Record<string, unknown>).createGift;
-    if (createGift && typeof createGift === 'object') {
-      const id = (createGift as Record<string, unknown>).id;
-      if (typeof id === 'string') {
-        return id;
-      }
-    }
-
-    return undefined;
   }
 
   private buildPath(
@@ -473,4 +439,26 @@ export class GiftService {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
 
+  private buildStagingAcknowledgementResponse(
+    record: GiftStagingRecord,
+  ): Record<string, unknown> {
+    const promotionStatus = record.promotionStatus
+      ? record.promotionStatus
+      : record.autoPromote
+        ? 'committing'
+        : 'pending';
+
+    return {
+      data: {
+        giftStaging: {
+          id: record.id,
+          autoPromote: record.autoPromote,
+          promotionStatus,
+        },
+      },
+      meta: {
+        stagedOnly: true,
+      },
+    } as Record<string, unknown>;
+  }
 }

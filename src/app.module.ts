@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { GiftModule } from './gift/gift.module';
+import { GiftStagingModule } from './gift-staging/gift-staging.module';
 import { HealthController } from './health/health.controller';
 import { LoggingModule } from './logging/logging.module';
 import { PeopleModule } from './people/people.module';
@@ -15,6 +16,7 @@ import { StripeModule } from './stripe/stripe.module';
     LoggingModule,
     TwentyModule,
     GiftModule,
+    GiftStagingModule,
     PeopleModule,
     StripeModule,
   ],

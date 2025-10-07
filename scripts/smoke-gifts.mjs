@@ -1,41 +1,112 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 
-const execFileAsync = promisify(execFile);
+const DEFAULT_GATEWAY_BASE =
+  process.env.GATEWAY_BASE ?? process.env.SMOKE_GIFTS_BASE ?? 'http://gateway:4000/api/fundraising';
 
-const GATEWAY_BASE = process.env.GATEWAY_BASE ?? 'http://localhost:4000/api/fundraising';
+const GATEWAY_BASE = DEFAULT_GATEWAY_BASE;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function curlJson(method, path, body) {
+async function httpJson(method, path, body) {
   const url = `${GATEWAY_BASE}${path.startsWith('/') ? path : `/${path}`}`;
 
-  const args = ['curl', '-sS', '-X', method, url, '-H', 'Content-Type: application/json'];
+  const init = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  };
 
   if (body !== undefined) {
-    args.push('-d', JSON.stringify(body));
+    init.body = JSON.stringify(body);
   } else if (method === 'PATCH') {
-    // curl sends an empty body for PATCH by default; explicitly provide {} so Twenty treats it as JSON
-    args.push('-d', '{}');
+    init.body = '{}';
   }
 
-  const { stdout } = await execFileAsync(args[0], args.slice(1));
+  const response = await fetch(url, init);
+  const text = await response.text();
 
+  let parsed;
   try {
-    return JSON.parse(stdout);
+    parsed = text ? JSON.parse(text) : undefined;
   } catch (error) {
-    console.error('Failed to parse response body:', stdout);
+    console.error('Failed to parse response body:', text);
     throw error;
   }
+
+  if (!response.ok) {
+    console.error('Request failed', {
+      method,
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      body,
+      response: parsed,
+    });
+    throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  }
+
+  return parsed;
 }
 
 async function main() {
+  console.log('--- Gift staging manual promotion flow ---');
+  const uniqueSuffix = Date.now();
+  const stagedResponse = await httpJson('POST', '/gifts', {
+    amount: { currencyCode: 'GBP', value: 15.5 },
+    name: `Smoke Test Staged Gift ${uniqueSuffix}`,
+    autoPromote: false,
+    contact: {
+      firstName: 'Smoke',
+      lastName: `Tester${uniqueSuffix}`,
+      email: `smoketester+${uniqueSuffix}@example.org`,
+    },
+  });
+
+  const stagedGift = stagedResponse?.data?.giftStaging;
+  const stagedMeta = stagedResponse?.meta;
+  assert(stagedMeta?.stagedOnly === true, 'expected stagedOnly meta flag');
+  assert(stagedGift?.id, 'staged gift response missing id');
+
+  console.log(`Staged gift row created with id ${stagedGift.id}`);
+
+  const rawPayloadString = stagedMeta?.rawPayload ?? stagedGift.rawPayload;
+  if (!rawPayloadString) {
+    console.warn('Smoke test: staging response missing raw payload, continuing');
+  }
+
+  console.log('Marking staging row ready for manual promotion');
+  await httpJson('PATCH', `/gift-staging/${stagedGift.id}/status`, {
+    promotionStatus: 'ready_for_commit',
+    validationStatus: 'passed',
+    dedupeStatus: 'passed',
+    rawPayload: rawPayloadString,
+  });
+
+  const promoteResponse = await httpJson('POST', `/gift-staging/${stagedGift.id}/promote`);
+  console.log('Promotion response:', promoteResponse);
+  assert(promoteResponse?.status === 'committed', 'promotion did not commit gift');
+  assert(promoteResponse?.giftId, 'promotion response missing giftId');
+
+  const promotedGiftId = promoteResponse.giftId;
+  console.log(`Promotion committed gift ${promotedGiftId}`);
+
+  const promotedGiftResponse = await httpJson('GET', `/gifts/${promotedGiftId}`);
+  const promotedGift = promotedGiftResponse?.data?.gift;
+  assert(promotedGift?.id === promotedGiftId, 'promoted gift not retrievable');
+
+  console.log('Cleaning up promoted gift');
+  await httpJson('DELETE', `/gifts/${promotedGiftId}`);
+
+  console.log('✅ Staging promotion smoke test succeeded');
+
+  console.log('\n--- Gift proxy CRUD flow ---');
   console.log('Creating gift via fundraising-service → Twenty proxy');
-  const createResponse = await curlJson('POST', '/gifts', {
+  const createResponse = await httpJson('POST', '/gifts', {
     amount: { currencyCode: 'USD', value: 42 },
     name: 'Smoke Test Gift',
+    autoPromote: true,
   });
 
   const createdGift = createResponse?.data?.createGift;
@@ -45,34 +116,35 @@ async function main() {
   console.log(`Gift created with id ${createdGift.id}`);
 
   console.log('Listing gifts via proxy');
-  const listResponse = await curlJson('GET', '/gifts');
+  const listResponse = await httpJson('GET', '/gifts');
   const gifts = listResponse?.data?.gifts;
   assert(Array.isArray(gifts), 'list response missing gifts array');
   assert(gifts.some((gift) => gift.id === createdGift.id), 'created gift not found in list');
 
   console.log('Fetching gift by id via proxy');
-  const getResponse = await curlJson('GET', `/gifts/${createdGift.id}`);
+  const getResponse = await httpJson('GET', `/gifts/${createdGift.id}`);
   const fetchedGift = getResponse?.data?.gift;
   assert(fetchedGift?.id === createdGift.id, 'get response id mismatch');
 
   console.log('Updating gift via proxy');
-  const updateResponse = await curlJson('PATCH', `/gifts/${createdGift.id}`, {
+  const updateResponse = await httpJson('PATCH', `/gifts/${createdGift.id}`, {
     name: 'Smoke Test Gift (Updated)',
   });
   const updatedGift = updateResponse?.data?.updateGift;
   assert(updatedGift?.id === createdGift.id, 'update response id mismatch');
 
   console.log('Deleting gift via proxy');
-  const deleteResponse = await curlJson('DELETE', `/gifts/${createdGift.id}`);
+  const deleteResponse = await httpJson('DELETE', `/gifts/${createdGift.id}`);
   const deletedGift = deleteResponse?.data?.deleteGift;
   assert(deletedGift?.id === createdGift.id, 'delete response id mismatch');
 
   console.log('✅ Smoke test succeeded');
 
   console.log('\nCreating a persistent gift for UI verification');
-  const persistentCreateResponse = await curlJson('POST', '/gifts', {
+  const persistentCreateResponse = await httpJson('POST', '/gifts', {
     amount: { currencyCode: 'EUR', value: 99 },
     name: 'Persistent Smoke Test Gift',
+    autoPromote: true,
   });
 
   const persistentGift = persistentCreateResponse?.data?.createGift;

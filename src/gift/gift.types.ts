@@ -24,5 +24,6 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
 export interface GiftStagingRecord {
   id: string;
   autoPromote: boolean;
+  promotionStatus?: string;
   payload: NormalizedGiftCreatePayload;
 }
