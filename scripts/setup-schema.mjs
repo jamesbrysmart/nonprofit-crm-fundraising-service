@@ -72,27 +72,32 @@ async function restCall(method, endpoint, payload) {
 }
 
 async function findObjectByNameSingular(nameSingular) {
-  const url = `${TWENTY_REST_METADATA_URL}/objects?filter[nameSingular]=${encodeURIComponent(nameSingular)}`;
+  const url = `${TWENTY_REST_METADATA_URL}/objects`;
   const headers = {
     'Authorization': `Bearer ${API_KEY}`,
   };
 
-  console.log(`Finding object: ${nameSingular} via GET ${url}`);
+  console.log(`Fetching all objects to find: ${nameSingular}`);
 
   const response = await fetch(url, { method: 'GET', headers });
   const result = await response.json();
 
   if (!response.ok) {
-    console.error(`Failed to find object ${nameSingular}:`);
+    console.error(`Failed to fetch objects:`);
     console.error(JSON.stringify(result, null, 2));
     const messages = result?.messages || result?.message;
     throw new Error(`REST API Error: ${messages || response.statusText}`);
   }
 
-  if (result.data && result.data.objects && result.data.objects.length > 0) {
-    console.log(`Found object ${nameSingular} with ID: ${result.data.objects[0].id}`);
-    return result.data.objects[0].id;
+  if (result.data && result.data.objects) {
+    const foundObject = result.data.objects.find(obj => obj.nameSingular === nameSingular);
+    if (foundObject) {
+      console.log(`Found object ${nameSingular} with ID: ${foundObject.id}`);
+      return foundObject.id;
+    }
   }
+  
+  console.log(`Object ${nameSingular} not found.`);
   return null;
 }
 
@@ -123,7 +128,7 @@ async function createField(fieldData) {
       : typeof messages === 'string'
         ? [messages]
         : [];
-    if (messageList.includes('Field already exists')) {
+    if (messageList.some(msg => msg.includes('Field already exists') || msg.includes('is not available'))) {
       console.log(`Field ${fieldData.name} already exists. Skipping.`);
       return null;
     }
@@ -149,14 +154,14 @@ async function main() {
 
   await createField({
     objectMetadataId: campaignObjectId,
-    name: "StartDate",
+    name: "startDate",
     label: "Start Date",
     type: "DATE"
   });
 
   await createField({
     objectMetadataId: campaignObjectId,
-    name: "EndDate",
+    name: "endDate",
     label: "End Date",
     type: "DATE"
   });
@@ -173,23 +178,61 @@ async function main() {
 
   await createField({
     objectMetadataId: giftObjectId,
-    name: "Amount",
+    name: "amount",
     label: "Amount",
     type: "CURRENCY"
   });
 
   await createField({
     objectMetadataId: giftObjectId,
-    name: "Date",
+    name: "date",
     label: "Gift Date",
     type: "DATE"
   });
+
+  console.log('--- Setting up Gift Staging Object ---');
+  const giftStagingObjectId = await ensureObject({
+    nameSingular: 'giftStaging',
+    namePlural: 'giftStagings',
+    labelSingular: 'Gift Staging',
+    labelPlural: 'Gift Stagings',
+    icon: 'IconInbox',
+    description: 'Temporary staging record for gifts prior to commit.',
+  });
+
+  const giftStagingFields = [
+    { name: 'source', label: 'Source', type: 'TEXT' },
+    { name: 'intakeSource', label: 'Intake Source', type: 'TEXT' },
+    { name: 'sourceFingerprint', label: 'Source Fingerprint', type: 'TEXT' },
+    { name: 'externalId', label: 'External ID', type: 'TEXT' },
+    { name: 'amountMinor', label: 'Amount (minor units)', type: 'NUMBER' },
+    { name: 'paymentMethod', label: 'Payment Method', type: 'TEXT' },
+    { name: 'dateReceived', label: 'Date Received', type: 'DATE' },
+    { name: 'validationStatus', label: 'Validation Status', type: 'TEXT' },
+    { name: 'dedupeStatus', label: 'Dedupe Status', type: 'TEXT' },
+    { name: 'promotionStatus', label: 'Promotion Status', type: 'TEXT' },
+    { name: 'autoPromote', label: 'Auto Promote', type: 'BOOLEAN' },
+    { name: 'giftAidEligible', label: 'Gift Aid Eligible', type: 'BOOLEAN' },
+    { name: 'giftBatchId', label: 'Gift Batch ID', type: 'TEXT' },
+    { name: 'rawPayload', label: 'Raw Payload', type: 'RAW_JSON' },
+  ];
+
+  for (const field of giftStagingFields) {
+    await createField({
+      objectMetadataId: giftStagingObjectId,
+      name: field.name,
+      label: field.label,
+      type: field.type,
+    });
+  }
 
   console.log('--- Linking Objects (Manual Step Required) ---');
   console.log('NOTE: RELATION/LOOKUP fields cannot be created via API at this time.');
   console.log('Please create the following LOOKUP fields manually in the Twenty UI:');
   console.log('- For Gift object: "Campaign" (linking to Campaign object)');
   console.log('- For Gift object: "Contact" (linking to Person object)');
+  console.log('- For Gift Staging object: "Gift" (linking to Gift object)');
+  console.log('- For Gift Staging object: "Gift Batch" (linking to Gift Batch object, optional)');
 
   console.log('✅ Twenty CRM custom objects and fields setup complete (manual steps for LOOKUP fields pending).');
 }

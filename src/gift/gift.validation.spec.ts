@@ -69,6 +69,20 @@ describe('gift.validation', () => {
       expect(result.amountMinor).toBe(1235);
       expect(result.currency).toBe('GBP');
     });
+
+    it('allows intake metadata fields', () => {
+      const result = validateCreateGiftPayload({
+        amount: { currencyCode: 'USD', value: 1 },
+        contact: { firstName: 'Pat', lastName: 'Lee' },
+        intakeSource: 'portal',
+        sourceFingerprint: 'fingerprint-123',
+        autoPromote: false,
+      });
+
+      expect(result.intakeSource).toBe('portal');
+      expect(result.sourceFingerprint).toBe('fingerprint-123');
+      expect(result.autoPromote).toBe(false);
+    });
   });
 
   describe('ensureCreateGiftResponse', () => {

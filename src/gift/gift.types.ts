@@ -8,6 +8,9 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   donorId?: string;
   externalId?: string;
   paymentMethod?: string;
+  intakeSource?: string;
+  sourceFingerprint?: string;
+  autoPromote?: boolean;
   appealId?: string;
   appealSegmentId?: string;
   trackingCodeId?: string;

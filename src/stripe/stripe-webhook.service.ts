@@ -103,6 +103,9 @@ export class StripeWebhookService {
       giftDate: this.formatEventDate(event.created),
       paymentMethod: 'card',
       externalId: paymentIntentId ?? session.id,
+      intakeSource: 'stripe_webhook',
+      sourceFingerprint: paymentIntentId ?? session.id,
+      autoPromote: true,
     };
 
     const contact = this.buildContact(session, metadata);

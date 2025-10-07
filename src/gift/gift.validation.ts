@@ -3,9 +3,6 @@ import { BadRequestException } from '@nestjs/common';
 const ALLOWED_STRING_FIELDS = new Set([
   'contactId',
   'campaignId',
-  'appealId',
-  'appealSegmentId',
-  'trackingCodeId',
   'fundId',
   'date',
   'giftDate',
@@ -15,11 +12,13 @@ const ALLOWED_STRING_FIELDS = new Set([
   'externalId',
   'paymentMethod',
   'giftBatchId',
+  'intakeSource',
+  'sourceFingerprint',
 ]);
 
 const ALLOWED_NUMBER_FIELDS = new Set(['amountMicros', 'amountMinor']);
 
-const ALLOWED_BOOLEAN_FIELDS = new Set(['giftAidEligible']);
+const ALLOWED_BOOLEAN_FIELDS = new Set(['giftAidEligible', 'autoPromote']);
 
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
 
@@ -35,6 +34,12 @@ export type GiftCreatePayload = Writable<
 > & {
   amountMinor?: number;
   currency?: string;
+  giftAidEligible?: boolean;
+  giftBatchId?: string;
+  paymentMethod?: string;
+  intakeSource?: string;
+  sourceFingerprint?: string;
+  autoPromote?: boolean;
 };
 
 export type GiftUpdatePayload = Partial<GiftCreatePayload>;
@@ -122,6 +127,11 @@ const collectAllowedFields = (
 
   for (const [key, value] of Object.entries(source)) {
     if (key === 'amount') {
+      continue;
+    }
+
+    if (key === 'campaignId' && typeof value === 'string') {
+      normalizeStringField(result, 'appealId', value);
       continue;
     }
 

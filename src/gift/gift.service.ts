@@ -148,6 +148,30 @@ export class GiftService {
       prepared.paymentMethod = prepared.paymentMethod.trim();
     }
 
+    if (typeof prepared.intakeSource !== 'string' || prepared.intakeSource.trim().length === 0) {
+      prepared.intakeSource = 'manual_ui';
+    } else {
+      prepared.intakeSource = prepared.intakeSource.trim();
+    }
+
+    if (
+      typeof prepared.sourceFingerprint !== 'string' ||
+      prepared.sourceFingerprint.trim().length === 0
+    ) {
+      const fingerprintSeed = [
+        prepared.externalId,
+        prepared.donorId,
+        prepared.amountMinor?.toString(),
+        prepared.currency,
+      ]
+        .filter((value) => typeof value === 'string' && value.length > 0)
+        .join('|');
+
+      prepared.sourceFingerprint = fingerprintSeed.length > 0 ? fingerprintSeed : this.generateFallbackFingerprint();
+    } else {
+      prepared.sourceFingerprint = prepared.sourceFingerprint.trim();
+    }
+
     return prepared;
   }
 
@@ -380,13 +404,13 @@ export class GiftService {
     delete body.currency;
     delete body.dateReceived;
     delete body.giftBatchId;
+    delete body.intakeSource;
+    delete body.sourceFingerprint;
+    delete body.autoPromote;
+    delete body.giftAidEligible;
 
     if (!body.giftDate && typeof payload.dateReceived === 'string') {
       body.giftDate = payload.dateReceived;
-    }
-
-    if (payload.appealId && !body.campaignId) {
-      body.campaignId = payload.appealId;
     }
 
     delete body.appealId;
@@ -443,6 +467,10 @@ export class GiftService {
 
     const queryString = params.toString();
     return queryString ? `${basePath}?${queryString}` : basePath;
+  }
+
+  private generateFallbackFingerprint(): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
 
 }
