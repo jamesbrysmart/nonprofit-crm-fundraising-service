@@ -205,6 +205,7 @@ async function main() {
     { name: 'intakeSource', label: 'Intake Source', type: 'TEXT' },
     { name: 'sourceFingerprint', label: 'Source Fingerprint', type: 'TEXT' },
     { name: 'externalId', label: 'External ID', type: 'TEXT' },
+    { name: 'amount', label: 'Amount', type: 'CURRENCY' },
     { name: 'amountMinor', label: 'Amount (minor units)', type: 'NUMBER' },
     { name: 'paymentMethod', label: 'Payment Method', type: 'TEXT' },
     { name: 'dateReceived', label: 'Date Received', type: 'DATE' },
@@ -214,6 +215,10 @@ async function main() {
     { name: 'autoPromote', label: 'Auto Promote', type: 'BOOLEAN' },
     { name: 'giftAidEligible', label: 'Gift Aid Eligible', type: 'BOOLEAN' },
     { name: 'giftBatchId', label: 'Gift Batch ID', type: 'TEXT' },
+    { name: 'donorFirstName', label: 'Donor First Name', type: 'TEXT' },
+    { name: 'donorLastName', label: 'Donor Last Name', type: 'TEXT' },
+    { name: 'donorEmail', label: 'Donor Email', type: 'TEXT' },
+    { name: 'notes', label: 'Notes', type: 'TEXT' },
     { name: 'rawPayload', label: 'Raw Payload', type: 'RAW_JSON' },
   ];
 

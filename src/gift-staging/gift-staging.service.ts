@@ -15,6 +15,7 @@ export interface GiftStagingEntity {
   giftBatchId?: string;
   createdAt?: string;
   updatedAt?: string;
+  amount?: number;
   amountMinor?: number;
   currency?: string;
   intakeSource?: string;
@@ -24,10 +25,14 @@ export interface GiftStagingEntity {
   dateReceived?: string;
   giftAidEligible?: boolean;
   donorId?: string;
+  donorFirstName?: string;
+  donorLastName?: string;
+  donorEmail?: string;
   fundId?: string;
   appealId?: string;
   appealSegmentId?: string;
   trackingCodeId?: string;
+  notes?: string;
   errorDetail?: string;
 }
 
@@ -63,16 +68,21 @@ export interface GiftStagingListItem {
   giftBatchId?: string;
   autoPromote: boolean;
   amountMinor?: number;
+  amount?: number;
   currency?: string;
   dateReceived?: string;
   paymentMethod?: string;
   giftAidEligible: boolean;
   donorId?: string;
+  donorFirstName?: string;
+  donorLastName?: string;
+  donorEmail?: string;
   fundId?: string;
   appealId?: string;
   appealSegmentId?: string;
   trackingCodeId?: string;
   rawPayloadAvailable: boolean;
+  notes?: string;
 }
 
 export interface GiftStagingListResult {
@@ -415,7 +425,9 @@ export class GiftStagingService {
       sourceFingerprint: payload.sourceFingerprint,
       source: payload.intakeSource,
       externalId: payload.externalId,
+      amount: payload.amountMajor,
       amountMinor: payload.amountMinor,
+      currency: payload.currency,
       paymentMethod: payload.paymentMethod,
       dateReceived: payload.dateReceived ?? payload.giftDate,
       giftAidEligible: payload.giftAidEligible ?? false,
@@ -424,7 +436,11 @@ export class GiftStagingService {
       appealSegmentId: payload.appealSegmentId,
       trackingCodeId: payload.trackingCodeId,
       contactId: payload.donorId,
+      donorFirstName: payload.donorFirstName,
+      donorLastName: payload.donorLastName,
+      donorEmail: payload.donorEmail,
       giftBatchId: payload.giftBatchId,
+      notes: payload.notes,
       rawPayload,
     };
 
@@ -479,6 +495,10 @@ export class GiftStagingService {
       giftBatchId: typeof record.giftBatchId === 'string' ? record.giftBatchId : undefined,
       createdAt: typeof record.createdAt === 'string' ? record.createdAt : undefined,
       updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : undefined,
+      amount:
+        typeof record.amount === 'number' && Number.isFinite(record.amount)
+          ? record.amount
+          : undefined,
       amountMinor:
         typeof record.amountMinor === 'number' && Number.isFinite(record.amountMinor)
           ? record.amountMinor
@@ -493,12 +513,18 @@ export class GiftStagingService {
       giftAidEligible:
         typeof record.giftAidEligible === 'boolean' ? record.giftAidEligible : undefined,
       donorId: typeof record.donorId === 'string' ? record.donorId : undefined,
+      donorFirstName:
+        typeof record.donorFirstName === 'string' ? record.donorFirstName : undefined,
+      donorLastName:
+        typeof record.donorLastName === 'string' ? record.donorLastName : undefined,
+      donorEmail: typeof record.donorEmail === 'string' ? record.donorEmail : undefined,
       fundId: typeof record.fundId === 'string' ? record.fundId : undefined,
       appealId: typeof record.appealId === 'string' ? record.appealId : undefined,
       appealSegmentId:
         typeof record.appealSegmentId === 'string' ? record.appealSegmentId : undefined,
       trackingCodeId:
         typeof record.trackingCodeId === 'string' ? record.trackingCodeId : undefined,
+      notes: typeof record.notes === 'string' ? record.notes : undefined,
       errorDetail: typeof record.errorDetail === 'string' ? record.errorDetail : undefined,
     };
 
@@ -608,6 +634,9 @@ export class GiftStagingService {
           record.sourceFingerprint,
           record.giftBatchId,
           record.giftId,
+          record.donorEmail,
+          record.donorFirstName,
+          record.donorLastName,
         ]
           .filter(Boolean)
           .map((value) => value!.toLowerCase());
@@ -681,17 +710,22 @@ export class GiftStagingService {
       externalId: entity.externalId,
       giftBatchId: entity.giftBatchId,
       autoPromote: entity.autoPromote ?? false,
+      amount: entity.amount,
       amountMinor: entity.amountMinor,
       currency: entity.currency,
       dateReceived: entity.dateReceived,
       paymentMethod: entity.paymentMethod,
       giftAidEligible: entity.giftAidEligible ?? false,
       donorId: entity.donorId,
+      donorFirstName: entity.donorFirstName,
+      donorLastName: entity.donorLastName,
+      donorEmail: entity.donorEmail,
       fundId: entity.fundId,
       appealId: entity.appealId,
       appealSegmentId: entity.appealSegmentId,
       trackingCodeId: entity.trackingCodeId,
       rawPayloadAvailable: Boolean(entity.rawPayload && entity.rawPayload.length > 0),
+      notes: entity.notes,
     };
   }
 

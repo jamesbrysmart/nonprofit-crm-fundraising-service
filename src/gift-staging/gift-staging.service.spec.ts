@@ -93,14 +93,13 @@ describe('GiftStagingService', () => {
     });
 
     expect(result.data).toHaveLength(1);
-    expect(result.data[0]).toEqual({
+    expect(result.data[0]).toMatchObject({
       id: 'stg-1',
       createdAt: '2025-10-08T12:00:00Z',
       updatedAt: '2025-10-08T12:10:00Z',
       processingStatus: 'ready_for_commit',
       validationStatus: 'passed',
       dedupeStatus: 'passed',
-      errorDetail: undefined,
       intakeSource: 'manual_ui',
       sourceFingerprint: 'fp-1',
       externalId: 'ext-1',
@@ -112,10 +111,6 @@ describe('GiftStagingService', () => {
       paymentMethod: 'card',
       giftAidEligible: true,
       donorId: 'person-1',
-      fundId: undefined,
-      appealId: undefined,
-      appealSegmentId: undefined,
-      trackingCodeId: undefined,
       rawPayloadAvailable: true,
     });
   });

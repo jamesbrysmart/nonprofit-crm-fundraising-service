@@ -29,6 +29,7 @@ describe('GiftService - staging auto promote', () => {
       stageGift: jest.fn(),
       markCommitted: jest.fn(),
       isEnabled: jest.fn(),
+      updateStatusById: jest.fn(),
     } as unknown as jest.Mocked<GiftStagingService>;
 
     // Silence real logger instances instantiated inside GiftService.
@@ -85,6 +86,7 @@ describe('GiftService - staging auto promote', () => {
 
     expect(twentyApiService.request).not.toHaveBeenCalled();
     expect(giftStagingService.markCommitted).not.toHaveBeenCalled();
+    expect(giftStagingService.updateStatusById).not.toHaveBeenCalled();
   });
 
   it('commits gift immediately when autoPromote resolves true', async () => {
@@ -133,5 +135,59 @@ describe('GiftService - staging auto promote', () => {
       }),
       'gift-789',
     );
+    expect(giftStagingService.updateStatusById).not.toHaveBeenCalled();
+  });
+
+  it('updates dedupe status when diagnostics present', async () => {
+    const sanitizedPayload = { amount: { currencyCode: 'GBP', value: 30 } } as GiftCreatePayload;
+    jest
+      .spyOn(giftValidation, 'validateCreateGiftPayload')
+      .mockReturnValue(sanitizedPayload);
+
+    const preparedPayload: NormalizedGiftCreatePayload = {
+      amount: { currencyCode: 'GBP', value: 30 },
+      amountMinor: 3000,
+      currency: 'GBP',
+      intakeSource: 'csv_import',
+      sourceFingerprint: 'fp-789',
+      autoPromote: false,
+      dedupeDiagnostics: {
+        matchType: 'email',
+        matchedDonorId: 'person-42',
+        matchedBy: 'email',
+        confidence: 1,
+      },
+    };
+
+    jest
+      .spyOn(giftService as unknown as { prepareGiftPayload: () => Promise<NormalizedGiftCreatePayload> }, 'prepareGiftPayload')
+      .mockResolvedValue(preparedPayload);
+
+    giftStagingService.isEnabled.mockReturnValue(true);
+    giftStagingService.stageGift.mockResolvedValue({
+      id: 'stg-900',
+      autoPromote: false,
+      promotionStatus: 'pending',
+      payload: preparedPayload,
+    });
+
+    const response = await giftService.createGift({});
+
+    expect(response).toEqual({
+      data: {
+        giftStaging: {
+          id: 'stg-900',
+          autoPromote: false,
+          promotionStatus: 'pending',
+        },
+      },
+      meta: {
+        stagedOnly: true,
+      },
+    });
+
+    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith('stg-900', {
+      dedupeStatus: 'matched_existing',
+    });
   });
 });

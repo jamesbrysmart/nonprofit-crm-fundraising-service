@@ -2,14 +2,19 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
+  InternalServerErrorException,
+  NotFoundException,
   Param,
   Patch,
   Post,
   Query,
   ServiceUnavailableException,
+  forwardRef,
 } from '@nestjs/common';
 import {
   GiftStagingService,
+  GiftStagingEntity,
   GiftStagingListResult,
   GiftStagingListQuery,
   GiftStagingStatusUpdate,
@@ -19,12 +24,32 @@ import {
   ProcessGiftArgs,
   ProcessGiftResult,
 } from './gift-staging-processing.service';
+import { GiftService } from '../gift/gift.service';
+
+interface GiftStagingCreateResponse {
+  data: {
+    giftStaging: {
+      id: string;
+      autoPromote: boolean;
+      promotionStatus: string;
+      validationStatus: string;
+      dedupeStatus: string;
+    };
+  };
+  meta: {
+    stagedOnly: boolean;
+    rawPayload?: string;
+    rawPayloadAvailable: boolean;
+  };
+}
 
 @Controller('gift-staging')
 export class GiftStagingController {
   constructor(
     private readonly giftStagingService: GiftStagingService,
     private readonly giftStagingProcessingService: GiftStagingProcessingService,
+    @Inject(forwardRef(() => GiftService))
+    private readonly giftService: GiftService,
   ) {}
 
   @Get()
@@ -43,6 +68,65 @@ export class GiftStagingController {
     };
 
     return this.giftStagingService.listGiftStaging(normalizedQuery);
+  }
+
+  @Get(':id')
+  async getGiftStaging(
+    @Param('id') stagingId: string,
+  ): Promise<{ data: { giftStaging: GiftStagingEntity } }> {
+    this.ensureEnabled();
+
+    const entity = await this.giftStagingService.getGiftStagingById(stagingId);
+    if (!entity) {
+      throw new NotFoundException('Gift staging record not found');
+    }
+
+    return {
+      data: {
+        giftStaging: entity,
+      },
+    };
+  }
+
+  @Post()
+  async createGiftStaging(@Body() body: unknown): Promise<GiftStagingCreateResponse> {
+    this.ensureEnabled();
+
+    const normalizedPayload = await this.giftService.normalizeCreateGiftPayload(body ?? {});
+    normalizedPayload.autoPromote = false;
+
+    const stagedRecord = await this.giftStagingService.stageGift(normalizedPayload);
+    if (!stagedRecord) {
+      throw new InternalServerErrorException('Failed to create gift staging record');
+    }
+
+    const stagingEntity = await this.giftStagingService.getGiftStagingById(stagedRecord.id);
+
+    const promotionStatus =
+      stagingEntity?.promotionStatus?.trim() ??
+      stagedRecord.promotionStatus ??
+      (stagedRecord.autoPromote ? 'committing' : 'pending');
+
+    const validationStatus = stagingEntity?.validationStatus ?? 'pending';
+    const dedupeStatus = stagingEntity?.dedupeStatus ?? 'pending';
+    const rawPayload = stagingEntity?.rawPayload;
+
+    return {
+      data: {
+        giftStaging: {
+          id: stagedRecord.id,
+          autoPromote: stagedRecord.autoPromote,
+          promotionStatus,
+          validationStatus,
+          dedupeStatus,
+        },
+      },
+      meta: {
+        stagedOnly: !stagedRecord.autoPromote,
+        rawPayload,
+        rawPayloadAvailable: typeof rawPayload === 'string' && rawPayload.length > 0,
+      },
+    };
   }
 
   @Post(':id/process')

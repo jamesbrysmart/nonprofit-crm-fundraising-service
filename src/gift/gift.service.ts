@@ -18,7 +18,18 @@ import {
 import type { GiftCreatePayload } from './gift.validation';
 import { GiftStagingService } from '../gift-staging/gift-staging.service';
 import { buildTwentyGiftPayload, extractCreateGiftId } from './gift-payload.util';
-import { GiftStagingRecord, NormalizedGiftCreatePayload } from './gift.types';
+import {
+  GiftDedupeDiagnostics,
+  GiftStagingRecord,
+  NormalizedGiftCreatePayload,
+} from './gift.types';
+
+interface ExistingPersonMatch {
+  personId: string;
+  matchedBy: 'email' | 'name';
+  confidence?: number;
+  candidateIds?: string[];
+}
 
 @Injectable()
 export class GiftService {
@@ -31,6 +42,14 @@ export class GiftService {
     private readonly giftStagingService: GiftStagingService,
   ) {}
 
+
+  async normalizeCreateGiftPayload(
+    payload: unknown,
+  ): Promise<NormalizedGiftCreatePayload> {
+    const sanitizedPayload = validateCreateGiftPayload(payload);
+    return this.prepareGiftPayload(sanitizedPayload);
+  }
+
   async createGift(payload: unknown): Promise<unknown> {
     const sanitizedPayload = validateCreateGiftPayload(payload);
     const preparedPayload = await this.prepareGiftPayload(sanitizedPayload);
@@ -39,8 +58,11 @@ export class GiftService {
     let shouldPromoteImmediately = true;
     try {
       stagingRecord = await this.giftStagingService.stageGift(preparedPayload);
-      if (this.giftStagingService.isEnabled() && stagingRecord && !stagingRecord.autoPromote) {
-        shouldPromoteImmediately = false;
+      if (this.giftStagingService.isEnabled() && stagingRecord) {
+        await this.applyDedupeStatusToStaging(stagingRecord.id, preparedPayload);
+        if (!stagingRecord.autoPromote) {
+          shouldPromoteImmediately = false;
+        }
       }
     } catch (error) {
       this.loggerInstance.warn(
@@ -110,6 +132,24 @@ export class GiftService {
   private async prepareGiftPayload(
     payload: GiftCreatePayload,
   ): Promise<NormalizedGiftCreatePayload> {
+    let contactFirstName: string | undefined;
+    let contactLastName: string | undefined;
+    let contactEmail: string | undefined;
+
+    if (payload.contact && typeof payload.contact === 'object') {
+      const contactPayload = payload.contact as Record<string, unknown>;
+      contactFirstName =
+        typeof contactPayload.firstName === 'string'
+          ? contactPayload.firstName.trim()
+          : undefined;
+      contactLastName =
+        typeof contactPayload.lastName === 'string' ? contactPayload.lastName.trim() : undefined;
+      contactEmail =
+        typeof contactPayload.email === 'string' && contactPayload.email.trim().length > 0
+          ? contactPayload.email.trim()
+          : undefined;
+    }
+
     const prepared: NormalizedGiftCreatePayload = {
       ...payload,
       currency:
@@ -120,24 +160,52 @@ export class GiftService {
         typeof payload.amountMinor === 'number'
           ? payload.amountMinor
           : Math.round((payload.amount?.value ?? 0) * 100),
+      amountMajor:
+        typeof payload.amount?.value === 'number'
+          ? payload.amount.value
+          : typeof payload.amountMinor === 'number'
+            ? Number((payload.amountMinor / 100).toFixed(2))
+            : undefined,
     };
+
+    let dedupeDiagnostics: GiftDedupeDiagnostics | undefined;
 
     if (prepared.contact && typeof prepared.contact === 'object') {
       const contactInput = prepared.contact as Record<string, unknown>;
       delete prepared.contact;
 
-      const existingPersonId = await this.findExistingPersonId(contactInput);
+      const existingPersonMatch = await this.findExistingPersonMatch(contactInput);
 
-      if (existingPersonId) {
+      if (existingPersonMatch) {
         this.loggerInstance.log(
-          `Reusing existing person ${existingPersonId} for gift contact`,
+          `Reusing existing person ${existingPersonMatch.personId} for gift contact (match=${existingPersonMatch.matchedBy})`,
           this.logContext,
         );
-        prepared.donorId = existingPersonId;
+        prepared.donorId = existingPersonMatch.personId;
+        dedupeDiagnostics = {
+          matchType: existingPersonMatch.matchedBy === 'email' ? 'email' : 'name',
+          matchedDonorId: existingPersonMatch.personId,
+          matchedBy: existingPersonMatch.matchedBy,
+          confidence: existingPersonMatch.confidence,
+          candidateDonorIds: existingPersonMatch.candidateIds,
+        };
+        if (existingPersonMatch.matchedBy !== 'email') {
+          prepared.autoPromote = false;
+        }
       } else {
         const personId = await this.createPerson(contactInput);
         prepared.donorId = personId;
       }
+    }
+
+    if (contactFirstName) {
+      prepared.donorFirstName = contactFirstName;
+    }
+    if (contactLastName) {
+      prepared.donorLastName = contactLastName;
+    }
+    if (contactEmail) {
+      prepared.donorEmail = contactEmail;
     }
 
     if (
@@ -183,6 +251,10 @@ export class GiftService {
       prepared.sourceFingerprint = fingerprintSeed.length > 0 ? fingerprintSeed : this.generateFallbackFingerprint();
     } else {
       prepared.sourceFingerprint = prepared.sourceFingerprint.trim();
+    }
+
+    if (dedupeDiagnostics) {
+      prepared.dedupeDiagnostics = dedupeDiagnostics;
     }
 
     return prepared;
@@ -233,9 +305,9 @@ export class GiftService {
     return personId;
   }
 
-  private async findExistingPersonId(
+  private async findExistingPersonMatch(
     contact: Record<string, unknown>,
-  ): Promise<string | undefined> {
+  ): Promise<ExistingPersonMatch | undefined> {
     const firstName =
       typeof contact.firstName === 'string' ? contact.firstName.trim() : undefined;
     const lastName =
@@ -281,9 +353,9 @@ export class GiftService {
         this.logContext,
       );
 
-      const duplicateId = this.extractDuplicatePersonId(response, email);
-      if (duplicateId) {
-        return duplicateId;
+      const match = this.extractDuplicatePersonMatch(response, email);
+      if (match) {
+        return match;
       }
     } catch (error) {
       const message =
@@ -297,10 +369,10 @@ export class GiftService {
     return undefined;
   }
 
-  private extractDuplicatePersonId(
+  private extractDuplicatePersonMatch(
     response: unknown,
     email?: string,
-  ): string | undefined {
+  ): ExistingPersonMatch | undefined {
     if (!response || typeof response !== 'object') {
       return undefined;
     }
@@ -311,6 +383,9 @@ export class GiftService {
     }
 
     const normalizedEmail = email?.trim().toLowerCase();
+    const candidateIds = new Set<string>();
+    let emailMatchedId: string | undefined;
+    let fallbackId: string | undefined;
 
     for (const entry of data) {
       if (!entry || typeof entry !== 'object') {
@@ -322,8 +397,6 @@ export class GiftService {
         continue;
       }
 
-      let fallbackId: string | undefined;
-
       for (const duplicate of duplicates) {
         if (!duplicate || typeof duplicate !== 'object') {
           continue;
@@ -334,6 +407,8 @@ export class GiftService {
           continue;
         }
 
+        candidateIds.add(duplicateId);
+
         if (normalizedEmail) {
           const emails = (duplicate as Record<string, unknown>).emails;
           if (emails && typeof emails === 'object') {
@@ -342,7 +417,8 @@ export class GiftService {
               typeof primaryEmail === 'string' &&
               primaryEmail.trim().toLowerCase() === normalizedEmail
             ) {
-              return duplicateId;
+              emailMatchedId = duplicateId;
+              break;
             }
           }
         }
@@ -352,9 +428,29 @@ export class GiftService {
         }
       }
 
-      if (fallbackId) {
-        return fallbackId;
+      if (emailMatchedId) {
+        break;
       }
+    }
+
+    const candidateList = Array.from(candidateIds);
+
+    if (emailMatchedId) {
+      return {
+        personId: emailMatchedId,
+        matchedBy: 'email',
+        confidence: 1,
+        candidateIds: candidateList,
+      };
+    }
+
+    if (fallbackId) {
+      return {
+        personId: fallbackId,
+        matchedBy: 'name',
+        confidence: 0.5,
+        candidateIds: candidateList,
+      };
     }
 
     return undefined;
@@ -437,6 +533,32 @@ export class GiftService {
 
   private generateFallbackFingerprint(): string {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  private async applyDedupeStatusToStaging(
+    stagingId: string,
+    payload: NormalizedGiftCreatePayload,
+  ): Promise<void> {
+    const diagnostics = payload.dedupeDiagnostics;
+    if (!diagnostics) {
+      return;
+    }
+
+    const dedupeStatus =
+      diagnostics.matchType === 'email' ? 'matched_existing' : 'needs_review';
+
+    try {
+      await this.giftStagingService.updateStatusById(stagingId, {
+        dedupeStatus,
+      });
+    } catch (error) {
+      this.loggerInstance.warn(
+        `Failed to update dedupe status for stagingId=${stagingId}: ${
+          error instanceof Error ? error.message : error
+        }`,
+        this.logContext,
+      );
+    }
   }
 
   private buildStagingAcknowledgementResponse(

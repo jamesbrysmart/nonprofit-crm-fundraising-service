@@ -3,9 +3,13 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
     currencyCode: string;
     value: number;
   };
+  amountMajor?: number;
   amountMinor: number;
   currency: string;
   donorId?: string;
+  donorFirstName?: string;
+  donorLastName?: string;
+  donorEmail?: string;
   externalId?: string;
   paymentMethod?: string;
   intakeSource?: string;
@@ -19,6 +23,8 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   dateReceived?: string;
   giftBatchId?: string;
   giftAidEligible?: boolean;
+  dedupeDiagnostics?: GiftDedupeDiagnostics;
+  notes?: string;
 }
 
 export interface GiftStagingRecord {
@@ -26,4 +32,12 @@ export interface GiftStagingRecord {
   autoPromote: boolean;
   promotionStatus?: string;
   payload: NormalizedGiftCreatePayload;
+}
+
+export interface GiftDedupeDiagnostics {
+  matchType: 'email' | 'name' | 'partial';
+  matchedDonorId?: string;
+  matchedBy?: 'email' | 'name' | 'other';
+  confidence?: number;
+  candidateDonorIds?: string[];
 }
