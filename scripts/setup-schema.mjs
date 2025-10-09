@@ -190,6 +190,30 @@ async function main() {
     type: "DATE"
   });
 
+  console.log('--- Ensuring Person Rollup Fields ---');
+  const personObjectId = await findObjectByNameSingular('person');
+  if (!personObjectId) {
+    throw new Error('Unable to locate core Person object via metadata API; cannot create rollup fields.');
+  }
+
+  const personRollupFields = [
+    { name: 'lifetimeGiftAmount', label: 'Lifetime Gift Amount', type: 'CURRENCY' },
+    { name: 'lifetimeGiftCount', label: 'Lifetime Gift Count', type: 'NUMBER' },
+    { name: 'lastGiftDate', label: 'Last Gift Date', type: 'DATE' },
+    { name: 'firstGiftDate', label: 'First Gift Date', type: 'DATE' },
+    { name: 'yearToDateGiftAmount', label: 'Year-To-Date Gift Amount', type: 'CURRENCY' },
+    { name: 'yearToDateGiftCount', label: 'Year-To-Date Gift Count', type: 'NUMBER' },
+  ];
+
+  for (const field of personRollupFields) {
+    await createField({
+      objectMetadataId: personObjectId,
+      name: field.name,
+      label: field.label,
+      type: field.type,
+    });
+  }
+
   console.log('--- Setting up Gift Staging Object ---');
   const giftStagingObjectId = await ensureObject({
     nameSingular: 'giftStaging',
