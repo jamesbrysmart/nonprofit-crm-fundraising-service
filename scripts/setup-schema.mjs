@@ -7,7 +7,7 @@ import { dirname } from 'path';
 // --- Start Diagnostics ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const defaultEnvPath = path.resolve(__dirname, '..', '..', '..', '.env');
+const defaultEnvPath = path.resolve(__dirname, '..', '.env');
 const envFilePath = process.env.TWENTY_ENV_PATH
   ? path.resolve(process.env.TWENTY_ENV_PATH)
   : defaultEnvPath;
@@ -176,19 +176,22 @@ async function main() {
     description: "A single donation made by a contact to a campaign."
   });
 
-  await createField({
-    objectMetadataId: giftObjectId,
-    name: "amount",
-    label: "Amount",
-    type: "CURRENCY"
-  });
+  const giftFields = [
+    { name: "amount", label: "Amount", type: "CURRENCY" },
+    { name: "date", label: "Gift Date", type: "DATE" },
+    { name: "donorFirstName", label: "Donor First Name", type: "TEXT" },
+    { name: "donorLastName", label: "Donor Last Name", type: "TEXT" },
+    { name: "donorEmail", label: "Donor Email", type: "TEXT" },
+  ];
 
-  await createField({
-    objectMetadataId: giftObjectId,
-    name: "date",
-    label: "Gift Date",
-    type: "DATE"
-  });
+  for (const field of giftFields) {
+    await createField({
+      objectMetadataId: giftObjectId,
+      name: field.name,
+      label: field.label,
+      type: field.type,
+    });
+  }
 
   console.log('--- Ensuring Person Rollup Fields ---');
   const personObjectId = await findObjectByNameSingular('person');
@@ -243,6 +246,7 @@ async function main() {
     { name: 'donorLastName', label: 'Donor Last Name', type: 'TEXT' },
     { name: 'donorEmail', label: 'Donor Email', type: 'TEXT' },
     { name: 'notes', label: 'Notes', type: 'TEXT' },
+    { name: 'errorDetail', label: 'Error Detail', type: 'RAW_JSON' },
     { name: 'rawPayload', label: 'Raw Payload', type: 'RAW_JSON' },
   ];
 
