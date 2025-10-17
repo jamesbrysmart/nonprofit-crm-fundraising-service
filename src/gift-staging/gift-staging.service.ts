@@ -425,9 +425,11 @@ export class GiftStagingService {
       sourceFingerprint: payload.sourceFingerprint,
       source: payload.intakeSource,
       externalId: payload.externalId,
-      amount: payload.amountMajor,
+      amount: {
+        value: payload.amountMajor,
+        currencyCode: payload.currency,
+      },
       amountMinor: payload.amountMinor,
-      currency: payload.currency,
       paymentMethod: payload.paymentMethod,
       dateReceived: payload.dateReceived ?? payload.giftDate,
       giftAidEligible: payload.giftAidEligible ?? false,

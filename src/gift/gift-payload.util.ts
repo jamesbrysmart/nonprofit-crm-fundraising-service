@@ -15,10 +15,19 @@ export const buildTwentyGiftPayload = (
   delete body.sourceFingerprint;
   delete body.autoPromote;
   delete body.giftAidEligible;
+  delete body.amountMajor;
 
   if (!body.giftDate && typeof payload.dateReceived === 'string') {
     body.giftDate = payload.dateReceived;
   }
+
+  if (payload.amountMajor && payload.currency) {
+    body.amount = {
+      value: payload.amountMajor,
+      currencyCode: payload.currency,
+    };
+  }
+
 
   delete body.appealId;
   delete body.appealSegmentId;
