@@ -32,7 +32,7 @@ Fundraising service is the managed-extension API that brokers donation intake in
 ### Getting Started
 - **Docker (recommended for dev stack)**  
   ```
-  docker compose --profile fast up -d --build
+  docker compose up -d --build
   ```
   Refer to `docs/OPERATIONS_RUNBOOK.md` for deeper operations guidance and smoke checks.
 
