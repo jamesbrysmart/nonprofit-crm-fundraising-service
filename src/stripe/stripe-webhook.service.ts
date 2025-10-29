@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { StructuredLoggerService } from '../logging/structured-logger.service';
 import { GiftService } from '../gift/gift.service';
+import { RecurringAgreementService } from '../recurring-agreement/recurring-agreement.service';
+import { RecurringAgreementPayload } from '../recurring-agreement/recurring-agreement.types';
 
 interface HandleIncomingEventArgs {
   signature: string | string[] | undefined;
@@ -18,6 +20,7 @@ export class StripeWebhookService {
   constructor(
     private readonly configService: ConfigService,
     private readonly giftService: GiftService,
+    private readonly recurringAgreementService: RecurringAgreementService,
     private readonly logger: StructuredLoggerService,
   ) {
     const apiKey = this.configService.get<string>('STRIPE_API_KEY') ?? '';
@@ -112,6 +115,8 @@ export class StripeWebhookService {
     if (contact) {
       giftPayload.contact = contact;
     }
+
+    await this.enrichWithRecurringAgreement(session, metadata, giftPayload, paymentIntentId);
 
     this.logger.info('Forwarding Stripe checkout session to fundraising proxy', {
       event: 'stripe_checkout_session_forward',
@@ -208,6 +213,67 @@ export class StripeWebhookService {
     return contact;
   }
 
+  private async enrichWithRecurringAgreement(
+    session: Stripe.Checkout.Session,
+    metadata: Stripe.Metadata,
+    giftPayload: Record<string, unknown>,
+    paymentIntentId?: string,
+  ): Promise<void> {
+    giftPayload.provider = 'stripe';
+    giftPayload.providerPaymentId = paymentIntentId ?? session.id;
+    giftPayload.providerContext = this.buildStripeProviderContext(session, metadata, paymentIntentId);
+
+    const subscriptionId = this.extractSubscriptionId(session);
+    if (subscriptionId) {
+      giftPayload.recurringStatus = 'active';
+    }
+
+    const metadataAgreementId = this.lookupMetadataValue(metadata, [
+      'recurringAgreementId',
+      'recurring_agreement_id',
+    ]);
+    const trimmedAgreementId = metadataAgreementId?.trim();
+    if (!trimmedAgreementId) {
+      this.logger.debug('Stripe webhook missing recurring agreement metadata; skipping agreement sync', {
+        event: 'stripe_webhook_missing_recurring_agreement_id',
+        stripeSessionId: session.id,
+      });
+      return;
+    }
+
+    giftPayload.recurringAgreementId = trimmedAgreementId;
+
+    const nextExpectedAt =
+      this.lookupMetadataValue(metadata, ['nextExpectedAt', 'next_expected_at']) ?? undefined;
+    if (nextExpectedAt) {
+      giftPayload.expectedAt = nextExpectedAt;
+    }
+
+    const agreementUpdate: RecurringAgreementPayload = {
+      status: 'active',
+      provider: 'stripe',
+      providerAgreementId: subscriptionId,
+      providerPaymentMethodId: this.extractPaymentMethodId(session),
+      providerContext: this.buildStripeProviderContext(session, metadata, paymentIntentId),
+      nextExpectedAt,
+    };
+
+    try {
+      await this.recurringAgreementService.updateAgreement(trimmedAgreementId, agreementUpdate);
+    } catch (error) {
+      this.logger.warn(
+        'Failed to update recurring agreement from Stripe webhook',
+        {
+          event: 'stripe_webhook_recurring_agreement_update_failed',
+          recurringAgreementId: trimmedAgreementId,
+          stripeSessionId: session.id,
+        },
+        StripeWebhookService.name,
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
   private normalizeName(value: unknown): string | undefined {
     if (typeof value !== 'string') {
       return undefined;
@@ -234,6 +300,73 @@ export class StripeWebhookService {
       }
     }
     return undefined;
+  }
+
+  private extractSubscriptionId(session: Stripe.Checkout.Session): string | undefined {
+    const { subscription } = session;
+    if (!subscription) {
+      return undefined;
+    }
+
+    if (typeof subscription === 'string') {
+      return subscription;
+    }
+
+    return subscription.id ?? undefined;
+  }
+
+  private extractPaymentMethodId(session: Stripe.Checkout.Session): string | undefined {
+    if (!session.payment_method) {
+      return undefined;
+    }
+
+    if (typeof session.payment_method === 'string') {
+      return session.payment_method;
+    }
+
+    return session.payment_method.id;
+  }
+
+  private buildStripeProviderContext(
+    session: Stripe.Checkout.Session,
+    metadata: Stripe.Metadata,
+    paymentIntentId?: string,
+  ): Record<string, unknown> {
+    const subscriptionId = this.extractSubscriptionId(session);
+    const customerId =
+      typeof session.customer === 'string'
+        ? session.customer
+        : session.customer
+          ? session.customer.id
+          : undefined;
+
+    const cleanedMetadata: Record<string, string> = {};
+    Object.entries(metadata ?? {}).forEach(([key, value]) => {
+      if (typeof value === 'string' && value.trim().length > 0) {
+        cleanedMetadata[key] = value;
+      }
+    });
+
+    const context: Record<string, unknown> = {
+      checkoutSessionId: session.id,
+      paymentIntentId,
+      subscriptionId,
+      customerId,
+      mode: session.mode,
+      metadata: Object.keys(cleanedMetadata).length > 0 ? cleanedMetadata : undefined,
+    };
+
+    return this.pruneUndefined(context);
+  }
+
+  private pruneUndefined(input: Record<string, unknown>): Record<string, unknown> {
+    const output: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (value !== undefined && value !== null) {
+        output[key] = value;
+      }
+    }
+    return output;
   }
 
   private splitFullName(fullName: string): { firstName?: string; lastName?: string } {

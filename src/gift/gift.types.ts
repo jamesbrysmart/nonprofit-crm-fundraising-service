@@ -25,6 +25,13 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   giftAidEligible?: boolean;
   dedupeDiagnostics?: GiftDedupeDiagnostics;
   notes?: string;
+  recurringAgreementId?: string;
+  expectedAt?: string;
+  provider?: string;
+  providerPaymentId?: string;
+  providerContext?: Record<string, unknown> | string;
+  recurringStatus?: string;
+  recurringMetadata?: Record<string, unknown>;
 }
 
 export interface GiftStagingRecord {

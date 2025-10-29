@@ -5,17 +5,18 @@ Fundraising service is the managed-extension API that brokers donation intake in
 ### Highlights
 - NestJS service with React/Vite client bundled into the same container (`/fundraising` route served by `main.ts`).
 - Gift proxy with validation, contact dedupe against Twenty `/people/duplicates`, and optional staging/processing path.
-- Stripe webhook adapter normalises `checkout.session.completed` events into the gift contract defined in `docs/features/donation-intake.md`.
+- Recurring agreement proxy for CRUD access to the `recurringAgreements` metadata we provisioned (Stripe/GoCardless first slice).
+- Stripe webhook adapter normalises `checkout.session.completed` events into the gift contract defined in `docs/features/donation-intake.md` and enriches recurring metadata.
 - Structured JSON logging plus `x-request-id` propagation for request tracing (see `docs/OPERATIONS_RUNBOOK.md`).
 - Smoke scripts and metadata helpers to provision the custom objects described in `docs/data-model/fundraising.md`.
 
 ### Architecture Overview
-- `AppModule` wires core modules: `GiftModule`, `GiftStagingModule`, `PeopleModule`, `StripeModule`, `TwentyModule`, and logging.
+- `AppModule` wires core modules: `GiftModule`, `GiftStagingModule`, `PeopleModule`, `RecurringAgreementModule`, `StripeModule`, `TwentyModule`, and logging.
 - `GiftService` prepares payloads, ensures donor contacts exist, and calls Twenty via `TwentyApiService` with retries and error logging.
 - `GiftStagingService` and `GiftStagingProcessingService` implement the staging state machine described in `docs/features/donation-staging.md`; they remain behind `FUNDRAISING_ENABLE_GIFT_STAGING`.
 - `PeopleService` exposes `/people/duplicates` proxying to Twenty to support manual intake dedupe.
 - `StripeWebhookService` verifies signatures, converts checkout sessions into the canonical gift payload, and reuses the gift service for promotion (`docs/DONATION_CONNECTOR_SCAFFOLDING.md`).
-- Frontend (`client/`) provides the POC manual gift entry UI that exercises the same API.
+- Frontend (`client/`) provides the POC manual gift entry UI, staging queue with recurring filters, and a lightweight recurring agreement list.
 
 ### API Surface (default prefix `http://localhost:4500/api/fundraising`)
 - `POST /gifts` → validate payload, optionally stage, or forward to Twenty `/gifts`.
@@ -27,6 +28,10 @@ Fundraising service is the managed-extension API that brokers donation intake in
   - `PATCH /gift-staging/:id/status` → reviewer updates for validation/dedupe state.
   - `POST /gift-staging/:id/process` → manual processing path (`docs/solutions/gift-staging-processing.md`).
   - _Heads-up_: older scripts may still target `/promote`; update them to `/process` as you bump dependencies.
+- Recurring agreements:
+  - `GET /recurring-agreements` → proxy Twenty recurring agreement records (supports `limit`, `cursor`, and client-side filters).
+  - `POST /recurring-agreements` / `PATCH /recurring-agreements/:id` → pass-through for metadata updates (used by connectors).
+- GoCardless webhook skeleton (`POST /webhooks/gocardless`) logs incoming events and prepares for Direct Debit ingestion.
 - Health: `GET /health` is exposed separately without the `/api/fundraising` prefix.
 
 ### Getting Started

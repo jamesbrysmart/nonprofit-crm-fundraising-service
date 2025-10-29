@@ -9,11 +9,13 @@ interface UseGiftStagingListResult {
   refresh: () => Promise<void>;
 }
 
-export function useGiftStagingList(): UseGiftStagingListResult {
+export function useGiftStagingList(filters: { recurringAgreementId?: string } = {}): UseGiftStagingListResult {
   const [items, setItems] = useState<GiftStagingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const activeRecurringAgreementId = filters.recurringAgreementId?.trim() || undefined;
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh' = 'initial') => {
@@ -28,6 +30,7 @@ export function useGiftStagingList(): UseGiftStagingListResult {
         const response = await fetchGiftStagingList({
           limit: 50,
           sort: 'updatedAt:desc',
+          recurringAgreementId: activeRecurringAgreementId,
         });
         setItems(response.data ?? []);
       } catch (err) {
@@ -43,7 +46,7 @@ export function useGiftStagingList(): UseGiftStagingListResult {
         }
       }
     },
-    [],
+    [activeRecurringAgreementId],
   );
 
   useEffect(() => {

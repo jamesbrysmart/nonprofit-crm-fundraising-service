@@ -14,6 +14,12 @@ const ALLOWED_STRING_FIELDS = new Set([
   'giftBatchId',
   'intakeSource',
   'sourceFingerprint',
+  'recurringAgreementId',
+  'provider',
+  'providerAgreementId',
+  'providerPaymentId',
+  'expectedAt',
+  'recurringStatus',
 ]);
 
 const ALLOWED_NUMBER_FIELDS = new Set(['amountMicros', 'amountMinor']);
@@ -162,6 +168,31 @@ const collectAllowedFields = (
 
     if (ALLOWED_BOOLEAN_FIELDS.has(key)) {
       normalizeBooleanField(result, key, value);
+      continue;
+    }
+
+    if (key === 'providerContext') {
+      if (
+        value === undefined ||
+        value === null ||
+        typeof value === 'string' ||
+        isPlainObject(value)
+      ) {
+        result.providerContext = value;
+      } else {
+        throw new BadRequestException('providerContext must be an object or JSON string');
+      }
+      continue;
+    }
+
+    if (key === 'recurringMetadata') {
+      if (value === undefined || value === null) {
+        continue;
+      }
+      if (!isPlainObject(value)) {
+        throw new BadRequestException('recurringMetadata must be an object');
+      }
+      result.recurringMetadata = value;
       continue;
     }
 

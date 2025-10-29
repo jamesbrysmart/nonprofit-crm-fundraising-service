@@ -1,5 +1,27 @@
 import { NormalizedGiftCreatePayload } from './gift.types';
 
+const normalizeProviderContext = (
+  input: Record<string, unknown> | string | undefined,
+): Record<string, unknown> | undefined => {
+  if (!input) {
+    return undefined;
+  }
+
+  if (typeof input === 'string') {
+    try {
+      const parsed = JSON.parse(input);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return undefined;
+    }
+    return undefined;
+  }
+
+  return input;
+};
+
 export const buildTwentyGiftPayload = (
   payload: NormalizedGiftCreatePayload,
 ): Record<string, unknown> => {
@@ -16,6 +38,7 @@ export const buildTwentyGiftPayload = (
   delete body.autoPromote;
   delete body.giftAidEligible;
   delete body.amountMajor;
+  delete body.expectedAt;
 
   if (!body.giftDate && typeof payload.dateReceived === 'string') {
     body.giftDate = payload.dateReceived;
@@ -28,7 +51,13 @@ export const buildTwentyGiftPayload = (
     };
   }
 
+  const providerContext = normalizeProviderContext(payload.providerContext);
+  if (providerContext && !body.recurringMetadata) {
+    body.recurringMetadata = providerContext;
+  }
 
+  delete body.providerContext;
+  delete body.dedupeDiagnostics;
   delete body.appealId;
   delete body.appealSegmentId;
   delete body.trackingCodeId;

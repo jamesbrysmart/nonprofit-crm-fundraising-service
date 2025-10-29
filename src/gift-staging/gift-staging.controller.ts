@@ -65,6 +65,7 @@ export class GiftStagingController {
       cursor: this.toOptionalString(query.cursor),
       limit: this.toOptionalNumber(query.limit),
       sort: this.toOptionalString(query.sort),
+      recurringAgreementId: this.toOptionalString(query.recurringAgreementId),
     };
 
     return this.giftStagingService.listGiftStaging(normalizedQuery);

@@ -7,21 +7,33 @@ import { dirname } from 'path';
 // --- Start Diagnostics ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const defaultEnvPath = path.resolve(__dirname, '..', '.env');
-const envFilePath = process.env.TWENTY_ENV_PATH
-  ? path.resolve(process.env.TWENTY_ENV_PATH)
-  : defaultEnvPath;
+const localEnvPath = path.resolve(__dirname, '..', '.env');
+const rootEnvPath = path.resolve(__dirname, '..', '..', '..', '.env');
+const envCandidates = [
+  process.env.TWENTY_ENV_PATH ? path.resolve(process.env.TWENTY_ENV_PATH) : null,
+  localEnvPath,
+  rootEnvPath,
+].filter(Boolean);
+const envFilePath = envCandidates[0];
 console.log(`Script execution started.`);
 console.log(`Script's absolute path: ${__filename}`);
 console.log(`Script's dirname: ${__dirname}`);
 console.log(`Calculated .env path: ${envFilePath}`);
 console.log(`Current working directory (process.cwd()): ${process.cwd()}`);
 
-const result = dotenv.config({ path: envFilePath, debug: true }); // Add debug for dotenv
-if (result.error) {
-  console.error('ERROR loading .env file:', result.error);
+let resolvedEnvPath = null;
+for (const candidate of envCandidates) {
+  const result = dotenv.config({ path: candidate, debug: true });
+  if (result.error) {
+    console.warn(`WARN: failed to load ${candidate}:`, result.error.message);
+    continue;
+  }
+  resolvedEnvPath = candidate;
+  console.log(`Dotenv parsed object from ${candidate}:`, result.parsed);
+  if (process.env.TWENTY_API_KEY) {
+    break;
+  }
 }
-console.log('Dotenv parsed object:', result.parsed);
 console.log(`TWENTY_API_KEY from process.env (after dotenv): ${process.env.TWENTY_API_KEY}`);
 // --- End Diagnostics ---
 
@@ -182,6 +194,11 @@ async function main() {
     { name: "donorFirstName", label: "Donor First Name", type: "TEXT" },
     { name: "donorLastName", label: "Donor Last Name", type: "TEXT" },
     { name: "donorEmail", label: "Donor Email", type: "TEXT" },
+    { name: "provider", label: "Provider", type: "TEXT" },
+    { name: "providerPaymentId", label: "Provider Payment ID", type: "TEXT" },
+    { name: "intakeSource", label: "Intake Source", type: "TEXT" },
+    { name: "recurringStatus", label: "Recurring Status Snapshot", type: "TEXT" },
+    { name: "recurringMetadata", label: "Recurring Metadata", type: "RAW_JSON" },
   ];
 
   for (const field of giftFields) {
@@ -236,12 +253,16 @@ async function main() {
     { name: 'amountMinor', label: 'Amount (minor units)', type: 'NUMBER' },
     { name: 'paymentMethod', label: 'Payment Method', type: 'TEXT' },
     { name: 'dateReceived', label: 'Date Received', type: 'DATE' },
+    { name: 'expectedAt', label: 'Expected At', type: 'DATE' },
     { name: 'validationStatus', label: 'Validation Status', type: 'TEXT' },
     { name: 'dedupeStatus', label: 'Dedupe Status', type: 'TEXT' },
     { name: 'promotionStatus', label: 'Promotion Status', type: 'TEXT' },
     { name: 'autoPromote', label: 'Auto Promote', type: 'BOOLEAN' },
     { name: 'giftAidEligible', label: 'Gift Aid Eligible', type: 'BOOLEAN' },
     { name: 'giftBatchId', label: 'Gift Batch ID', type: 'TEXT' },
+    { name: 'provider', label: 'Provider', type: 'TEXT' },
+    { name: 'providerPaymentId', label: 'Provider Payment ID', type: 'TEXT' },
+    { name: 'providerContext', label: 'Provider Context', type: 'RAW_JSON' },
     { name: 'donorFirstName', label: 'Donor First Name', type: 'TEXT' },
     { name: 'donorLastName', label: 'Donor Last Name', type: 'TEXT' },
     { name: 'donorEmail', label: 'Donor Email', type: 'TEXT' },
@@ -259,13 +280,60 @@ async function main() {
     });
   }
 
+  console.log('--- Setting up Recurring Agreement Object ---');
+  const recurringAgreementObjectId = await ensureObject({
+    nameSingular: 'recurringAgreement',
+    namePlural: 'recurringAgreements',
+    labelSingular: 'Recurring Agreement',
+    labelPlural: 'Recurring Agreements',
+    icon: 'IconRepeat',
+    description: 'Represents a donor’s recurring commitment (amount, cadence, defaults, provider linkage).',
+  });
+
+  const recurringAgreementFields = [
+    { name: 'status', label: 'Status', type: 'TEXT' },
+    { name: 'cadence', label: 'Cadence', type: 'TEXT' },
+    { name: 'intervalCount', label: 'Interval Count', type: 'NUMBER' },
+    { name: 'amountMinor', label: 'Amount (minor units)', type: 'NUMBER' },
+    { name: 'currency', label: 'Currency', type: 'TEXT' },
+    { name: 'startDate', label: 'Start Date', type: 'DATE' },
+    { name: 'endDate', label: 'End Date', type: 'DATE' },
+    { name: 'nextExpectedAt', label: 'Next Expected At', type: 'DATE' },
+    { name: 'autoPromoteEnabled', label: 'Auto Promote Enabled', type: 'BOOLEAN' },
+    { name: 'defaultCampaignId', label: 'Default Campaign ID', type: 'TEXT' },
+    { name: 'defaultFundId', label: 'Default Fund ID', type: 'TEXT' },
+    { name: 'defaultSoftCreditJson', label: 'Default Soft Credit JSON', type: 'RAW_JSON' },
+    { name: 'giftAidDeclarationId', label: 'Gift Aid Declaration ID', type: 'TEXT' },
+    { name: 'provider', label: 'Provider', type: 'TEXT' },
+    { name: 'providerAgreementId', label: 'Provider Agreement ID', type: 'TEXT' },
+    { name: 'providerPaymentMethodId', label: 'Provider Payment Method ID', type: 'TEXT' },
+    { name: 'mandateReference', label: 'Mandate Reference', type: 'TEXT' },
+    { name: 'providerContext', label: 'Provider Context', type: 'RAW_JSON' },
+    { name: 'source', label: 'Source', type: 'TEXT' },
+    { name: 'canceledAt', label: 'Canceled At', type: 'DATE_TIME' },
+    { name: 'completedAt', label: 'Completed At', type: 'DATE_TIME' },
+    { name: 'statusUpdatedAt', label: 'Status Updated At', type: 'DATE_TIME' },
+  ];
+
+  for (const field of recurringAgreementFields) {
+    await createField({
+      objectMetadataId: recurringAgreementObjectId,
+      name: field.name,
+      label: field.label,
+      type: field.type,
+    });
+  }
+
   console.log('--- Linking Objects (Manual Step Required) ---');
   console.log('NOTE: RELATION/LOOKUP fields cannot be created via API at this time.');
   console.log('Please create the following LOOKUP fields manually in the Twenty UI:');
   console.log('- For Gift object: "Campaign" (linking to Campaign object)');
   console.log('- For Gift object: "Contact" (linking to Person object)');
+  console.log('- For Gift object: "Recurring Agreement" (linking to Recurring Agreement object)');
   console.log('- For Gift Staging object: "Gift" (linking to Gift object)');
   console.log('- For Gift Staging object: "Gift Batch" (linking to Gift Batch object, optional)');
+  console.log('- For Gift Staging object: "Recurring Agreement" (linking to Recurring Agreement object)');
+  console.log('- For Recurring Agreement object: "Contact" (linking to Person object)');
 
   console.log('✅ Twenty CRM custom objects and fields setup complete (manual steps for LOOKUP fields pending).');
 }

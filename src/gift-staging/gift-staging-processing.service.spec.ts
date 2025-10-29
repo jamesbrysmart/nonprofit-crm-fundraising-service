@@ -7,12 +7,14 @@ import { GiftStagingService, GiftStagingEntity } from './gift-staging.service';
 import { TwentyApiService } from '../twenty/twenty-api.service';
 import { StructuredLoggerService } from '../logging/structured-logger.service';
 import { NormalizedGiftCreatePayload } from '../gift/gift.types';
+import { RecurringAgreementService } from '../recurring-agreement/recurring-agreement.service';
 
 describe('GiftStagingProcessingService (manual processing)', () => {
   let service: GiftStagingProcessingService;
   let giftStagingService: jest.Mocked<GiftStagingService>;
   let twentyApiService: jest.Mocked<TwentyApiService>;
   let structuredLogger: jest.Mocked<StructuredLoggerService>;
+  let recurringAgreementService: jest.Mocked<RecurringAgreementService>;
 
   const basePayload: NormalizedGiftCreatePayload = {
     amount: { currencyCode: 'GBP', value: 12.34 },
@@ -49,10 +51,15 @@ describe('GiftStagingProcessingService (manual processing)', () => {
       debug: jest.fn(),
     } as unknown as jest.Mocked<StructuredLoggerService>;
 
+    recurringAgreementService = {
+      updateAgreement: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<RecurringAgreementService>;
+
     service = new GiftStagingProcessingService(
       giftStagingService,
       twentyApiService,
       structuredLogger,
+      recurringAgreementService,
     );
   });
 
@@ -274,23 +281,42 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     );
   });
 
-  it('creates gift, marks staging committed, and returns success when eligible', async () => {
-    giftStagingService.getGiftStagingById.mockResolvedValue(baseStaging);
-    twentyApiService.request.mockResolvedValue({ data: { createGift: { id: 'gift-100' } } });
+it('creates gift, marks staging committed, and returns success when eligible', async () => {
+  giftStagingService.getGiftStagingById.mockResolvedValue(baseStaging);
+  twentyApiService.request.mockResolvedValue({ data: { createGift: { id: 'gift-100' } } });
 
-    const result = await service.processGift({ stagingId: 'stg-123' });
+  const result = await service.processGift({ stagingId: 'stg-123' });
 
-    expect(result).toEqual({ status: 'committed', stagingId: 'stg-123', giftId: 'gift-100' });
-    expect(twentyApiService.request).toHaveBeenCalledWith(
-      'POST',
-      '/gifts',
-      expect.objectContaining({ amount: basePayload.amount }),
-      'GiftStagingProcessingService',
-    );
-    expect(giftStagingService.markCommittedById).toHaveBeenCalledWith('stg-123', 'gift-100');
-    expect(giftStagingService.updateStatusById).toHaveBeenCalledTimes(1);
-    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith('stg-123', {
-      promotionStatus: 'committing',
-    });
+  expect(result).toEqual({ status: 'committed', stagingId: 'stg-123', giftId: 'gift-100' });
+  expect(twentyApiService.request).toHaveBeenCalledWith(
+    'POST',
+    '/gifts',
+    expect.objectContaining({ amount: basePayload.amount }),
+    'GiftStagingProcessingService',
+  );
+  expect(giftStagingService.markCommittedById).toHaveBeenCalledWith('stg-123', 'gift-100');
+  expect(giftStagingService.updateStatusById).toHaveBeenCalledTimes(1);
+  expect(giftStagingService.updateStatusById).toHaveBeenCalledWith('stg-123', {
+    promotionStatus: 'committing',
   });
+  expect(recurringAgreementService.updateAgreement).not.toHaveBeenCalled();
+});
+
+it('updates recurring agreement when staging is linked', async () => {
+  giftStagingService.getGiftStagingById.mockResolvedValue({
+    ...baseStaging,
+    recurringAgreementId: 'ra-123',
+    expectedAt: '2025-12-01',
+  });
+  twentyApiService.request.mockResolvedValue({ data: { createGift: { id: 'gift-101' } } });
+
+  const result = await service.processGift({ stagingId: 'stg-123' });
+
+  expect(result).toEqual({ status: 'committed', stagingId: 'stg-123', giftId: 'gift-101' });
+  expect(giftStagingService.markCommittedById).toHaveBeenCalledWith('stg-123', 'gift-101');
+  expect(recurringAgreementService.updateAgreement).toHaveBeenCalledWith('ra-123', {
+    nextExpectedAt: '2025-12-01',
+    status: 'active',
+  });
+});
 });

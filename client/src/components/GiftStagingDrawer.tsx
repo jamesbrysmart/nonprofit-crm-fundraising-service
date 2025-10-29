@@ -225,6 +225,22 @@ export function GiftStagingDrawer({
                   <dd>{detail.giftId ?? 'Not committed yet'}</dd>
                 </div>
                 <div>
+                  <dt>Recurring agreement</dt>
+                  <dd>{detail.recurringAgreementId ? <code>{detail.recurringAgreementId}</code> : '—'}</dd>
+                </div>
+                <div>
+                  <dt>Expected installment</dt>
+                  <dd>{detail.expectedAt ? formatDate(detail.expectedAt) : '—'}</dd>
+                </div>
+                <div>
+                  <dt>Provider</dt>
+                  <dd>{detail.provider ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt>Provider payment ID</dt>
+                  <dd>{detail.providerPaymentId ?? '—'}</dd>
+                </div>
+                <div>
                   <dt>Notes</dt>
                   <dd>{detail.notes ?? '—'}</dd>
                 </div>

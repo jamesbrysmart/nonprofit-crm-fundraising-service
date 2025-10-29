@@ -9,6 +9,7 @@ import { TwentyApiService } from '../twenty/twenty-api.service';
 import { buildTwentyGiftPayload, extractCreateGiftId } from '../gift/gift-payload.util';
 import { ensureCreateGiftResponse } from '../gift/gift.validation';
 import type { NormalizedGiftCreatePayload } from '../gift/gift.types';
+import { RecurringAgreementService } from '../recurring-agreement/recurring-agreement.service';
 
 export interface ProcessGiftArgs {
   stagingId: string;
@@ -31,6 +32,7 @@ export class GiftStagingProcessingService {
     private readonly giftStagingService: GiftStagingService,
     private readonly twentyApiService: TwentyApiService,
     private readonly structuredLogger: StructuredLoggerService,
+    private readonly recurringAgreementService: RecurringAgreementService,
   ) {}
 
   async processGift(args: ProcessGiftArgs): Promise<ProcessGiftResult> {
@@ -234,6 +236,29 @@ export class GiftStagingProcessingService {
 
     await this.giftStagingService.markCommittedById(stagingId, giftId);
 
+    const agreementId = stagingRecord.recurringAgreementId;
+    if (agreementId) {
+      const nextExpectedAt = this.calculateNextExpectedAt(stagingRecord);
+      try {
+        await this.recurringAgreementService.updateAgreement(agreementId, {
+          nextExpectedAt,
+          status: 'active',
+        });
+      } catch (error) {
+        this.structuredLogger.warn(
+          'Failed to update recurring agreement after staging promotion',
+          {
+            event: 'gift_staging_recurring_update_failed',
+            stagingId,
+            giftId,
+            recurringAgreementId: agreementId,
+            errorMessage: error instanceof Error ? error.message : String(error),
+          },
+          this.logContext,
+        );
+      }
+    }
+
     return {
       status: 'committed',
       stagingId,
@@ -323,6 +348,27 @@ export class GiftStagingProcessingService {
     }
 
     return undefined;
+  }
+
+  private calculateNextExpectedAt(stagingRecord: GiftStagingEntity): string | undefined {
+    // If the staging record carries an explicit expectedAt (from provider schedule), honour it.
+    if (typeof stagingRecord.expectedAt === 'string' && stagingRecord.expectedAt.trim().length > 0) {
+      return stagingRecord.expectedAt.trim();
+    }
+
+    // Fallback: add one month to the posted date to keep the agreement moving forward.
+    const referenceDate = stagingRecord.dateReceived ?? stagingRecord.createdAt;
+    if (!referenceDate) {
+      return undefined;
+    }
+
+    const parsedDate = new Date(referenceDate);
+    if (Number.isNaN(parsedDate.valueOf())) {
+      return undefined;
+    }
+
+    parsedDate.setUTCMonth(parsedDate.getUTCMonth() + 1);
+    return parsedDate.toISOString().slice(0, 10);
   }
 
   private isValidPreparedPayload(payload: NormalizedGiftCreatePayload): boolean {

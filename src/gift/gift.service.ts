@@ -229,6 +229,39 @@ export class GiftService {
       prepared.paymentMethod = prepared.paymentMethod.trim();
     }
 
+    if (typeof prepared.recurringAgreementId === 'string') {
+      prepared.recurringAgreementId = prepared.recurringAgreementId.trim();
+      if (prepared.recurringAgreementId.length === 0) {
+        delete prepared.recurringAgreementId;
+      }
+    }
+
+    if (typeof prepared.provider === 'string') {
+      prepared.provider = prepared.provider.trim();
+      if (prepared.provider.length === 0) {
+        delete prepared.provider;
+      }
+    }
+
+    if (typeof prepared.providerPaymentId === 'string') {
+      prepared.providerPaymentId = prepared.providerPaymentId.trim();
+      if (prepared.providerPaymentId.length === 0) {
+        delete prepared.providerPaymentId;
+      }
+    }
+
+    if (typeof prepared.recurringStatus === 'string') {
+      prepared.recurringStatus = prepared.recurringStatus.trim();
+      if (prepared.recurringStatus.length === 0) {
+        delete prepared.recurringStatus;
+      }
+    }
+
+    if (typeof prepared.expectedAt === 'string') {
+      const trimmed = prepared.expectedAt.trim();
+      prepared.expectedAt = trimmed.length > 0 ? trimmed : undefined;
+    }
+
     if (typeof prepared.intakeSource !== 'string' || prepared.intakeSource.trim().length === 0) {
       prepared.intakeSource = 'manual_ui';
     } else {
@@ -242,6 +275,7 @@ export class GiftService {
       const fingerprintSeed = [
         prepared.externalId,
         prepared.donorId,
+        prepared.recurringAgreementId,
         prepared.amountMinor?.toString(),
         prepared.currency,
       ]

@@ -90,8 +90,24 @@ function formatDedupeStatus(status?: string): { label: string; tone: 'info' | 's
 }
 
 export function StagingQueue(): JSX.Element {
-  const { items, loading, isRefreshing, error, refresh } = useGiftStagingList();
+  const [recurringFilterInput, setRecurringFilterInput] = useState('');
+  const [appliedRecurringFilter, setAppliedRecurringFilter] = useState<string | undefined>(
+    undefined,
+  );
+  const { items, loading, isRefreshing, error, refresh } = useGiftStagingList({
+    recurringAgreementId: appliedRecurringFilter,
+  });
   const [selectedStagingId, setSelectedStagingId] = useState<string | null>(null);
+
+  const handleApplyFilter = () => {
+    const trimmed = recurringFilterInput.trim();
+    setAppliedRecurringFilter(trimmed.length > 0 ? trimmed : undefined);
+  };
+
+  const handleClearFilter = () => {
+    setRecurringFilterInput('');
+    setAppliedRecurringFilter(undefined);
+  };
 
   const derivedRows = useMemo(
     () =>
@@ -101,6 +117,7 @@ export function StagingQueue(): JSX.Element {
         formattedAmount: formatAmount(item),
         donorSummary: resolveDonor(item),
         dedupeStatusMeta: formatDedupeStatus(item.dedupeStatus),
+        expectedAtDisplay: item.expectedAt ? formatDate(item.expectedAt) : '—',
       })),
     [items],
   );
@@ -136,6 +153,38 @@ export function StagingQueue(): JSX.Element {
         </div>
       </div>
 
+      <div className="queue-filters" style={{ marginBottom: '1.5rem' }}>
+        <label htmlFor="recurring-filter" className="small-text" style={{ marginRight: '0.75rem' }}>
+          Recurring agreement ID
+        </label>
+        <input
+          id="recurring-filter"
+          type="text"
+          value={recurringFilterInput}
+          onChange={(event) => setRecurringFilterInput(event.target.value)}
+          placeholder="ra_..."
+          style={{ marginRight: '0.75rem' }}
+        />
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={handleApplyFilter}
+          disabled={loading && !appliedRecurringFilter}
+        >
+          Apply
+        </button>
+        {appliedRecurringFilter && (
+          <button
+            type="button"
+            className="secondary-button"
+            style={{ marginLeft: '0.5rem' }}
+            onClick={handleClearFilter}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       {loading ? (
         <div className="queue-state">Loading staging records…</div>
       ) : error ? (
@@ -156,6 +205,9 @@ export function StagingQueue(): JSX.Element {
                 <th scope="col">Validation</th>
                 <th scope="col">Dedupe</th>
                 <th scope="col">Intake Source</th>
+                <th scope="col">Recurring</th>
+                <th scope="col">Expected</th>
+                <th scope="col">Provider</th>
                 <th scope="col">Donor</th>
                 <th scope="col" className="queue-col-actions">
                   Actions
@@ -180,6 +232,11 @@ export function StagingQueue(): JSX.Element {
                     </span>
                   </td>
                   <td>{row.intakeSource ?? '—'}</td>
+                  <td>
+                    {row.recurringAgreementId ? <code>{row.recurringAgreementId}</code> : '—'}
+                  </td>
+                  <td>{row.expectedAtDisplay}</td>
+                  <td>{row.provider ?? '—'}</td>
                   <td>{row.donorSummary}</td>
                   <td className="queue-actions">
                     <button

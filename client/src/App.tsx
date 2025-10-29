@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { ManualGiftEntry } from './components/ManualGiftEntry';
 import { StagingQueue } from './components/StagingQueue';
+import { RecurringAgreementList } from './components/RecurringAgreementList';
 
-type ViewMode = 'manual' | 'queue';
+type ViewMode = 'manual' | 'queue' | 'agreements';
 
 export function App(): JSX.Element {
   const [view, setView] = useState<ViewMode>('manual');
@@ -33,9 +34,22 @@ export function App(): JSX.Element {
           >
             Staging queue
           </button>
+          <button
+            type="button"
+            onClick={() => setView('agreements')}
+            disabled={view === 'agreements'}
+          >
+            Recurring agreements
+          </button>
         </nav>
 
-        {view === 'manual' ? <ManualGiftEntry /> : <StagingQueue />}
+        {view === 'manual' ? (
+          <ManualGiftEntry />
+        ) : view === 'queue' ? (
+          <StagingQueue />
+        ) : (
+          <RecurringAgreementList />
+        )}
       </main>
     </div>
   );

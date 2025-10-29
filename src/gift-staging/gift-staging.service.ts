@@ -23,6 +23,10 @@ export interface GiftStagingEntity {
   externalId?: string;
   paymentMethod?: string;
   dateReceived?: string;
+  expectedAt?: string;
+  provider?: string;
+  providerPaymentId?: string;
+  providerContext?: Record<string, unknown>;
   giftAidEligible?: boolean;
   donorId?: string;
   donorFirstName?: string;
@@ -32,6 +36,7 @@ export interface GiftStagingEntity {
   appealId?: string;
   appealSegmentId?: string;
   trackingCodeId?: string;
+  recurringAgreementId?: string;
   notes?: string;
   errorDetail?: string;
 }
@@ -52,6 +57,7 @@ export interface GiftStagingListQuery {
   cursor?: string;
   limit?: number;
   sort?: string;
+  recurringAgreementId?: string;
 }
 
 export interface GiftStagingListItem {
@@ -71,6 +77,7 @@ export interface GiftStagingListItem {
   amount?: number;
   currency?: string;
   dateReceived?: string;
+  expectedAt?: string;
   paymentMethod?: string;
   giftAidEligible: boolean;
   donorId?: string;
@@ -81,6 +88,10 @@ export interface GiftStagingListItem {
   appealId?: string;
   appealSegmentId?: string;
   trackingCodeId?: string;
+  provider?: string;
+  providerPaymentId?: string;
+  providerContext?: Record<string, unknown>;
+  recurringAgreementId?: string;
   rawPayloadAvailable: boolean;
   notes?: string;
 }
@@ -259,6 +270,7 @@ export class GiftStagingService {
       cursor: query.cursor?.trim() || undefined,
       limit,
       sort: this.normalizeSort(query.sort),
+      recurringAgreementId: this.normalizeId(query.recurringAgreementId),
     };
 
     const path = this.buildPath('/giftStagings', this.buildListQueryParams(sanitizedQuery));
@@ -432,6 +444,7 @@ export class GiftStagingService {
       amountMinor: payload.amountMinor,
       paymentMethod: payload.paymentMethod,
       dateReceived: payload.dateReceived ?? payload.giftDate,
+      expectedAt: payload.expectedAt,
       giftAidEligible: payload.giftAidEligible ?? false,
       fundId: payload.fundId,
       appealId: payload.appealId,
@@ -442,6 +455,10 @@ export class GiftStagingService {
       donorLastName: payload.donorLastName,
       donorEmail: payload.donorEmail,
       giftBatchId: payload.giftBatchId,
+      provider: payload.provider,
+      providerPaymentId: payload.providerPaymentId,
+      providerContext: this.normalizeProviderContext(payload.providerContext),
+      recurringAgreementId: payload.recurringAgreementId,
       notes: payload.notes,
       rawPayload,
     };
@@ -457,6 +474,31 @@ export class GiftStagingService {
       }
     }
     return output as T;
+  }
+
+  private normalizeProviderContext(
+    value: Record<string, unknown> | string | undefined,
+  ): Record<string, unknown> | undefined {
+    if (this.isPlainObject(value)) {
+      return value as Record<string, unknown>;
+    }
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        if (this.isPlainObject(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+      } catch {
+        this.structuredLogger.warn(
+          'Failed to parse providerContext string; dropping value',
+          {
+            event: 'gift_staging_provider_context_parse_failed',
+          },
+          GiftStagingService.name,
+        );
+      }
+    }
+    return undefined;
   }
 
   private safeStringify(payload: NormalizedGiftCreatePayload): string {
@@ -480,7 +522,9 @@ export class GiftStagingService {
       return undefined;
     }
 
-    const id = record.id;
+    const recordObj = record as Record<string, unknown>;
+
+    const id = recordObj.id;
     if (typeof id !== 'string' || id.trim().length === 0) {
       return undefined;
     }
@@ -488,58 +532,93 @@ export class GiftStagingService {
     const entity: GiftStagingEntity = {
       id,
       promotionStatus:
-        typeof record.promotionStatus === 'string' ? record.promotionStatus : undefined,
+        typeof recordObj.promotionStatus === 'string' ? recordObj.promotionStatus : undefined,
       validationStatus:
-        typeof record.validationStatus === 'string' ? record.validationStatus : undefined,
-      dedupeStatus: typeof record.dedupeStatus === 'string' ? record.dedupeStatus : undefined,
-      giftId: typeof record.giftId === 'string' ? record.giftId : undefined,
-      autoPromote: typeof record.autoPromote === 'boolean' ? record.autoPromote : undefined,
-      giftBatchId: typeof record.giftBatchId === 'string' ? record.giftBatchId : undefined,
-      createdAt: typeof record.createdAt === 'string' ? record.createdAt : undefined,
-      updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : undefined,
+        typeof recordObj.validationStatus === 'string' ? recordObj.validationStatus : undefined,
+      dedupeStatus: typeof recordObj.dedupeStatus === 'string' ? recordObj.dedupeStatus : undefined,
+      giftId: typeof recordObj.giftId === 'string' ? recordObj.giftId : undefined,
+      autoPromote: typeof recordObj.autoPromote === 'boolean' ? recordObj.autoPromote : undefined,
+      giftBatchId: typeof recordObj.giftBatchId === 'string' ? recordObj.giftBatchId : undefined,
+      createdAt: typeof recordObj.createdAt === 'string' ? recordObj.createdAt : undefined,
+      updatedAt: typeof recordObj.updatedAt === 'string' ? recordObj.updatedAt : undefined,
       amount:
-        typeof record.amount === 'number' && Number.isFinite(record.amount)
-          ? record.amount
+        typeof recordObj.amount === 'number' && Number.isFinite(recordObj.amount)
+          ? recordObj.amount
           : undefined,
       amountMinor:
-        typeof record.amountMinor === 'number' && Number.isFinite(record.amountMinor)
-          ? record.amountMinor
+        typeof recordObj.amountMinor === 'number' && Number.isFinite(recordObj.amountMinor)
+          ? recordObj.amountMinor
           : undefined,
-      currency: typeof record.currency === 'string' ? record.currency : undefined,
-      intakeSource: typeof record.intakeSource === 'string' ? record.intakeSource : undefined,
+      currency: typeof recordObj.currency === 'string' ? recordObj.currency : undefined,
+      intakeSource: typeof recordObj.intakeSource === 'string' ? recordObj.intakeSource : undefined,
       sourceFingerprint:
-        typeof record.sourceFingerprint === 'string' ? record.sourceFingerprint : undefined,
-      externalId: typeof record.externalId === 'string' ? record.externalId : undefined,
-      paymentMethod: typeof record.paymentMethod === 'string' ? record.paymentMethod : undefined,
-      dateReceived: typeof record.dateReceived === 'string' ? record.dateReceived : undefined,
+        typeof recordObj.sourceFingerprint === 'string'
+          ? recordObj.sourceFingerprint
+          : undefined,
+      externalId: typeof recordObj.externalId === 'string' ? recordObj.externalId : undefined,
+      paymentMethod:
+        typeof recordObj.paymentMethod === 'string' ? recordObj.paymentMethod : undefined,
+      dateReceived: typeof recordObj.dateReceived === 'string' ? recordObj.dateReceived : undefined,
+      expectedAt: typeof recordObj.expectedAt === 'string' ? recordObj.expectedAt : undefined,
+      provider: typeof recordObj.provider === 'string' ? recordObj.provider : undefined,
+      providerPaymentId:
+        typeof recordObj.providerPaymentId === 'string'
+          ? recordObj.providerPaymentId
+          : undefined,
       giftAidEligible:
-        typeof record.giftAidEligible === 'boolean' ? record.giftAidEligible : undefined,
-      donorId: typeof record.donorId === 'string' ? record.donorId : undefined,
+        typeof recordObj.giftAidEligible === 'boolean' ? recordObj.giftAidEligible : undefined,
+      donorId: typeof recordObj.donorId === 'string' ? recordObj.donorId : undefined,
       donorFirstName:
-        typeof record.donorFirstName === 'string' ? record.donorFirstName : undefined,
+        typeof recordObj.donorFirstName === 'string' ? recordObj.donorFirstName : undefined,
       donorLastName:
-        typeof record.donorLastName === 'string' ? record.donorLastName : undefined,
-      donorEmail: typeof record.donorEmail === 'string' ? record.donorEmail : undefined,
-      fundId: typeof record.fundId === 'string' ? record.fundId : undefined,
-      appealId: typeof record.appealId === 'string' ? record.appealId : undefined,
+        typeof recordObj.donorLastName === 'string' ? recordObj.donorLastName : undefined,
+      donorEmail: typeof recordObj.donorEmail === 'string' ? recordObj.donorEmail : undefined,
+      fundId: typeof recordObj.fundId === 'string' ? recordObj.fundId : undefined,
+      appealId: typeof recordObj.appealId === 'string' ? recordObj.appealId : undefined,
       appealSegmentId:
-        typeof record.appealSegmentId === 'string' ? record.appealSegmentId : undefined,
+        typeof recordObj.appealSegmentId === 'string' ? recordObj.appealSegmentId : undefined,
       trackingCodeId:
-        typeof record.trackingCodeId === 'string' ? record.trackingCodeId : undefined,
-      notes: typeof record.notes === 'string' ? record.notes : undefined,
-      errorDetail: typeof record.errorDetail === 'string' ? record.errorDetail : undefined,
+        typeof recordObj.trackingCodeId === 'string' ? recordObj.trackingCodeId : undefined,
+      recurringAgreementId:
+        typeof recordObj.recurringAgreementId === 'string'
+          ? recordObj.recurringAgreementId
+          : undefined,
+      notes: typeof recordObj.notes === 'string' ? recordObj.notes : undefined,
+      errorDetail: typeof recordObj.errorDetail === 'string' ? recordObj.errorDetail : undefined,
     };
 
-    if (typeof record.rawPayload === 'string') {
-      entity.rawPayload = record.rawPayload;
-    } else if (this.isPlainObject(record.rawPayload)) {
+    const rawPayload = recordObj.rawPayload;
+    if (typeof rawPayload === 'string') {
+      entity.rawPayload = rawPayload;
+    } else if (this.isPlainObject(rawPayload)) {
       try {
-        entity.rawPayload = JSON.stringify(record.rawPayload);
+        entity.rawPayload = JSON.stringify(rawPayload);
       } catch (error) {
         this.structuredLogger.warn(
           'Failed to stringify rawPayload when extracting gift staging',
           {
             event: 'gift_staging_extract_raw_payload_failed',
+            stagingId: id,
+          },
+          GiftStagingService.name,
+        );
+      }
+    }
+
+    const providerContextRaw = recordObj.providerContext;
+    if (this.isPlainObject(providerContextRaw)) {
+      entity.providerContext = providerContextRaw as Record<string, unknown>;
+    } else if (typeof providerContextRaw === 'string') {
+      try {
+        const parsed = JSON.parse(providerContextRaw);
+        if (this.isPlainObject(parsed)) {
+          entity.providerContext = parsed as Record<string, unknown>;
+        }
+      } catch {
+        this.structuredLogger.warn(
+          'Failed to parse providerContext string when extracting gift staging',
+          {
+            event: 'gift_staging_provider_context_parse_failed',
             stagingId: id,
           },
           GiftStagingService.name,
@@ -611,6 +690,7 @@ export class GiftStagingService {
       statuses?: string[];
       intakeSources?: string[];
       search?: string;
+      recurringAgreementId?: string;
     },
   ): GiftStagingEntity[] {
     return records.filter((record) => {
@@ -628,10 +708,18 @@ export class GiftStagingService {
         }
       }
 
+      if (query.recurringAgreementId) {
+        if (record.recurringAgreementId !== query.recurringAgreementId) {
+          return false;
+        }
+      }
+
       if (query.search) {
         const needle = query.search;
         const haystacks = [
           record.id,
+          record.recurringAgreementId,
+          record.provider,
           record.externalId,
           record.sourceFingerprint,
           record.giftBatchId,
@@ -716,6 +804,7 @@ export class GiftStagingService {
       amountMinor: entity.amountMinor,
       currency: entity.currency,
       dateReceived: entity.dateReceived,
+      expectedAt: entity.expectedAt,
       paymentMethod: entity.paymentMethod,
       giftAidEligible: entity.giftAidEligible ?? false,
       donorId: entity.donorId,
@@ -726,6 +815,10 @@ export class GiftStagingService {
       appealId: entity.appealId,
       appealSegmentId: entity.appealSegmentId,
       trackingCodeId: entity.trackingCodeId,
+      provider: entity.provider,
+      providerPaymentId: entity.providerPaymentId,
+      providerContext: entity.providerContext,
+      recurringAgreementId: entity.recurringAgreementId,
       rawPayloadAvailable: Boolean(entity.rawPayload && entity.rawPayload.length > 0),
       notes: entity.notes,
     };
@@ -770,6 +863,14 @@ export class GiftStagingService {
       : 'createdAt';
     const normalizedDirection = direction === 'asc' ? 'asc' : 'desc';
     return `${normalizedField}:${normalizedDirection}`;
+  }
+
+  private normalizeId(value?: string): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
   }
 
   private buildPath(basePath: string, params: Record<string, string>): string {
