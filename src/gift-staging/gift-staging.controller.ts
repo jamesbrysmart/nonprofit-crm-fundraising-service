@@ -18,6 +18,7 @@ import {
   GiftStagingListResult,
   GiftStagingListQuery,
   GiftStagingStatusUpdate,
+  GiftStagingUpdateInput,
 } from './gift-staging.service';
 import {
   GiftStagingProcessingService,
@@ -42,6 +43,8 @@ interface GiftStagingCreateResponse {
     rawPayloadAvailable: boolean;
   };
 }
+
+type GiftStagingUpdateRequest = GiftStagingUpdateInput;
 
 @Controller('gift-staging')
 export class GiftStagingController {
@@ -139,6 +142,25 @@ export class GiftStagingController {
     };
 
     return this.giftStagingProcessingService.processGift(args);
+  }
+
+  @Patch(':id')
+  async updateGiftStaging(
+    @Param('id') stagingId: string,
+    @Body() body: GiftStagingUpdateRequest,
+  ): Promise<{ data: { giftStaging: GiftStagingEntity } }> {
+    this.ensureEnabled();
+
+    const entity = await this.giftStagingService.updateGiftStagingPayload(stagingId, body ?? {});
+    if (!entity) {
+      throw new NotFoundException('Gift staging record not found');
+    }
+
+    return {
+      data: {
+        giftStaging: entity,
+      },
+    };
   }
 
   @Patch(':id/status')

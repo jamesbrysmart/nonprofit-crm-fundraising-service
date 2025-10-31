@@ -143,7 +143,31 @@ export interface GiftStagingStatusUpdatePayload {
   validationStatus?: string;
   dedupeStatus?: string;
   errorDetail?: string;
+  giftBatchId?: string;
   rawPayload?: string;
+}
+
+export interface GiftStagingUpdatePayload {
+  donorId?: string | null;
+  donorFirstName?: string | null;
+  donorLastName?: string | null;
+  donorEmail?: string | null;
+  amountMinor?: number;
+  amountMajor?: number;
+  currency?: string | null;
+  dateReceived?: string | null;
+  expectedAt?: string | null;
+  fundId?: string | null;
+  appealId?: string | null;
+  appealSegmentId?: string | null;
+  trackingCodeId?: string | null;
+  notes?: string | null;
+  giftAidEligible?: boolean;
+  promotionStatus?: string;
+  validationStatus?: string;
+  dedupeStatus?: string;
+  errorDetail?: string | null;
+  giftBatchId?: string | null;
 }
 
 export async function updateGiftStagingStatus(
@@ -230,6 +254,7 @@ export interface GiftStagingListResponse {
   meta?: {
     nextCursor?: string;
     hasMore?: boolean;
+    totalCount?: number;
   };
 }
 
@@ -249,7 +274,14 @@ export interface RecurringAgreementListItem {
 }
 
 export async function fetchGiftStagingList(
-  params: { limit?: number; sort?: string; recurringAgreementId?: string } = {},
+  params: {
+    limit?: number;
+    sort?: string;
+    recurringAgreementId?: string;
+    statuses?: string[];
+    intakeSources?: string[];
+    search?: string;
+  } = {},
 ): Promise<GiftStagingListResponse> {
   const query = new URLSearchParams();
   if (typeof params.limit === 'number') {
@@ -260,6 +292,15 @@ export async function fetchGiftStagingList(
   }
   if (typeof params.recurringAgreementId === 'string' && params.recurringAgreementId.trim().length > 0) {
     query.set('recurringAgreementId', params.recurringAgreementId.trim());
+  }
+  if (Array.isArray(params.statuses) && params.statuses.length > 0) {
+    query.set('statuses', params.statuses.join(','));
+  }
+  if (Array.isArray(params.intakeSources) && params.intakeSources.length > 0) {
+    query.set('intakeSources', params.intakeSources.join(','));
+  }
+  if (typeof params.search === 'string' && params.search.trim().length > 0) {
+    query.set('search', params.search.trim());
   }
 
   const url =
@@ -399,6 +440,27 @@ export interface GiftStagingDetailResponse {
       notes?: string;
     };
   };
+}
+
+export async function updateGiftStaging(
+  stagingId: string,
+  payload: GiftStagingUpdatePayload,
+): Promise<GiftStagingDetailResponse> {
+  const response = await fetch(`/api/fundraising/gift-staging/${encodeURIComponent(stagingId)}`, {
+    method: 'PATCH',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || response.statusText);
+  }
+
+  return (await response.json()) as GiftStagingDetailResponse;
 }
 
 export async function fetchGiftStagingById(

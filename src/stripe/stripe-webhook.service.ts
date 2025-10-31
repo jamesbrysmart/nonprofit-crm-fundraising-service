@@ -111,9 +111,17 @@ export class StripeWebhookService {
       autoPromote: true,
     };
 
+
     const contact = this.buildContact(session, metadata);
     if (contact) {
       giftPayload.contact = contact;
+    }
+
+    // Downgrade auto-promote when the contact cannot be matched exactly
+    if (giftPayload.contact && contact?.email) {
+      giftPayload.autoPromote = true;
+    } else if (!giftPayload.contact) {
+      giftPayload.autoPromote = false;
     }
 
     await this.enrichWithRecurringAgreement(session, metadata, giftPayload, paymentIntentId);
@@ -125,7 +133,13 @@ export class StripeWebhookService {
     });
 
     try {
-      await this.giftService.createGift(giftPayload);
+      const result = await this.giftService.createGift(giftPayload);
+      if (giftPayload.autoPromote === false) {
+        this.logger.info('Stripe webhook staged gift for manual review', {
+          event: 'stripe_checkout_session_staged',
+          stripeSessionId: session.id,
+        });
+      }
     } catch (error) {
       this.logger.error(
         'Fundraising proxy failed to ingest Stripe checkout session',
@@ -267,9 +281,9 @@ export class StripeWebhookService {
           event: 'stripe_webhook_recurring_agreement_update_failed',
           recurringAgreementId: trimmedAgreementId,
           stripeSessionId: session.id,
+          errorMessage: error instanceof Error ? error.message : String(error),
         },
         StripeWebhookService.name,
-        error instanceof Error ? error : undefined,
       );
     }
   }
@@ -316,15 +330,21 @@ export class StripeWebhookService {
   }
 
   private extractPaymentMethodId(session: Stripe.Checkout.Session): string | undefined {
-    if (!session.payment_method) {
+    const paymentIntent = session.payment_intent;
+    if (!paymentIntent) {
       return undefined;
     }
 
-    if (typeof session.payment_method === 'string') {
-      return session.payment_method;
+    if (typeof paymentIntent === 'string') {
+      return undefined;
     }
 
-    return session.payment_method.id;
+    const method = (paymentIntent as Stripe.PaymentIntent).payment_method;
+    if (!method) {
+      return undefined;
+    }
+
+    return typeof method === 'string' ? method : method.id;
   }
 
   private buildStripeProviderContext(

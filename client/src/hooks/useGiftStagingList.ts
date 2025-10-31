@@ -9,7 +9,14 @@ interface UseGiftStagingListResult {
   refresh: () => Promise<void>;
 }
 
-export function useGiftStagingList(filters: { recurringAgreementId?: string } = {}): UseGiftStagingListResult {
+export interface GiftStagingListFetchOptions {
+  recurringAgreementId?: string;
+  statuses?: string[];
+  intakeSources?: string[];
+  search?: string;
+}
+
+export function useGiftStagingList(filters: GiftStagingListFetchOptions = {}): UseGiftStagingListResult {
   const [items, setItems] = useState<GiftStagingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -31,6 +38,9 @@ export function useGiftStagingList(filters: { recurringAgreementId?: string } = 
           limit: 50,
           sort: 'updatedAt:desc',
           recurringAgreementId: activeRecurringAgreementId,
+          statuses: filters.statuses,
+          intakeSources: filters.intakeSources,
+          search: filters.search,
         });
         setItems(response.data ?? []);
       } catch (err) {

@@ -50,6 +50,29 @@ export interface GiftStagingStatusUpdate {
   giftBatchId?: string;
 }
 
+export interface GiftStagingUpdateInput {
+  donorId?: string | null;
+  donorFirstName?: string | null;
+  donorLastName?: string | null;
+  donorEmail?: string | null;
+  amountMinor?: number;
+  amountMajor?: number;
+  currency?: string | null;
+  dateReceived?: string | null;
+  expectedAt?: string | null;
+  fundId?: string | null;
+  appealId?: string | null;
+  appealSegmentId?: string | null;
+  trackingCodeId?: string | null;
+  notes?: string | null;
+  giftAidEligible?: boolean;
+  promotionStatus?: string;
+  validationStatus?: string;
+  dedupeStatus?: string;
+  errorDetail?: string | null;
+  giftBatchId?: string | null;
+}
+
 export interface GiftStagingListQuery {
   statuses?: string[];
   intakeSources?: string[];
@@ -351,6 +374,44 @@ export class GiftStagingService {
     );
   }
 
+  async updateGiftStagingPayload(
+    stagingId: string,
+    updates: GiftStagingUpdateInput,
+  ): Promise<GiftStagingEntity | undefined> {
+    if (!this.enabled || typeof stagingId !== 'string' || stagingId.trim().length === 0) {
+      return undefined;
+    }
+
+    const existing = await this.getGiftStagingById(stagingId);
+    if (!existing) {
+      return undefined;
+    }
+
+    const mergedPayload = this.mergePayloadForUpdate(existing, updates);
+    const rawPayload = this.safeStringify(mergedPayload);
+    const patchBody = this.buildPayloadUpdateBody(existing, mergedPayload, updates, rawPayload);
+
+    await this.twentyApiService.request(
+      'PATCH',
+      `/giftStagings/${encodeURIComponent(stagingId)}`,
+      patchBody,
+      GiftStagingService.name,
+    );
+
+    this.structuredLogger.info(
+      'Updated gift staging payload',
+      {
+        event: 'gift_staging_payload_updated',
+        stagingId,
+        donorId: mergedPayload.donorId,
+        amountMinor: mergedPayload.amountMinor,
+      },
+      GiftStagingService.name,
+    );
+
+    return this.getGiftStagingById(stagingId);
+  }
+
   private async patchCommitted(stagingId: string, giftId: string): Promise<void> {
     try {
       await this.twentyApiService.request(
@@ -386,6 +447,317 @@ export class GiftStagingService {
         GiftStagingService.name,
       );
     }
+  }
+
+  private mergePayloadForUpdate(
+    existing: GiftStagingEntity,
+    updates: GiftStagingUpdateInput,
+  ): NormalizedGiftCreatePayload {
+    const basePayload =
+      this.parseRawPayload(existing.rawPayload) ?? this.buildPayloadFromEntity(existing);
+
+    const merged: NormalizedGiftCreatePayload = {
+      ...basePayload,
+      amount: { ...(basePayload.amount ?? { currencyCode: existing.currency ?? 'GBP', value: basePayload.amountMajor ?? 0 }) },
+      providerContext: basePayload.providerContext,
+    };
+
+    const normalizeString = (value?: string | null): string | undefined => {
+      if (value === null) {
+        return undefined;
+      }
+      if (typeof value !== 'string') {
+        return value as unknown as string | undefined;
+      }
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : undefined;
+    };
+
+    const normalizeCurrency = (value?: string | null): string | undefined => {
+      const normalized = normalizeString(value);
+      return normalized ? normalized.toUpperCase() : undefined;
+    };
+
+    if (updates.donorId !== undefined) {
+      const donorId = normalizeString(updates.donorId);
+      merged.donorId = donorId;
+      if (donorId) {
+        (merged as Record<string, unknown>).contactId = donorId;
+      } else {
+        delete (merged as Record<string, unknown>).contactId;
+      }
+    }
+
+    if (updates.donorFirstName !== undefined) {
+      merged.donorFirstName = normalizeString(updates.donorFirstName);
+    }
+
+    if (updates.donorLastName !== undefined) {
+      merged.donorLastName = normalizeString(updates.donorLastName);
+    }
+
+    if (updates.donorEmail !== undefined) {
+      merged.donorEmail = normalizeString(updates.donorEmail);
+    }
+
+    if (updates.currency !== undefined) {
+      const currency = normalizeCurrency(updates.currency);
+      merged.currency = currency ?? merged.currency ?? existing.currency;
+      if (merged.amount) {
+        merged.amount.currencyCode = merged.currency ?? merged.amount.currencyCode;
+      }
+    } else if (!merged.currency) {
+      merged.currency = existing.currency ?? merged.amount?.currencyCode ?? 'GBP';
+      if (merged.amount) {
+        merged.amount.currencyCode = merged.currency;
+      }
+    }
+
+    let amountMinor =
+      updates.amountMinor !== undefined
+        ? updates.amountMinor ?? undefined
+        : merged.amountMinor ?? existing.amountMinor;
+    let amountMajor =
+      updates.amountMajor !== undefined
+        ? updates.amountMajor ?? undefined
+        : merged.amountMajor ?? existing.amount;
+
+    if (amountMinor === undefined && amountMajor !== undefined) {
+      amountMinor = Math.round(amountMajor * 100);
+    }
+    if (amountMajor === undefined && amountMinor !== undefined) {
+      amountMajor = Number((amountMinor / 100).toFixed(2));
+    }
+
+    if (typeof amountMinor === 'number') {
+      merged.amountMinor = amountMinor;
+    }
+
+    if (typeof amountMajor === 'number') {
+      merged.amountMajor = amountMajor;
+    }
+
+    const resolvedAmountMajor =
+      typeof merged.amountMajor === 'number'
+        ? merged.amountMajor
+        : typeof merged.amountMinor === 'number'
+          ? Number((merged.amountMinor / 100).toFixed(2))
+          : merged.amount?.value;
+
+    if (!merged.amount) {
+      merged.amount = {
+        value: resolvedAmountMajor ?? 0,
+        currencyCode: merged.currency ?? 'GBP',
+      };
+    } else {
+      if (resolvedAmountMajor !== undefined) {
+        merged.amount.value = resolvedAmountMajor;
+      }
+      if (merged.currency) {
+        merged.amount.currencyCode = merged.currency;
+      }
+    }
+
+    if (updates.dateReceived !== undefined) {
+      const date = normalizeString(updates.dateReceived);
+      if (date) {
+        merged.dateReceived = date;
+        merged.giftDate = date;
+      } else {
+        delete merged.dateReceived;
+        delete merged.giftDate;
+      }
+    }
+
+    if (updates.expectedAt !== undefined) {
+      const expected = normalizeString(updates.expectedAt);
+      if (expected) {
+        merged.expectedAt = expected;
+      } else {
+        delete merged.expectedAt;
+      }
+    }
+
+    if (updates.fundId !== undefined) {
+      const fundId = normalizeString(updates.fundId);
+      if (fundId) {
+        merged.fundId = fundId;
+      } else {
+        delete merged.fundId;
+      }
+    }
+
+    if (updates.appealId !== undefined) {
+      const appealId = normalizeString(updates.appealId);
+      if (appealId) {
+        merged.appealId = appealId;
+      } else {
+        delete merged.appealId;
+      }
+    }
+
+    if (updates.appealSegmentId !== undefined) {
+      const appealSegmentId = normalizeString(updates.appealSegmentId);
+      if (appealSegmentId) {
+        merged.appealSegmentId = appealSegmentId;
+      } else {
+        delete merged.appealSegmentId;
+      }
+    }
+
+    if (updates.trackingCodeId !== undefined) {
+      const trackingCodeId = normalizeString(updates.trackingCodeId);
+      if (trackingCodeId) {
+        merged.trackingCodeId = trackingCodeId;
+      } else {
+        delete merged.trackingCodeId;
+      }
+    }
+
+    if (updates.notes !== undefined) {
+      const notes = normalizeString(updates.notes);
+      if (notes) {
+        merged.notes = notes;
+      } else {
+        delete merged.notes;
+      }
+    }
+
+    if (updates.giftAidEligible !== undefined) {
+      merged.giftAidEligible = updates.giftAidEligible;
+    }
+
+    if (updates.giftBatchId !== undefined) {
+      const batchId = normalizeString(updates.giftBatchId);
+      if (batchId) {
+        merged.giftBatchId = batchId;
+      } else {
+        delete merged.giftBatchId;
+      }
+    }
+
+    return merged;
+  }
+
+  private buildPayloadUpdateBody(
+    existing: GiftStagingEntity,
+    payload: NormalizedGiftCreatePayload,
+    updates: GiftStagingUpdateInput,
+    rawPayload: string,
+  ): Record<string, unknown> {
+    const body: Record<string, unknown> = {
+      donorId: payload.donorId,
+      donorFirstName: payload.donorFirstName,
+      donorLastName: payload.donorLastName,
+      donorEmail: payload.donorEmail,
+      amountMinor: payload.amountMinor,
+      amount: payload.amount,
+      currency: payload.currency ?? existing.currency,
+      dateReceived: payload.dateReceived ?? payload.giftDate ?? existing.dateReceived,
+      expectedAt: payload.expectedAt,
+      fundId: payload.fundId,
+      appealId: payload.appealId,
+      appealSegmentId: payload.appealSegmentId,
+      trackingCodeId: payload.trackingCodeId,
+      notes: payload.notes,
+      giftAidEligible:
+        typeof updates.giftAidEligible === 'boolean'
+          ? updates.giftAidEligible
+          : payload.giftAidEligible,
+      giftBatchId:
+        updates.giftBatchId !== undefined
+          ? this.normalizeNullableString(updates.giftBatchId)
+          : payload.giftBatchId ?? existing.giftBatchId,
+      promotionStatus: updates.promotionStatus,
+      validationStatus: updates.validationStatus,
+      dedupeStatus: updates.dedupeStatus,
+      errorDetail: updates.errorDetail,
+      rawPayload,
+    };
+
+    return this.pruneUndefinedValues(body);
+  }
+
+  private parseRawPayload(rawPayload?: string): NormalizedGiftCreatePayload | undefined {
+    if (!rawPayload || rawPayload.trim().length === 0) {
+      return undefined;
+    }
+    try {
+      const parsed = JSON.parse(rawPayload);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as NormalizedGiftCreatePayload;
+      }
+    } catch (error) {
+      this.structuredLogger.warn(
+        'Failed to parse existing gift staging raw payload; falling back to entity fields',
+        {
+          event: 'gift_staging_parse_payload_failed',
+          message: error instanceof Error ? error.message : String(error),
+        },
+        GiftStagingService.name,
+      );
+    }
+    return undefined;
+  }
+
+  private buildPayloadFromEntity(entity: GiftStagingEntity): NormalizedGiftCreatePayload {
+    const inferredAmountMinor =
+      typeof entity.amountMinor === 'number'
+        ? entity.amountMinor
+        : typeof entity.amount === 'number'
+          ? Math.round(entity.amount * 100)
+          : 0;
+
+    const inferredAmountMajor =
+      typeof entity.amount === 'number'
+        ? entity.amount
+        : Number((inferredAmountMinor / 100).toFixed(2));
+
+    const currency = entity.currency ?? 'GBP';
+
+    const payload: NormalizedGiftCreatePayload = {
+      amount: {
+        currencyCode: currency,
+        value: inferredAmountMajor,
+      },
+      amountMinor: inferredAmountMinor,
+      amountMajor: inferredAmountMajor,
+      currency,
+      donorId: entity.donorId,
+      donorFirstName: entity.donorFirstName,
+      donorLastName: entity.donorLastName,
+      donorEmail: entity.donorEmail,
+      dateReceived: entity.dateReceived,
+      giftDate: entity.dateReceived,
+      expectedAt: entity.expectedAt,
+      fundId: entity.fundId,
+      appealId: entity.appealId,
+      appealSegmentId: entity.appealSegmentId,
+      trackingCodeId: entity.trackingCodeId,
+      notes: entity.notes,
+      giftAidEligible: entity.giftAidEligible,
+      intakeSource: entity.intakeSource,
+      sourceFingerprint: entity.sourceFingerprint,
+      provider: entity.provider,
+      providerPaymentId: entity.providerPaymentId,
+      providerContext: entity.providerContext,
+      recurringAgreementId: entity.recurringAgreementId,
+      giftBatchId: entity.giftBatchId,
+      autoPromote: entity.autoPromote,
+    };
+
+    return payload;
+  }
+
+  private normalizeNullableString(value?: string | null): string | undefined {
+    if (value === null) {
+      return undefined;
+    }
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
   }
 
   private resolveBooleanFlag(value: string | undefined, fallback: boolean): boolean {
