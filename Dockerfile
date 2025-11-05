@@ -14,4 +14,4 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/package-lock.json ./
 COPY --from=builder /app/scripts ./scripts
 RUN npm ci --omit=dev
-CMD ["node","dist/main.js"]
+CMD ["node","dist/src/main.js"]

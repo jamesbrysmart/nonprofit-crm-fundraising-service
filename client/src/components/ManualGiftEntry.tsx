@@ -73,18 +73,22 @@ export function ManualGiftEntry(): JSX.Element {
     setSearchLoading(false);
   };
 
-  const handleSelectSupporter = (
-    supporterId: string | null | undefined,
+  const handleSelectDonor = (
+    donorId: string | null | undefined,
     options: { closeModal?: boolean } = {},
   ) => {
-    if (!supporterId) {
+    if (!donorId) {
       return;
     }
-    setSelectedDuplicateId(supporterId);
+    setSelectedDuplicateId(donorId);
     setShowDuplicates(false);
     if (options.closeModal ?? true) {
       closeSearchModal();
     }
+  };
+
+  const handleClearSelectedDonor = () => {
+    setSelectedDuplicateId(null);
   };
 
   const handleSearchSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -127,7 +131,7 @@ export function ManualGiftEntry(): JSX.Element {
       });
       setSearchResults(matches);
       if (matches.length === 0) {
-        setSearchError('No supporters found for that search.');
+      setSearchError('No donors found for that search.');
       }
     } catch (error) {
       setSearchResults([]);
@@ -194,10 +198,8 @@ export function ManualGiftEntry(): JSX.Element {
           setDuplicateLookupError(null);
           if (!showDuplicates) {
             setDuplicateMatches(matches);
-            if (matches.length === 0) {
+            if (!matches.some((candidate) => candidate?.id === selectedDuplicateId)) {
               setSelectedDuplicateId(null);
-            } else if (!selectedDuplicateId && matches.length === 1 && matches[0]?.id) {
-              setSelectedDuplicateId(matches[0].id);
             }
           }
         } catch (error) {
@@ -263,7 +265,7 @@ export function ManualGiftEntry(): JSX.Element {
         });
         if (duplicate) {
           setPotentialDuplicateMessage(
-            'A staged gift with the same supporter, amount, and date already exists. Double-check before continuing.',
+            'A staged gift with the same donor, amount, and date already exists. Double-check before continuing.',
           );
         } else {
           setPotentialDuplicateMessage(null);
@@ -366,7 +368,7 @@ export function ManualGiftEntry(): JSX.Element {
     if (showDuplicates) {
       setStatus({
         state: 'error',
-        message: 'Select an existing contact below or create a new one to continue.',
+        message: 'Select an existing donor below or create a new one to continue.',
       });
       return;
     }
@@ -456,7 +458,7 @@ export function ManualGiftEntry(): JSX.Element {
       .sort((a, b) => order[a.tier] - order[b.tier]);
   }, [duplicateMatches, formState]);
 
-  const selectedSupporter = useMemo(() => {
+  const selectedDonor = useMemo(() => {
     if (!selectedDuplicateId) {
       return undefined;
     }
@@ -569,39 +571,67 @@ export function ManualGiftEntry(): JSX.Element {
             />
           </div>
 
-          {selectedSupporter ? (
+          {selectedDonor ? (
             <div className="supporter-summary" role="status" aria-live="polite">
               <div className="supporter-summary-header">
-                <h4>Selected supporter</h4>
+                <h4>Selected donor</h4>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => {
+                    handleClearSelectedDonor();
+                    openSearchModal();
+                  }}
+                  disabled={status.state === 'submitting'}
+                >
+                  Change donor
+                </button>
+              </div>
+              <dl className="supporter-summary-meta">
+                <div>
+                  <dt>Name</dt>
+                  <dd>{describeDuplicate(selectedDonor)}</dd>
+                </div>
+                <div>
+                  <dt>Email</dt>
+                  <dd>{selectedDonor.emails?.primaryEmail ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt>Donor ID</dt>
+                  <dd>{selectedDonor.id}</dd>
+                </div>
+                <div>
+                  <dt>Updated</dt>
+                  <dd>{formatMatchDate(selectedDonor.updatedAt ?? selectedDonor.createdAt)}</dd>
+                </div>
+              </dl>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={handleClearSelectedDonor}
+                disabled={status.state === 'submitting'}
+              >
+                Clear selection
+              </button>
+            </div>
+          ) : (
+            <div className="supporter-summary supporter-summary--empty">
+              <div className="supporter-summary-header">
+                <h4>Donor selection</h4>
                 <button
                   type="button"
                   className="secondary-button"
                   onClick={openSearchModal}
                   disabled={status.state === 'submitting'}
                 >
-                  Change supporter
+                  Search donors…
                 </button>
               </div>
-              <dl className="supporter-summary-meta">
-                <div>
-                  <dt>Name</dt>
-                  <dd>{describeDuplicate(selectedSupporter)}</dd>
-                </div>
-                <div>
-                  <dt>Email</dt>
-                  <dd>{selectedSupporter.emails?.primaryEmail ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt>Supporter ID</dt>
-                  <dd>{selectedSupporter.id}</dd>
-                </div>
-                <div>
-                  <dt>Updated</dt>
-                  <dd>{formatMatchDate(selectedSupporter.updatedAt ?? selectedSupporter.createdAt)}</dd>
-                </div>
-              </dl>
+              <p className="small-text">
+                No donor selected. A new donor record will be created when you submit this gift.
+              </p>
             </div>
-          ) : null}
+          )}
 
           {duplicateLookupError ? (
             <div className="form-alert form-alert-error" role="alert">
@@ -612,16 +642,16 @@ export function ManualGiftEntry(): JSX.Element {
           {!showDuplicates && classifiedDuplicates.length > 0 ? (
             <div className="duplicate-hint">
               <div className="duplicate-hint-header">
-                <p className="small-text">Possible existing supporters:</p>
+                <p className="small-text">Possible existing donors:</p>
                 <button type="button" className="secondary-button" onClick={openSearchModal}>
-                  Search supporters…
+                  Search donors…
                 </button>
               </div>
               <table className="duplicate-table">
                 <thead>
                   <tr>
                     <th scope="col">Match</th>
-                    <th scope="col">Supporter</th>
+                    <th scope="col">Donor</th>
                     <th scope="col">Email</th>
                     <th scope="col">Updated</th>
                     <th scope="col" aria-label="Actions" />
@@ -652,9 +682,9 @@ export function ManualGiftEntry(): JSX.Element {
                           <button
                             type="button"
                             className="secondary-button"
-                            onClick={() => handleSelectSupporter(match.id, { closeModal: false })}
+                            onClick={() => handleSelectDonor(match.id, { closeModal: false })}
                           >
-                            {isSelected ? 'Selected' : 'Use supporter'}
+                            {isSelected ? 'Selected' : 'Use donor'}
                           </button>
                         </td>
                       </tr>
@@ -664,19 +694,17 @@ export function ManualGiftEntry(): JSX.Element {
               </table>
               {selectedDuplicateId ? (
                 <p className="small-text">
-                  Selected supporter:&nbsp;
+                  Selected donor:&nbsp;
                   <code>{selectedDuplicateId}</code>
                 </p>
               ) : (
-                <p className="small-text">
-                  Select a supporter or search the directory.
-                </p>
+                <p className="small-text">Select a donor or search the directory.</p>
               )}
             </div>
           ) : (
             <div className="duplicate-hint-actions">
               <button type="button" className="secondary-button" onClick={openSearchModal}>
-                Search supporters…
+                Search donors…
               </button>
             </div>
           )}
@@ -713,7 +741,7 @@ export function ManualGiftEntry(): JSX.Element {
                 type="text"
                 value={recurringSearch}
                 onChange={(event) => setRecurringSearch(event.target.value)}
-                placeholder="Search by agreement ID or supporter"
+                placeholder="Search by agreement ID or donor"
               />
               <div className="recurring-options">
                 {recurringOptions.length === 0 ? (
@@ -782,16 +810,16 @@ export function ManualGiftEntry(): JSX.Element {
 
       {showDuplicates && classifiedDuplicates.length > 0 ? (
         <div className="duplicate-panel" role="status" aria-live="polite">
-          <h2>Possible existing supporters</h2>
+          <h2>Possible existing donors</h2>
           <p className="small-text">
-            We found supporters that match the details you entered. Select one to reuse their
+            We found donors that match the details you entered. Select one to reuse their
             record or continue to create a new contact.
           </p>
           <table className="duplicate-table">
             <thead>
               <tr>
                 <th scope="col">Match</th>
-                <th scope="col">Supporter</th>
+                <th scope="col">Donor</th>
                 <th scope="col">Email</th>
                 <th scope="col">Updated</th>
                 <th scope="col" aria-label="Actions" />
@@ -822,10 +850,10 @@ export function ManualGiftEntry(): JSX.Element {
                       <button
                         type="button"
                         className="secondary-button"
-                        onClick={() => handleSelectSupporter(match.id, { closeModal: false })}
+                        onClick={() => handleSelectDonor(match.id, { closeModal: false })}
                         disabled={status.state === 'submitting'}
                       >
-                        {isSelected ? 'Selected' : 'Use supporter'}
+                        {isSelected ? 'Selected' : 'Use donor'}
                       </button>
                     </td>
                   </tr>
@@ -847,7 +875,7 @@ export function ManualGiftEntry(): JSX.Element {
               onClick={handleUseExistingContact}
               disabled={!selectedDuplicateId || status.state === 'submitting'}
             >
-              Use selected supporter
+              Use selected donor
             </button>
           </div>
           <button
@@ -856,7 +884,7 @@ export function ManualGiftEntry(): JSX.Element {
             onClick={openSearchModal}
             disabled={status.state === 'submitting'}
           >
-            Search supporters…
+            Search donors…
           </button>
         </div>
       ) : null}
@@ -865,7 +893,7 @@ export function ManualGiftEntry(): JSX.Element {
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal">
             <div className="modal-header">
-              <h3>Search supporters</h3>
+              <h3>Search donors</h3>
               <button type="button" className="secondary-button" onClick={closeSearchModal}>
                 Close
               </button>
@@ -887,7 +915,7 @@ export function ManualGiftEntry(): JSX.Element {
               </div>
             ) : null}
             {searchLoading ? (
-              <div className="queue-state">Searching supporters…</div>
+              <div className="queue-state">Searching donors…</div>
             ) : searchResults.length > 0 ? (
               <table className="modal-table">
                 <thead>
@@ -921,9 +949,9 @@ export function ManualGiftEntry(): JSX.Element {
                           <button
                             type="button"
                             className="secondary-button"
-                            onClick={() => handleSelectSupporter(match.id)}
+                            onClick={() => handleSelectDonor(match.id)}
                           >
-                            Use supporter
+                            Use donor
                           </button>
                         </td>
                       </tr>
@@ -994,7 +1022,7 @@ function describeDuplicate(match: PersonDuplicate): string {
     parts.push(`<${email}>`);
   }
 
-  return parts.length > 0 ? parts.join(' ') : 'Existing supporter';
+  return parts.length > 0 ? parts.join(' ') : 'Existing donor';
 }
 
 type DuplicateTier = 'exact' | 'review' | 'partial';

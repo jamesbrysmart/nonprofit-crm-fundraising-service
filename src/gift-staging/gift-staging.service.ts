@@ -479,13 +479,7 @@ export class GiftStagingService {
     };
 
     if (updates.donorId !== undefined) {
-      const donorId = normalizeString(updates.donorId);
-      merged.donorId = donorId;
-      if (donorId) {
-        (merged as Record<string, unknown>).contactId = donorId;
-      } else {
-        delete (merged as Record<string, unknown>).contactId;
-      }
+      merged.donorId = normalizeString(updates.donorId);
     }
 
     if (updates.donorFirstName !== undefined) {
@@ -497,21 +491,8 @@ export class GiftStagingService {
     }
 
     if (updates.donorEmail !== undefined) {
-      merged.donorEmail = normalizeString(updates.donorEmail);
-    }
-
-    if (updates.currency !== undefined) {
-      const currency = normalizeCurrency(updates.currency);
-      merged.currency = currency ?? merged.currency ?? existing.currency;
-      if (merged.amount) {
-        merged.amount.currencyCode = merged.currency ?? merged.amount.currencyCode;
-      }
-    } else if (!merged.currency) {
-      merged.currency = existing.currency ?? merged.amount?.currencyCode ?? 'GBP';
-      if (merged.amount) {
-        merged.amount.currencyCode = merged.currency;
-      }
-    }
+    merged.donorEmail = normalizeString(updates.donorEmail);
+  }
 
     let amountMinor =
       updates.amountMinor !== undefined
@@ -652,7 +633,6 @@ export class GiftStagingService {
       donorEmail: payload.donorEmail,
       amountMinor: payload.amountMinor,
       amount: payload.amount,
-      currency: payload.currency ?? existing.currency,
       dateReceived: payload.dateReceived ?? payload.giftDate ?? existing.dateReceived,
       expectedAt: payload.expectedAt,
       fundId: payload.fundId,
@@ -822,7 +802,7 @@ export class GiftStagingService {
       appealId: payload.appealId,
       appealSegmentId: payload.appealSegmentId,
       trackingCodeId: payload.trackingCodeId,
-      contactId: payload.donorId,
+      donorId: payload.donorId,
       donorFirstName: payload.donorFirstName,
       donorLastName: payload.donorLastName,
       donorEmail: payload.donorEmail,

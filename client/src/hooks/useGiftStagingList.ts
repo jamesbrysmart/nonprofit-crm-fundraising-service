@@ -23,6 +23,9 @@ export function useGiftStagingList(filters: GiftStagingListFetchOptions = {}): U
   const [error, setError] = useState<string | null>(null);
 
   const activeRecurringAgreementId = filters.recurringAgreementId?.trim() || undefined;
+  const statusesKey = Array.isArray(filters.statuses) ? filters.statuses.join('|') : '';
+  const intakeSourcesKey = Array.isArray(filters.intakeSources) ? filters.intakeSources.join('|') : '';
+  const searchKey = typeof filters.search === 'string' ? filters.search.trim() : '';
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh' = 'initial') => {
@@ -56,7 +59,7 @@ export function useGiftStagingList(filters: GiftStagingListFetchOptions = {}): U
         }
       }
     },
-    [activeRecurringAgreementId],
+    [activeRecurringAgreementId, statusesKey, intakeSourcesKey, searchKey],
   );
 
   useEffect(() => {

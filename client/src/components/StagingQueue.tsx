@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   GiftStagingListItem,
   processGiftStaging,
@@ -17,6 +17,67 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 const currencyFormatters = new Map<string, Intl.NumberFormat>();
+
+type StagingStatusTone = 'info' | 'success' | 'warning' | 'danger';
+
+function getProcessingStatusMeta(
+  item: GiftStagingListItem,
+): { label: string; tone: StagingStatusTone } {
+  const promotionStatus = item.processingStatus ?? item.promotionStatus ?? 'pending';
+  const validationStatus = item.validationStatus ?? 'pending';
+  const dedupeStatus = item.dedupeStatus ?? 'pending';
+
+  if (promotionStatus === 'commit_failed') {
+    return { label: 'Commit failed', tone: 'danger' };
+  }
+
+  if (promotionStatus === 'committed') {
+    return { label: 'Committed', tone: 'success' };
+  }
+
+  if (promotionStatus === 'ready_for_commit') {
+    return { label: 'Ready to process', tone: 'info' };
+  }
+
+  const needsValidation = validationStatus !== 'passed';
+  const needsDedupeReview = dedupeStatus === 'needs_review';
+
+  if (needsValidation || needsDedupeReview) {
+    return { label: 'Needs review', tone: 'warning' };
+  }
+
+  return { label: 'Pending', tone: 'info' };
+}
+
+function getAlertFlags(item: GiftStagingListItem): string[] {
+  const alerts = new Set<string>();
+  if ((item.dedupeStatus ?? '') === 'needs_review') {
+    alerts.add('Possible duplicate');
+  }
+  if (!item.donorId) {
+    alerts.add('Donor unresolved');
+  }
+  if (typeof item.errorDetail === 'string' && item.errorDetail.toLowerCase().includes('duplicate')) {
+    alerts.add('Duplicate warning');
+  }
+  if (item.recurringAgreementId) {
+    alerts.add('Recurring');
+  }
+  return Array.from(alerts);
+}
+
+function statusToneClass(tone: StagingStatusTone): string {
+  switch (tone) {
+    case 'success':
+      return 'status-pill--success';
+    case 'warning':
+      return 'status-pill--warning';
+    case 'danger':
+      return 'status-pill--danger';
+    default:
+      return 'status-pill--info';
+  }
+}
 
 function formatDate(value?: string): string {
   if (!value) {
@@ -105,12 +166,7 @@ export function StagingQueue(): JSX.Element {
   );
   const [actionError, setActionError] = useState<string | null>(null);
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
-  const [recurringHealth, setRecurringHealth] = useState({
-    pendingReview: 0,
-    autoPromoted: 0,
-    unlinked: 0,
-    lastWebhookAt: null as string | null,
-  });
+  const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
 
   const openDrawer = useCallback((stagingId: string, focus: GiftDrawerFocus = 'overview') => {
     setSelectedStagingId(stagingId);
@@ -151,6 +207,40 @@ export function StagingQueue(): JSX.Element {
     }
   };
 
+  const activeIntakeSources = activeFilters.intakeSources ?? [];
+  const hasActiveFilters =
+    Boolean(activeBatchId) ||
+    activeIntakeSources.length > 0 ||
+    showDuplicatesOnly ||
+    Boolean(activeFilters.recurringAgreementId) ||
+    Boolean(activeFilters.search);
+
+  const handleSelectIntakeSource = (source: string) => {
+    if (activeIntakeSources.includes(source)) {
+      clearFilterKey('intakeSources');
+    } else {
+      applyFilter({ intakeSources: [source] });
+    }
+  };
+
+  const handleSelectBatch = (batchId: string) => {
+    setActiveBatchId((current) => (current === batchId ? null : batchId));
+  };
+
+  const handleClearFilters = () => {
+    if (activeFilters.intakeSources) {
+      clearFilterKey('intakeSources');
+    }
+    if (activeFilters.recurringAgreementId) {
+      clearFilterKey('recurringAgreementId');
+    }
+    if (activeFilters.search) {
+      clearFilterKey('search');
+    }
+    setActiveBatchId(null);
+    setShowDuplicatesOnly(false);
+  };
+
   const derivedRows = useMemo(
     () =>
       items.map((item) => ({
@@ -159,43 +249,90 @@ export function StagingQueue(): JSX.Element {
         formattedAmount: formatAmount(item),
         donorSummary: resolveDonor(item),
         dedupeStatusMeta: formatDedupeStatus(item.dedupeStatus),
+        statusMeta: getProcessingStatusMeta(item),
         expectedAtDisplay: item.expectedAt ? formatDate(item.expectedAt) : '—',
+        hasRecurringMetadata: Boolean(
+          item.provider ||
+            item.providerPaymentId ||
+            item.recurringAgreementId ||
+            item.expectedAt,
+        ),
         hasGiftDuplicate:
           typeof item.errorDetail === 'string' && item.errorDetail.toLowerCase().includes('duplicate'),
+        alertFlags: getAlertFlags(item),
       })),
     [items],
   );
 
   const filteredRows = useMemo(() => {
-    if (!showDuplicatesOnly) {
-      return derivedRows;
+    let rows = derivedRows;
+    if (activeBatchId) {
+      rows = rows.filter((row) => row.giftBatchId === activeBatchId);
     }
-    return derivedRows.filter(
-      (row) =>
-        row.dedupeStatusMeta.label !== 'Auto-matched' ||
-        row.hasGiftDuplicate,
-    );
-  }, [derivedRows, showDuplicatesOnly]);
+    if (showDuplicatesOnly) {
+      rows = rows.filter(
+        (row) =>
+          row.dedupeStatusMeta.label !== 'Auto-matched' ||
+          row.hasGiftDuplicate,
+      );
+    }
+    return rows;
+  }, [derivedRows, activeBatchId, showDuplicatesOnly]);
 
   useEffect(() => {
-    const recurringRows = derivedRows.filter((row) => Boolean(row.recurringAgreementId));
-    const pendingReview = recurringRows.filter(
-      (row) => row.processingStatus !== 'committed' && row.dedupeStatus !== 'matched_existing',
-    ).length;
-    const autoPromoted = recurringRows.filter(
-      (row) => row.processingStatus === 'committed' && row.autoPromote,
-    ).length;
-    const unlinked = derivedRows.filter((row) => row.hasRecurringMetadata && !row.recurringAgreementId).length;
-    const lastAuto = recurringRows
-      .filter((row) => row.processingStatus === 'committed')
-      .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))[0]?.updatedAt;
+    if (activeBatchId && !derivedRows.some((row) => row.giftBatchId === activeBatchId)) {
+      setActiveBatchId(null);
+    }
+  }, [derivedRows, activeBatchId]);
 
-    setRecurringHealth({
-      pendingReview,
-      autoPromoted,
-      unlinked,
-      lastWebhookAt: lastAuto ? formatDate(lastAuto) : null,
+  const statusSummary = useMemo(() => {
+    let needsReview = 0;
+    let ready = 0;
+    let commitFailed = 0;
+    let committed = 0;
+    derivedRows.forEach((row) => {
+      const tone = row.statusMeta.tone;
+      const label = row.statusMeta.label;
+      if (label === 'Commit failed') {
+        commitFailed += 1;
+      } else if (label === 'Committed') {
+        committed += 1;
+      } else if (label === 'Ready to process') {
+        ready += 1;
+      } else if (tone === 'warning') {
+        needsReview += 1;
+      }
     });
+    return {
+      total: derivedRows.length,
+      needsReview,
+      ready,
+      commitFailed,
+      committed,
+    };
+  }, [derivedRows]);
+
+  const intakeSummary = useMemo(() => {
+    const counts = new Map<string, number>();
+    derivedRows.forEach((row) => {
+      const key = row.intakeSource?.trim() && row.intakeSource.length > 0 ? row.intakeSource : 'Unknown source';
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [derivedRows]);
+
+  const batchSummary = useMemo(() => {
+    const counts = new Map<string, number>();
+    derivedRows.forEach((row) => {
+      if (row.giftBatchId) {
+        counts.set(row.giftBatchId, (counts.get(row.giftBatchId) ?? 0) + 1);
+      }
+    });
+    return Array.from(counts.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count);
   }, [derivedRows]);
 
   const markReady = useCallback(
@@ -269,33 +406,17 @@ export function StagingQueue(): JSX.Element {
             Latest staged gifts sorted by most recently updated. Use refresh after new submissions.
           </p>
         </div>
-        <div className="queue-actions-bar">
-          {actionError ? (
-            <div className="queue-state queue-state-error" role="alert" style={{ marginRight: '1rem' }}>
-              {actionError}
-            </div>
+        <div className="queue-header-actions">
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleClearFilters}
+              disabled={loading}
+            >
+              Clear filters
+            </button>
           ) : null}
-          <div className="recurring-health">
-            <h3>Recurring health</h3>
-            <dl>
-              <div>
-                <dt>Pending review</dt>
-                <dd>{recurringHealth.pendingReview}</dd>
-              </div>
-              <div>
-                <dt>Auto-promoted</dt>
-                <dd>{recurringHealth.autoPromoted}</dd>
-              </div>
-              <div>
-                <dt>Unlinked</dt>
-                <dd>{recurringHealth.unlinked}</dd>
-              </div>
-              <div>
-                <dt>Last webhook</dt>
-                <dd>{recurringHealth.lastWebhookAt ?? 'n/a'}</dd>
-              </div>
-            </dl>
-          </div>
           <a
             href="/objects/giftStagings"
             target="_blank"
@@ -317,21 +438,75 @@ export function StagingQueue(): JSX.Element {
         </div>
       </div>
 
-      <div className="queue-filters" style={{ marginBottom: '1.5rem' }}>
-        <div className="filter-chip-group">
-          <button
-            type="button"
-            className={`chip ${activeFilters.statuses?.includes('commit_failed') ? 'chip--active' : ''}`}
-            onClick={() => {
-              if (activeFilters.statuses?.includes('commit_failed')) {
-                clearFilterKey('statuses');
-              } else {
-                applyFilter({ statuses: ['commit_failed'] });
-              }
-            }}
-          >
-            Commit failed
-          </button>
+      {actionError ? (
+        <div className="queue-state queue-state-error" role="alert">
+          {actionError}
+        </div>
+      ) : null}
+
+      <div className="queue-summary">
+        <div className="queue-summary-section">
+          <h3>Status overview</h3>
+          <div className="summary-pill-group">
+            <span className="summary-pill">
+              Total: <strong>{statusSummary.total}</strong>
+            </span>
+            <span className="summary-pill">
+              Needs review: <strong>{statusSummary.needsReview}</strong>
+            </span>
+            <span className="summary-pill">
+              Ready: <strong>{statusSummary.ready}</strong>
+            </span>
+            <span className="summary-pill">
+              Commit failed: <strong>{statusSummary.commitFailed}</strong>
+            </span>
+            <span className="summary-pill">
+              Committed: <strong>{statusSummary.committed}</strong>
+            </span>
+          </div>
+        </div>
+        <div className="queue-summary-section">
+          <h3>Intake sources</h3>
+          <div className="summary-chip-group">
+            {intakeSummary.length === 0 ? (
+              <span className="summary-empty">No intake sources</span>
+            ) : (
+              intakeSummary.map(({ label, count }) => (
+                <button
+                  key={label}
+                  type="button"
+                  className={`summary-chip ${
+                    activeIntakeSources.includes(label) ? 'summary-chip--active' : ''
+                  }`}
+                  onClick={() => handleSelectIntakeSource(label)}
+                >
+                  {label} <span className="summary-chip-count">{count}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+        {batchSummary.length > 0 ? (
+          <div className="queue-summary-section">
+            <h3>Gift batches</h3>
+            <div className="summary-chip-group">
+              {batchSummary.map(({ label, count }) => (
+                <button
+                  key={label}
+                  type="button"
+                  className={`summary-chip ${activeBatchId === label ? 'summary-chip--active' : ''}`}
+                  onClick={() => handleSelectBatch(label)}
+                >
+                  {label} <span className="summary-chip-count">{count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="queue-tools">
+        <div className="queue-tools-left">
           <button
             type="button"
             className={`chip ${showDuplicatesOnly ? 'chip--active' : ''}`}
@@ -339,55 +514,42 @@ export function StagingQueue(): JSX.Element {
           >
             Duplicates
           </button>
-          <button
-            type="button"
-            className={`chip ${
-              activeFilters.intakeSources?.includes('manual_ui') ? 'chip--active' : ''
-            }`}
-            onClick={() => {
-              if (activeFilters.intakeSources?.includes('manual_ui')) {
-                clearFilterKey('intakeSources');
-              } else {
-                applyFilter({ intakeSources: ['manual_ui'] });
-              }
-            }}
-          >
-            Manual UI
-          </button>
         </div>
-        <div className="filter-inline-group">
-          <label htmlFor="recurring-filter" className="small-text" style={{ marginRight: '0.75rem' }}>
-            Recurring agreement ID
-          </label>
-          <input
-            id="recurring-filter"
-            type="text"
-            value={recurringFilterInput}
-            onChange={(event) => setRecurringFilterInput(event.target.value)}
-            placeholder="ra_..."
-            style={{ marginRight: '0.75rem' }}
-          />
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={handleApplyRecurringFilter}
-            disabled={loading && !recurringFilterInput}
-          >
-            Apply
-          </button>
-          {activeFilters.recurringAgreementId && (
-            <button
-              type="button"
-              className="secondary-button"
-              style={{ marginLeft: '0.5rem' }}
-              onClick={() => {
-                clearFilterKey('recurringAgreementId');
-                setRecurringFilterInput('');
-              }}
-            >
-              Clear
-            </button>
-          )}
+        <div className="queue-tools-right">
+          <div className="queue-tools-recurring">
+            <label htmlFor="recurring-filter" className="small-text">
+              Recurring agreement ID
+            </label>
+            <div className="queue-tools-recurring-controls">
+              <input
+                id="recurring-filter"
+                type="text"
+                value={recurringFilterInput}
+                onChange={(event) => setRecurringFilterInput(event.target.value)}
+                placeholder="ra_..."
+              />
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={handleApplyRecurringFilter}
+                disabled={loading && !recurringFilterInput}
+              >
+                Apply
+              </button>
+              {activeFilters.recurringAgreementId && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => {
+                    clearFilterKey('recurringAgreementId');
+                    setRecurringFilterInput('');
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -405,17 +567,12 @@ export function StagingQueue(): JSX.Element {
             <thead>
               <tr>
                 <th scope="col">Staging ID</th>
-                <th scope="col">Created</th>
-                <th scope="col">Amount</th>
-                <th scope="col">Processing</th>
-                <th scope="col">Validation</th>
-                <th scope="col">Dedupe</th>
-                <th scope="col">Intake Source</th>
-                <th scope="col">Batch</th>
-                <th scope="col">Recurring</th>
-                <th scope="col">Expected</th>
-                <th scope="col">Provider</th>
                 <th scope="col">Donor</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Updated</th>
+                <th scope="col">Status</th>
+                <th scope="col">Source</th>
+                <th scope="col">Alerts</th>
                 <th scope="col" className="queue-col-actions">
                   Actions
                 </th>
@@ -427,55 +584,54 @@ export function StagingQueue(): JSX.Element {
                   <td className="queue-cell-id">
                     <code>{row.id}</code>
                   </td>
-                  <td>{row.formattedDate}</td>
                   <td>{row.formattedAmount}</td>
-                  <td>{row.processingStatus ?? '—'}</td>
-                  <td>{row.validationStatus ?? '—'}</td>
-                  <td>
-                    <span
-                      className={`status-pill status-pill--${row.dedupeStatusMeta.tone}`}
-                    >
-                      {row.dedupeStatusMeta.label}
-                    </span>
-                    {row.hasGiftDuplicate ? (
-                      <span className="status-pill status-pill--warning" style={{ marginLeft: '0.35rem' }}>
-                        Possible duplicate gift
-                      </span>
-                    ) : null}
-                  </td>
-                  <td>{row.intakeSource ?? '—'}</td>
-                  <td>{row.giftBatchId ? <code>{row.giftBatchId}</code> : '—'}</td>
-                  <td>
-                    {row.recurringAgreementId ? <code>{row.recurringAgreementId}</code> : '—'}
-                  </td>
-                  <td>{row.expectedAtDisplay}</td>
-                  <td>{row.provider ?? '—'}</td>
                   <td>{row.donorSummary}</td>
+                  <td>{row.formattedDate}</td>
+                  <td>
+                    <span className={`status-pill ${statusToneClass(row.statusMeta.tone)}`}>
+                      {row.statusMeta.label}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="queue-source">
+                      <span>{row.intakeSource ?? '—'}</span>
+                      {row.giftBatchId ? (
+                        <span className="queue-batch-tag">{row.giftBatchId}</span>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td>
+                    {row.alertFlags.length === 0 ? (
+                      '—'
+                    ) : (
+                      <div className="queue-alerts">
+                        {row.alertFlags.map((alert) => (
+                          <span key={alert} className="queue-alert">
+                            {alert}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td className="queue-actions">
                     <button
                       type="button"
                       className="secondary-button"
-                      onClick={() => openDrawer(row.id, 'duplicates')}
+                      onClick={() => openDrawer(row.id)}
                     >
-                      Resolve duplicates
+                      Review
                     </button>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => markReady(row.id)}
-                      disabled={processingIds[row.id] === 'mark-ready'}
-                    >
-                      {processingIds[row.id] === 'mark-ready' ? 'Marking…' : 'Mark ready'}
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => processNow(row.id)}
-                      disabled={processingIds[row.id] === 'process'}
-                    >
-                      {processingIds[row.id] === 'process' ? 'Processing…' : 'Process now'}
-                    </button>
-                    {row.processingStatus === 'commit_failed' ? (
+                    {row.statusMeta.label === 'Ready to process' ? (
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => processNow(row.id)}
+                        disabled={processingIds[row.id] === 'process'}
+                      >
+                        {processingIds[row.id] === 'process' ? 'Processing…' : 'Process now'}
+                      </button>
+                    ) : null}
+                    {row.statusMeta.label === 'Commit failed' ? (
                       <button
                         type="button"
                         className="secondary-button"
@@ -485,13 +641,6 @@ export function StagingQueue(): JSX.Element {
                         Retry
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => openDrawer(row.id)}
-                    >
-                      View details
-                    </button>
                   </td>
                 </tr>
               ))}

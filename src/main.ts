@@ -18,7 +18,7 @@ async function bootstrap() {
     exclude: [{ path: 'health', method: RequestMethod.ALL }],
   });
   const requestContextService = app.get(RequestContextService);
-  const clientAssetsPath = join(__dirname, 'client');
+  const clientAssetsPath = join(__dirname, '..', 'client');
 
   app.use((req: Request, res: Response, next: NextFunction) => {
     const headerValue = req.headers['x-request-id'];

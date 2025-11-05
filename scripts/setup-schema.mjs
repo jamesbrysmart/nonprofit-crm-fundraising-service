@@ -191,12 +191,15 @@ async function main() {
   const giftFields = [
     { name: "amount", label: "Amount", type: "CURRENCY" },
     { name: "date", label: "Gift Date", type: "DATE" },
+    { name: "externalId", label: "External ID", type: "TEXT" },
+    { name: "paymentMethod", label: "Payment Method", type: "TEXT" },
     { name: "donorFirstName", label: "Donor First Name", type: "TEXT" },
     { name: "donorLastName", label: "Donor Last Name", type: "TEXT" },
     { name: "donorEmail", label: "Donor Email", type: "TEXT" },
     { name: "provider", label: "Provider", type: "TEXT" },
     { name: "providerPaymentId", label: "Provider Payment ID", type: "TEXT" },
     { name: "intakeSource", label: "Intake Source", type: "TEXT" },
+    { name: "notes", label: "Notes", type: "TEXT" },
     { name: "recurringStatus", label: "Recurring Status Snapshot", type: "TEXT" },
     { name: "recurringMetadata", label: "Recurring Metadata", type: "RAW_JSON" },
   ];
