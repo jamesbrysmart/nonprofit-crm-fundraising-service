@@ -154,29 +154,41 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('--- Setting up Campaign Object ---');
-  const campaignObjectId = await ensureObject({
-    nameSingular: "campaign",
-    namePlural: "campaigns",
-    labelSingular: "Campaign",
-    labelPlural: "Campaigns",
-    icon: "IconTargetArrow",
-    description: "A fundraising campaign to raise money for a specific purpose."
+  console.log('--- Setting up Appeal Object ---');
+  const appealObjectId = await ensureObject({
+    nameSingular: 'appeal',
+    namePlural: 'appeals',
+    labelSingular: 'Appeal',
+    labelPlural: 'Appeals',
+    icon: 'IconSpeakerphone',
+    description:
+      'A fundraising appeal used for attribution, goals, and performance tracking.',
   });
 
-  await createField({
-    objectMetadataId: campaignObjectId,
-    name: "startDate",
-    label: "Start Date",
-    type: "DATE"
-  });
+  const appealFields = [
+    { name: 'appealType', label: 'Appeal Type', type: 'TEXT' },
+    { name: 'description', label: 'Description', type: 'TEXT' },
+    { name: 'startDate', label: 'Start Date', type: 'DATE' },
+    { name: 'endDate', label: 'End Date', type: 'DATE' },
+    { name: 'goalAmount', label: 'Goal Amount', type: 'CURRENCY' },
+    { name: 'targetSolicitedCount', label: 'Target Solicited Count', type: 'NUMBER' },
+    { name: 'budgetAmount', label: 'Budget Amount', type: 'CURRENCY' },
+    { name: 'raisedAmount', label: 'Raised Amount', type: 'CURRENCY' },
+    { name: 'giftCount', label: 'Gift Count', type: 'NUMBER' },
+    { name: 'donorCount', label: 'Donor Count', type: 'NUMBER' },
+    { name: 'responseRate', label: 'Response Rate', type: 'NUMBER' },
+    { name: 'costPerPound', label: 'Cost per £', type: 'NUMBER' },
+    { name: 'lastGiftAt', label: 'Last Gift At', type: 'DATE_TIME' },
+  ];
 
-  await createField({
-    objectMetadataId: campaignObjectId,
-    name: "endDate",
-    label: "End Date",
-    type: "DATE"
-  });
+  for (const field of appealFields) {
+    await createField({
+      objectMetadataId: appealObjectId,
+      name: field.name,
+      label: field.label,
+      type: field.type,
+    });
+  }
 
   console.log('--- Setting up Gift Object ---');
   const giftObjectId = await ensureObject({
@@ -185,7 +197,7 @@ async function main() {
     labelSingular: "Gift",
     labelPlural: "Gifts",
     icon: "IconGift",
-    description: "A single donation made by a contact to a campaign."
+    description: "A single donation made by a contact to an appeal."
   });
 
   const giftFields = [
@@ -303,7 +315,7 @@ async function main() {
     { name: 'endDate', label: 'End Date', type: 'DATE' },
     { name: 'nextExpectedAt', label: 'Next Expected At', type: 'DATE' },
     { name: 'autoPromoteEnabled', label: 'Auto Promote Enabled', type: 'BOOLEAN' },
-    { name: 'defaultCampaignId', label: 'Default Campaign ID', type: 'TEXT' },
+    { name: 'defaultAppealId', label: 'Default Appeal ID', type: 'TEXT' },
     { name: 'defaultFundId', label: 'Default Fund ID', type: 'TEXT' },
     { name: 'defaultSoftCreditJson', label: 'Default Soft Credit JSON', type: 'RAW_JSON' },
     { name: 'giftAidDeclarationId', label: 'Gift Aid Declaration ID', type: 'TEXT' },
@@ -327,16 +339,48 @@ async function main() {
     });
   }
 
+  console.log('--- Setting up Solicitation Snapshot Object ---');
+  const solicitationSnapshotObjectId = await ensureObject({
+    nameSingular: 'solicitationSnapshot',
+    namePlural: 'solicitationSnapshots',
+    labelSingular: 'Solicitation Snapshot',
+    labelPlural: 'Solicitation Snapshots',
+    icon: 'IconListNumbers',
+    description:
+      'Snapshot logging how many constituents were solicited for an appeal at a point in time.',
+  });
+
+  const solicitationSnapshotFields = [
+    { name: 'countSolicited', label: 'Count Solicited', type: 'NUMBER' },
+    { name: 'source', label: 'Source', type: 'TEXT' },
+    { name: 'capturedAt', label: 'Captured At', type: 'DATE_TIME' },
+    { name: 'notes', label: 'Notes', type: 'TEXT' },
+  ];
+
+  for (const field of solicitationSnapshotFields) {
+    await createField({
+      objectMetadataId: solicitationSnapshotObjectId,
+      name: field.name,
+      label: field.label,
+      type: field.type,
+    });
+  }
+
   console.log('--- Linking Objects (Manual Step Required) ---');
   console.log('NOTE: RELATION/LOOKUP fields cannot be created via API at this time.');
   console.log('Please create the following LOOKUP fields manually in the Twenty UI:');
-  console.log('- For Gift object: "Campaign" (linking to Campaign object)');
+  console.log('- For Gift object: "Appeal" (linking to Appeal object)');
   console.log('- For Gift object: "Contact" (linking to Person object)');
   console.log('- For Gift object: "Recurring Agreement" (linking to Recurring Agreement object)');
   console.log('- For Gift Staging object: "Gift" (linking to Gift object)');
   console.log('- For Gift Staging object: "Gift Batch" (linking to Gift Batch object, optional)');
   console.log('- For Gift Staging object: "Recurring Agreement" (linking to Recurring Agreement object)');
   console.log('- For Recurring Agreement object: "Contact" (linking to Person object)');
+  console.log('- For Appeal object: "Parent Appeal" (self-lookup to Appeal object)');
+  console.log('- For Appeal object: "Default Fund" (linking to Fund/Designation object, optional)');
+  console.log('- For Appeal object: "Default Tracking Code" (linking to Tracking Code object, optional)');
+  console.log('- For Solicitation Snapshot object: "Appeal" (linking to Appeal object)');
+  console.log('- For Solicitation Snapshot object: "Appeal Segment" (linking to Appeal Segment object, optional)');
 
   console.log('✅ Twenty CRM custom objects and fields setup complete (manual steps for LOOKUP fields pending).');
 }

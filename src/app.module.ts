@@ -9,6 +9,7 @@ import { TwentyModule } from './twenty/twenty.module';
 import { StripeModule } from './stripe/stripe.module';
 import { RecurringAgreementModule } from './recurring-agreement/recurring-agreement.module';
 import { GoCardlessModule } from './gocardless/gocardless.module';
+import { AppealModule } from './appeal/appeal.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { GoCardlessModule } from './gocardless/gocardless.module';
     StripeModule,
     RecurringAgreementModule,
     GoCardlessModule,
+    AppealModule,
   ],
   controllers: [HealthController],
   providers: [],

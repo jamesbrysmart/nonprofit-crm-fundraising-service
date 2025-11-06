@@ -23,7 +23,7 @@ export interface RecurringAgreementPayload extends Record<string, unknown> {
   endDate?: string;
   nextExpectedAt?: string;
   autoPromoteEnabled?: boolean;
-  defaultCampaignId?: string;
+  defaultAppealId?: string;
   defaultFundId?: string;
   defaultSoftCreditJson?: Record<string, unknown>;
   giftAidDeclarationId?: string;

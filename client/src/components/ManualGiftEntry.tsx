@@ -12,6 +12,7 @@ import type {
   GiftStagingListItem,
   RecurringAgreementListItem,
 } from '../api';
+import { useAppealOptions } from '../hooks/useAppealOptions';
 
 interface GiftFormState {
   amountValue: string;
@@ -21,6 +22,7 @@ interface GiftFormState {
   contactFirstName: string;
   contactLastName: string;
   contactEmail: string;
+  appealId: string;
 }
 
 const defaultFormState = (): GiftFormState => ({
@@ -31,6 +33,7 @@ const defaultFormState = (): GiftFormState => ({
   contactFirstName: '',
   contactLastName: '',
   contactEmail: '',
+  appealId: '',
 });
 
 type FormStatus =
@@ -59,6 +62,11 @@ export function ManualGiftEntry(): JSX.Element {
   const [searchResults, setSearchResults] = useState<PersonDuplicate[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const {
+    options: appealOptions,
+    loading: appealsLoading,
+    error: appealLoadError,
+  } = useAppealOptions();
 
   const openSearchModal = () => {
     setIsSearchModalOpen(true);
@@ -324,7 +332,7 @@ export function ManualGiftEntry(): JSX.Element {
       state: 'success',
       giftId,
     });
-    setFormState(defaultFormState());
+    setFormState({ ...defaultFormState(), appealId: formState.appealId });
     setShowDuplicates(false);
     setDuplicateMatches([]);
     setSelectedDuplicateId(null);
@@ -515,6 +523,33 @@ export function ManualGiftEntry(): JSX.Element {
               value={formState.giftDate}
               onChange={handleChange}
             />
+          </div>
+
+          <div className="form-row">
+            <label htmlFor="appealId">Appeal (optional)</label>
+            <select
+              id="appealId"
+              name="appealId"
+              value={formState.appealId}
+              onChange={handleChange}
+              disabled={appealsLoading && appealOptions.length === 0}
+            >
+              <option value="">No appeal</option>
+              {appealOptions.map((appeal) => (
+                <option key={appeal.id} value={appeal.id}>
+                  {appeal.name ?? 'Untitled appeal'}
+                </option>
+              ))}
+            </select>
+            {appealsLoading ? (
+              <span className="small-text" style={{ color: '#64748b' }}>
+                Loading appeals…
+              </span>
+            ) : appealLoadError ? (
+              <span className="small-text" style={{ color: '#991b1b' }}>
+                {appealLoadError}
+              </span>
+            ) : null}
           </div>
 
           <div className="form-row">
@@ -987,6 +1022,11 @@ function buildGiftPayload(state: GiftFormState, existingContactId?: string): Gif
     giftDate: state.giftDate,
     name: state.giftName.trim() || undefined,
   };
+
+  const appealId = state.appealId.trim();
+  if (appealId.length > 0) {
+    payload.appealId = appealId;
+  }
 
   if (existingContactId) {
     return {

@@ -48,14 +48,14 @@ describe('gift.validation', () => {
       ).toThrow(BadRequestException);
     });
 
-    it('maps campaignId to appealId', () => {
+    it('retains appealId when provided directly', () => {
       const result = validateCreateGiftPayload({
         amount: { currencyCode: 'GBP', value: 5 },
-        contact: { firstName: 'Tom', lastName: 'Smith' },
-        campaignId: 'cmp-123',
+        contact: { firstName: 'Edsger', lastName: 'Dijkstra' },
+        appealId: 'apl-456',
       });
 
-      expect(result.appealId).toBe('cmp-123');
+      expect(result.appealId).toBe('apl-456');
     });
 
     it('preserves provided amountMinor/currency when supplied', () => {

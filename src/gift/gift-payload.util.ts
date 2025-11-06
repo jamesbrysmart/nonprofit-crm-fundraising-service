@@ -58,7 +58,6 @@ export const buildTwentyGiftPayload = (
 
   delete body.providerContext;
   delete body.dedupeDiagnostics;
-  delete body.appealId;
   delete body.appealSegmentId;
   delete body.trackingCodeId;
   delete body.fundId;

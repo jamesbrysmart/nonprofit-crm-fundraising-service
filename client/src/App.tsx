@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { ManualGiftEntry } from './components/ManualGiftEntry';
 import { StagingQueue } from './components/StagingQueue';
 import { RecurringAgreementList } from './components/RecurringAgreementList';
+import { AppealsView } from './components/AppealsView';
 
-type ViewMode = 'manual' | 'queue' | 'agreements';
+type ViewMode = 'manual' | 'queue' | 'agreements' | 'appeals';
 
 export function App(): JSX.Element {
   const [view, setView] = useState<ViewMode>('manual');
@@ -41,14 +42,23 @@ export function App(): JSX.Element {
           >
             Recurring agreements
           </button>
+          <button
+            type="button"
+            onClick={() => setView('appeals')}
+            disabled={view === 'appeals'}
+          >
+            Appeals
+          </button>
         </nav>
 
         {view === 'manual' ? (
           <ManualGiftEntry />
         ) : view === 'queue' ? (
           <StagingQueue />
-        ) : (
+        ) : view === 'agreements' ? (
           <RecurringAgreementList />
+        ) : (
+          <AppealsView />
         )}
       </main>
     </div>

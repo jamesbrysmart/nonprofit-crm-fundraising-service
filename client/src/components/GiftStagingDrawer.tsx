@@ -6,6 +6,7 @@ import {
   updateGiftStagingStatus,
   type GiftStagingUpdatePayload,
 } from '../api';
+import { useAppealOptions } from '../hooks/useAppealOptions';
 import { useGiftStagingDetail } from '../hooks/useGiftStagingDetail';
 
 export type GiftDrawerFocus = 'overview' | 'duplicates' | 'recurring';
@@ -79,6 +80,15 @@ export function GiftStagingDrawer({
     giftBatchId: '',
     notes: '',
   });
+  const {
+    options: appealOptions,
+    loading: appealsLoading,
+    error: appealError,
+  } = useAppealOptions();
+  const appealListId = useMemo(
+    () => (stagingId ? `drawer-appeal-options-${stagingId}` : 'drawer-appeal-options'),
+    [stagingId],
+  );
 
   const { detail, loading, error, reload } = useGiftStagingDetail(stagingId);
 
@@ -523,13 +533,27 @@ export function GiftStagingDrawer({
                       />
                     </label>
                     <label className="drawer-field">
-                      <span>Appeal ID</span>
+                      <span>Appeal</span>
                       <input
                         type="text"
+                        list={appealListId}
                         value={editForm.appealId}
                         onChange={handleEditFieldChange('appealId')}
                         disabled={actionBusy === 'update' || loading}
+                        placeholder="Enter or select appeal id"
                       />
+                      <datalist id={appealListId}>
+                        {appealOptions.map((appeal) => (
+                          <option key={appeal.id} value={appeal.id}>
+                            {appeal.name ?? appeal.id}
+                          </option>
+                        ))}
+                      </datalist>
+                      {appealsLoading ? (
+                        <span className="drawer-hint">Loading appeals…</span>
+                      ) : appealError ? (
+                        <span className="drawer-hint drawer-hint--error">{appealError}</span>
+                      ) : null}
                     </label>
                     <label className="drawer-field">
                       <span>Tracking code ID</span>

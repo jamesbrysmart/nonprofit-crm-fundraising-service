@@ -16,6 +16,7 @@ export interface GiftCreatePayload {
     currencyCode: string;
     value: number;
   };
+  appealId?: string;
   giftDate?: string;
   name?: string;
   contact?: {
@@ -479,4 +480,344 @@ export async function fetchGiftStagingById(
   }
 
   return (await response.json()) as GiftStagingDetailResponse;
+}
+
+export interface MoneyValue {
+  value?: number;
+  currencyCode?: string;
+}
+
+export interface MoneyInput {
+  value: number;
+  currencyCode?: string;
+}
+
+export interface AppealRecord {
+  id: string;
+  name?: string;
+  description?: string | null;
+  appealType?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  goalAmount?: MoneyValue | null;
+  budgetAmount?: MoneyValue | null;
+  raisedAmount?: MoneyValue | null;
+  giftCount?: number | null;
+  donorCount?: number | null;
+  responseRate?: number | null;
+  costPerPound?: number | null;
+  lastGiftAt?: string | null;
+  targetSolicitedCount?: number | null;
+}
+
+export interface FetchAppealsParams {
+  limit?: number;
+  cursor?: string;
+  sort?: string;
+}
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const toMoneyValue = (value: unknown): MoneyValue | undefined => {
+  if (!isPlainObject(value)) {
+    return undefined;
+  }
+
+  const rawValue = value.value;
+  const rawCurrency = value.currencyCode ?? value.currency;
+
+  const numeric =
+    typeof rawValue === 'number'
+      ? rawValue
+      : typeof rawValue === 'string'
+        ? Number.parseFloat(rawValue)
+        : undefined;
+
+  if (numeric === undefined || Number.isNaN(numeric)) {
+    return undefined;
+  }
+
+  const currency =
+    typeof rawCurrency === 'string' && rawCurrency.trim().length > 0
+      ? rawCurrency.trim().toUpperCase()
+      : undefined;
+
+  return {
+    value: Number.parseFloat(numeric.toFixed(2)),
+    currencyCode: currency,
+  };
+};
+
+const toAppealRecord = (value: unknown): AppealRecord | undefined => {
+  if (!isPlainObject(value) || typeof value.id !== 'string') {
+    return undefined;
+  }
+
+  return {
+    id: value.id,
+    name: typeof value.name === 'string' ? value.name : undefined,
+    description: typeof value.description === 'string' ? value.description : null,
+    appealType: typeof value.appealType === 'string' ? value.appealType : undefined,
+    startDate: typeof value.startDate === 'string' ? value.startDate : null,
+    endDate: typeof value.endDate === 'string' ? value.endDate : null,
+    goalAmount: toMoneyValue(value.goalAmount) ?? null,
+    budgetAmount: toMoneyValue(value.budgetAmount) ?? null,
+    raisedAmount: toMoneyValue(value.raisedAmount) ?? null,
+    giftCount:
+      typeof value.giftCount === 'number'
+        ? value.giftCount
+        : typeof value.giftCount === 'string'
+          ? Number.parseInt(value.giftCount, 10)
+          : null,
+    donorCount:
+      typeof value.donorCount === 'number'
+        ? value.donorCount
+        : typeof value.donorCount === 'string'
+          ? Number.parseInt(value.donorCount, 10)
+          : null,
+    responseRate:
+      typeof value.responseRate === 'number'
+        ? value.responseRate
+        : typeof value.responseRate === 'string'
+          ? Number.parseFloat(value.responseRate)
+          : null,
+    costPerPound:
+      typeof value.costPerPound === 'number'
+        ? value.costPerPound
+        : typeof value.costPerPound === 'string'
+          ? Number.parseFloat(value.costPerPound)
+          : null,
+    lastGiftAt: typeof value.lastGiftAt === 'string' ? value.lastGiftAt : null,
+    targetSolicitedCount:
+      typeof value.targetSolicitedCount === 'number'
+        ? value.targetSolicitedCount
+        : typeof value.targetSolicitedCount === 'string'
+          ? Number.parseInt(value.targetSolicitedCount, 10)
+          : null,
+  };
+};
+
+export async function fetchAppeals(params: FetchAppealsParams = {}): Promise<AppealRecord[]> {
+  const search = new URLSearchParams();
+
+  if (params.limit && Number.isFinite(params.limit)) {
+    search.set('limit', String(params.limit));
+  }
+  if (params.cursor) {
+    search.set('cursor', params.cursor);
+  }
+  if (params.sort) {
+    search.set('sort', params.sort);
+  }
+
+  const queryString = search.toString();
+  const response = await fetch(
+    `/api/fundraising/appeals${queryString ? `?${queryString}` : ''}`,
+    {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || response.statusText);
+  }
+
+  const json = (await response.json()) as {
+    data?: { appeals?: unknown[] };
+  };
+
+  const appeals: AppealRecord[] = [];
+
+  for (const entry of json.data?.appeals ?? []) {
+    const record = toAppealRecord(entry);
+    if (record) {
+      appeals.push(record);
+    }
+  }
+
+  return appeals;
+}
+
+const serializeMoneyInput = (input: MoneyInput | undefined | null) => {
+  if (!input) {
+    return undefined;
+  }
+  const currency =
+    typeof input.currencyCode === 'string' && input.currencyCode.trim().length > 0
+      ? input.currencyCode.trim().toUpperCase()
+      : 'GBP';
+  return {
+    value: Number.parseFloat(input.value.toFixed(2)),
+    currencyCode: currency,
+  };
+};
+
+export interface AppealCreateRequest {
+  name: string;
+  description?: string;
+  appealType?: string;
+  startDate?: string;
+  endDate?: string;
+  goalAmount?: MoneyInput | null;
+  budgetAmount?: MoneyInput | null;
+  targetSolicitedCount?: number | null;
+}
+
+export type AppealUpdateRequest = Partial<AppealCreateRequest>;
+
+export async function createAppeal(payload: AppealCreateRequest): Promise<string> {
+  const response = await fetch('/api/fundraising/appeals', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      ...payload,
+      goalAmount: serializeMoneyInput(payload.goalAmount ?? undefined),
+      budgetAmount: serializeMoneyInput(payload.budgetAmount ?? undefined),
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || response.statusText);
+  }
+
+  const json = (await response.json()) as {
+    data?: { createAppeal?: { id?: string } };
+  };
+
+  const id = json.data?.createAppeal?.id;
+  if (!id) {
+    throw new Error('Twenty did not return an appeal id');
+  }
+  return id;
+}
+
+export async function updateAppeal(
+  appealId: string,
+  payload: AppealUpdateRequest,
+): Promise<void> {
+  const response = await fetch(`/api/fundraising/appeals/${encodeURIComponent(appealId)}`, {
+    method: 'PATCH',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      ...payload,
+      goalAmount: serializeMoneyInput(payload.goalAmount ?? undefined),
+      budgetAmount: serializeMoneyInput(payload.budgetAmount ?? undefined),
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || response.statusText);
+  }
+}
+
+export interface SolicitationSnapshotRecord {
+  id: string;
+  countSolicited?: number | null;
+  source?: string | null;
+  capturedAt?: string | null;
+  appealId?: string | null;
+  appealSegmentId?: string | null;
+}
+
+const toSolicitationSnapshotRecord = (value: unknown): SolicitationSnapshotRecord | undefined => {
+  if (!isPlainObject(value) || typeof value.id !== 'string') {
+    return undefined;
+  }
+
+  return {
+    id: value.id,
+    countSolicited:
+      typeof value.countSolicited === 'number'
+        ? value.countSolicited
+        : typeof value.countSolicited === 'string'
+          ? Number.parseInt(value.countSolicited, 10)
+          : null,
+    source: typeof value.source === 'string' ? value.source : null,
+    capturedAt: typeof value.capturedAt === 'string' ? value.capturedAt : null,
+    appealId: typeof value.appealId === 'string' ? value.appealId : null,
+    appealSegmentId: typeof value.appealSegmentId === 'string' ? value.appealSegmentId : null,
+  };
+};
+
+export async function fetchSolicitationSnapshots(
+  appealId: string,
+): Promise<SolicitationSnapshotRecord[]> {
+  const response = await fetch(
+    `/api/fundraising/appeals/${encodeURIComponent(appealId)}/solicitation-snapshots`,
+    {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || response.statusText);
+  }
+
+  const json = (await response.json()) as {
+    data?: { solicitationSnapshots?: unknown[] };
+  };
+
+  const snapshots: SolicitationSnapshotRecord[] = [];
+  for (const entry of json.data?.solicitationSnapshots ?? []) {
+    const record = toSolicitationSnapshotRecord(entry);
+    if (record) {
+      snapshots.push(record);
+    }
+  }
+  return snapshots.filter(
+    (snapshot) => typeof snapshot.appealId !== 'string' || snapshot.appealId === appealId,
+  );
+}
+
+export interface SolicitationSnapshotCreateRequest {
+  countSolicited: number;
+  source?: string;
+  capturedAt?: string;
+  appealSegmentId?: string;
+  notes?: string;
+}
+
+export async function createSolicitationSnapshot(
+  appealId: string,
+  payload: SolicitationSnapshotCreateRequest,
+): Promise<string> {
+  const response = await fetch(
+    `/api/fundraising/appeals/${encodeURIComponent(appealId)}/solicitation-snapshots`,
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || response.statusText);
+  }
+
+  const json = (await response.json()) as {
+    data?: { createSolicitationSnapshot?: { id?: string } };
+  };
+
+  const id = json.data?.createSolicitationSnapshot?.id;
+  if (!id) {
+    throw new Error('Twenty did not return a solicitation snapshot id');
+  }
+  return id;
 }

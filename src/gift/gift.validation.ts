@@ -2,7 +2,9 @@ import { BadRequestException } from '@nestjs/common';
 
 const ALLOWED_STRING_FIELDS = new Set([
   'contactId',
-  'campaignId',
+  'appealId',
+  'appealSegmentId',
+  'trackingCodeId',
   'fundId',
   'date',
   'giftDate',
@@ -136,21 +138,11 @@ const collectAllowedFields = (
       continue;
     }
 
-    if (key === 'campaignId' && typeof value === 'string') {
-      normalizeStringField(result, 'appealId', value);
-      continue;
-    }
-
     if (key === 'contact' && isPlainObject(value)) {
       const contact = normalizeContact(value, context);
       if (contact) {
         result.contact = contact;
       }
-      continue;
-    }
-
-    if (key === 'campaignId' && typeof value === 'string') {
-      normalizeStringField(result, 'appealId', value);
       continue;
     }
 

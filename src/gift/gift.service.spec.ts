@@ -190,4 +190,41 @@ describe('GiftService - staging auto promote', () => {
       dedupeStatus: 'matched_existing',
     });
   });
+
+  it('passes appealId through to the Twenty API payload when present', async () => {
+    const sanitizedPayload = {
+      amount: { currencyCode: 'GBP', value: 25 },
+      appealId: 'apl-123',
+    } as GiftCreatePayload;
+
+    jest
+      .spyOn(giftValidation, 'validateCreateGiftPayload')
+      .mockReturnValue(sanitizedPayload);
+
+    const preparedPayload: NormalizedGiftCreatePayload = {
+      amount: { currencyCode: 'GBP', value: 25 },
+      amountMinor: 2500,
+      currency: 'GBP',
+      appealId: 'apl-123',
+      autoPromote: true,
+    };
+
+    jest
+      .spyOn(giftService as unknown as { prepareGiftPayload: () => Promise<NormalizedGiftCreatePayload> }, 'prepareGiftPayload')
+      .mockResolvedValue(preparedPayload);
+
+    giftStagingService.isEnabled.mockReturnValue(false);
+    twentyApiService.request.mockResolvedValue({
+      data: { createGift: { id: 'gift-appeal' } },
+    });
+
+    await giftService.createGift({});
+
+    expect(twentyApiService.request).toHaveBeenCalledWith(
+      'POST',
+      '/gifts',
+      expect.objectContaining({ appealId: 'apl-123' }),
+      expect.any(String),
+    );
+  });
 });

@@ -2,61 +2,144 @@
 
 import assert from 'node:assert/strict';
 
-const DEFAULT_GATEWAY_BASE =
-  process.env.GATEWAY_BASE ?? process.env.SMOKE_GIFTS_BASE ?? 'http://gateway:4000/api/fundraising';
+const gatewayBaseCandidates = [
+  process.env.GATEWAY_BASE,
+  process.env.SMOKE_GIFTS_BASE,
+  'http://gateway:80',
+]
+  .filter(Boolean)
+  .map((base) => base.replace(/\/+$/, ''));
 
-const GATEWAY_BASE = DEFAULT_GATEWAY_BASE;
+let resolvedGatewayBase;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function httpJson(method, path, body) {
-  const url = `${GATEWAY_BASE}${path.startsWith('/') ? path : `/${path}`}`;
+  const basesToTry = resolvedGatewayBase
+    ? [resolvedGatewayBase]
+    : gatewayBaseCandidates.length > 0
+      ? gatewayBaseCandidates
+      : ['http://localhost:4000'];
 
-  const init = {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  };
+  let lastError;
 
-  if (body !== undefined) {
-    init.body = JSON.stringify(body);
-  } else if (method === 'PATCH') {
-    init.body = '{}';
-  }
-
-  const response = await fetch(url, init);
-  const text = await response.text();
-
-  let parsed;
-  try {
-    parsed = text ? JSON.parse(text) : undefined;
-  } catch (error) {
-    console.error('Failed to parse response body:', text);
-    throw error;
-  }
-
-  if (!response.ok) {
-    console.error('Request failed', {
+  for (const base of basesToTry) {
+    const finalBase = base.replace(/\/+$/, '');
+    const ensuredPath = path.startsWith('/') ? path : `/${path}`;
+    const prefixedPath = `/api/fundraising${ensuredPath}`;
+    const init = {
       method,
-      url,
-      status: response.status,
-      statusText: response.statusText,
-      body,
-      response: parsed,
-    });
-    throw new Error(`HTTP ${response.status} ${response.statusText}`);
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    };
+
+    if (body !== undefined) {
+      init.body = JSON.stringify(body);
+    } else if (method === 'PATCH') {
+      init.body = '{}';
+    }
+    const url = `${finalBase}${prefixedPath}`;
+
+    let response;
+    try {
+      response = await fetch(url, init);
+    } catch (error) {
+      console.warn(`Request failed for base ${base}: ${error}`);
+      lastError = error;
+      if (resolvedGatewayBase === base) {
+        resolvedGatewayBase = undefined;
+      }
+      continue;
+    }
+
+    const text = await response.text();
+
+    let parsed;
+    try {
+      parsed = text ? JSON.parse(text) : undefined;
+    } catch (error) {
+      console.error('Failed to parse response body:', text);
+      throw error;
+    }
+
+    if (!response.ok) {
+      console.error('Request failed', {
+        method,
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        body,
+        response: parsed,
+      });
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+
+    if (resolvedGatewayBase !== base) {
+      resolvedGatewayBase = base;
+      console.log(`Using fundraising gateway at ${base}`);
+    }
+
+    return parsed;
   }
 
-  return parsed;
+  throw lastError ?? new Error('Unable to reach fundraising gateway');
 }
 
 async function main() {
   console.log('--- Gift staging manual processing flow ---');
   const uniqueSuffix = Date.now();
+  console.log('\n--- Appeals API smoke ---');
+  const appealName = `Smoke Test Appeal ${uniqueSuffix}`;
+  const createAppealResponse = await httpJson('POST', '/appeals', {
+    name: appealName,
+    appealType: 'email',
+    startDate: new Date().toISOString().slice(0, 10),
+  });
+  const createdAppeal = createAppealResponse?.data?.createAppeal;
+  assert(createdAppeal?.id, 'createAppeal payload missing id');
+  console.log(`Appeal created with id ${createdAppeal.id}`);
+
+  const listAppealsResponse = await httpJson('GET', '/appeals?limit=20');
+  const appeals = listAppealsResponse?.data?.appeals;
+  assert(Array.isArray(appeals), 'appeals list response missing array');
+  assert(
+    appeals.some((appeal) => appeal?.id === createdAppeal.id),
+    'created appeal not returned in list',
+  );
+
+  const updateAppealResponse = await httpJson('PATCH', `/appeals/${createdAppeal.id}`, {
+    description: 'Smoke test appeal updated',
+  });
+  const updatedAppeal = updateAppealResponse?.data?.updateAppeal;
+  assert(updatedAppeal?.id === createdAppeal.id, 'updateAppeal response id mismatch');
+
+  const snapshotResponse = await httpJson(
+    'POST',
+    `/appeals/${createdAppeal.id}/solicitation-snapshots`,
+    {
+      countSolicited: 123,
+      source: 'Smoke test send',
+    },
+  );
+  const createdSnapshot = snapshotResponse?.data?.createSolicitationSnapshot;
+  assert(createdSnapshot?.id, 'createSolicitationSnapshot payload missing id');
+
+  const snapshotListResponse = await httpJson(
+    'GET',
+    `/appeals/${createdAppeal.id}/solicitation-snapshots`,
+  );
+  const snapshotList = snapshotListResponse?.data?.solicitationSnapshots;
+  assert(Array.isArray(snapshotList), 'snapshot list response missing array');
+  assert(
+    snapshotList.some((snapshot) => snapshot?.id === createdSnapshot.id),
+    'created snapshot not returned in list',
+  );
+
   const stagedResponse = await httpJson('POST', '/gifts', {
     amount: { currencyCode: 'GBP', value: 15.5 },
     name: `Smoke Test Staged Gift ${uniqueSuffix}`,
     autoPromote: false,
+    appealId: createdAppeal.id,
     contact: {
       firstName: 'Smoke',
       lastName: `Tester${uniqueSuffix}`,
@@ -107,6 +190,7 @@ async function main() {
     amount: { currencyCode: 'USD', value: 42 },
     name: 'Smoke Test Gift',
     autoPromote: true,
+    appealId: createdAppeal.id,
   });
 
   const createdGift = createResponse?.data?.createGift;
@@ -145,6 +229,7 @@ async function main() {
     amount: { currencyCode: 'EUR', value: 99 },
     name: 'Persistent Smoke Test Gift',
     autoPromote: true,
+    appealId: createdAppeal.id,
   });
 
   const persistentGift = persistentCreateResponse?.data?.createGift;
