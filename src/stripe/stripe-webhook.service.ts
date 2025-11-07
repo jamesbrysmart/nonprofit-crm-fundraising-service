@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { StructuredLoggerService } from '../logging/structured-logger.service';
@@ -24,7 +28,9 @@ export class StripeWebhookService {
     private readonly logger: StructuredLoggerService,
   ) {
     const apiKey = this.configService.get<string>('STRIPE_API_KEY') ?? '';
-    this.webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
+    this.webhookSecret = this.configService.get<string>(
+      'STRIPE_WEBHOOK_SECRET',
+    );
 
     // The Stripe SDK requires an API key even when only validating webhooks.
     this.stripe = new Stripe(apiKey || 'placeholder', {
@@ -52,7 +58,11 @@ export class StripeWebhookService {
 
     let event: Stripe.Event;
     try {
-      event = this.stripe.webhooks.constructEvent(bodyBuffer, signatureHeader, this.webhookSecret);
+      event = this.stripe.webhooks.constructEvent(
+        bodyBuffer,
+        signatureHeader,
+        this.webhookSecret,
+      );
     } catch (error) {
       this.logger.warn('Failed to validate Stripe webhook signature', {
         event: 'stripe_webhook_invalid_signature',
@@ -72,7 +82,10 @@ export class StripeWebhookService {
     await this.handleCheckoutSessionCompleted(event as Stripe.Event);
   }
 
-  private resolveRawBody(rawBody: Buffer | undefined, parsedBody: unknown): Buffer {
+  private resolveRawBody(
+    rawBody: Buffer | undefined,
+    parsedBody: unknown,
+  ): Buffer {
     if (rawBody) {
       return rawBody;
     }
@@ -88,7 +101,9 @@ export class StripeWebhookService {
     return Buffer.alloc(0);
   }
 
-  private async handleCheckoutSessionCompleted(event: Stripe.Event): Promise<void> {
+  private async handleCheckoutSessionCompleted(
+    event: Stripe.Event,
+  ): Promise<void> {
     const session = event.data.object as Stripe.Checkout.Session;
 
     const amountTotal = session.amount_total ?? 0;
@@ -111,7 +126,6 @@ export class StripeWebhookService {
       autoPromote: true,
     };
 
-
     const contact = this.buildContact(session, metadata);
     if (contact) {
       giftPayload.contact = contact;
@@ -124,13 +138,21 @@ export class StripeWebhookService {
       giftPayload.autoPromote = false;
     }
 
-    await this.enrichWithRecurringAgreement(session, metadata, giftPayload, paymentIntentId);
-
-    this.logger.info('Forwarding Stripe checkout session to fundraising proxy', {
-      event: 'stripe_checkout_session_forward',
-      stripeSessionId: session.id,
+    await this.enrichWithRecurringAgreement(
+      session,
+      metadata,
+      giftPayload,
       paymentIntentId,
-    });
+    );
+
+    this.logger.info(
+      'Forwarding Stripe checkout session to fundraising proxy',
+      {
+        event: 'stripe_checkout_session_forward',
+        stripeSessionId: session.id,
+        paymentIntentId,
+      },
+    );
 
     try {
       const result = await this.giftService.createGift(giftPayload);
@@ -154,7 +176,9 @@ export class StripeWebhookService {
     }
   }
 
-  private formatEventDate(timestampSeconds: number | undefined): string | undefined {
+  private formatEventDate(
+    timestampSeconds: number | undefined,
+  ): string | undefined {
     if (!timestampSeconds) {
       return undefined;
     }
@@ -175,7 +199,9 @@ export class StripeWebhookService {
     return undefined;
   }
 
-  private extractPaymentIntentId(session: Stripe.Checkout.Session): string | undefined {
+  private extractPaymentIntentId(
+    session: Stripe.Checkout.Session,
+  ): string | undefined {
     if (!session.payment_intent) {
       return undefined;
     }
@@ -195,7 +221,9 @@ export class StripeWebhookService {
     const metaLastName = this.normalizeName(
       this.lookupMetadataValue(metadata, ['lastName', 'last_name']),
     );
-    const metadataEmail = this.normalizeEmail(this.lookupMetadataValue(metadata, ['email']));
+    const metadataEmail = this.normalizeEmail(
+      this.lookupMetadataValue(metadata, ['email']),
+    );
 
     let firstName = metaFirstName;
     let lastName = metaLastName;
@@ -213,7 +241,9 @@ export class StripeWebhookService {
       return undefined;
     }
 
-    const email = this.normalizeEmail(metadataEmail ?? session.customer_details?.email ?? undefined);
+    const email = this.normalizeEmail(
+      metadataEmail ?? session.customer_details?.email ?? undefined,
+    );
 
     const contact: Record<string, string> = {
       firstName,
@@ -235,7 +265,11 @@ export class StripeWebhookService {
   ): Promise<void> {
     giftPayload.provider = 'stripe';
     giftPayload.providerPaymentId = paymentIntentId ?? session.id;
-    giftPayload.providerContext = this.buildStripeProviderContext(session, metadata, paymentIntentId);
+    giftPayload.providerContext = this.buildStripeProviderContext(
+      session,
+      metadata,
+      paymentIntentId,
+    );
 
     const subscriptionId = this.extractSubscriptionId(session);
     if (subscriptionId) {
@@ -248,17 +282,23 @@ export class StripeWebhookService {
     ]);
     const trimmedAgreementId = metadataAgreementId?.trim();
     if (!trimmedAgreementId) {
-      this.logger.debug('Stripe webhook missing recurring agreement metadata; skipping agreement sync', {
-        event: 'stripe_webhook_missing_recurring_agreement_id',
-        stripeSessionId: session.id,
-      });
+      this.logger.debug(
+        'Stripe webhook missing recurring agreement metadata; skipping agreement sync',
+        {
+          event: 'stripe_webhook_missing_recurring_agreement_id',
+          stripeSessionId: session.id,
+        },
+      );
       return;
     }
 
     giftPayload.recurringAgreementId = trimmedAgreementId;
 
     const nextExpectedAt =
-      this.lookupMetadataValue(metadata, ['nextExpectedAt', 'next_expected_at']) ?? undefined;
+      this.lookupMetadataValue(metadata, [
+        'nextExpectedAt',
+        'next_expected_at',
+      ]) ?? undefined;
     if (nextExpectedAt) {
       giftPayload.expectedAt = nextExpectedAt;
     }
@@ -268,12 +308,19 @@ export class StripeWebhookService {
       provider: 'stripe',
       providerAgreementId: subscriptionId,
       providerPaymentMethodId: this.extractPaymentMethodId(session),
-      providerContext: this.buildStripeProviderContext(session, metadata, paymentIntentId),
+      providerContext: this.buildStripeProviderContext(
+        session,
+        metadata,
+        paymentIntentId,
+      ),
       nextExpectedAt,
     };
 
     try {
-      await this.recurringAgreementService.updateAgreement(trimmedAgreementId, agreementUpdate);
+      await this.recurringAgreementService.updateAgreement(
+        trimmedAgreementId,
+        agreementUpdate,
+      );
     } catch (error) {
       this.logger.warn(
         'Failed to update recurring agreement from Stripe webhook',
@@ -306,7 +353,10 @@ export class StripeWebhookService {
     return trimmed.length > 0 ? trimmed : undefined;
   }
 
-  private lookupMetadataValue(metadata: Stripe.Metadata, keys: string[]): string | undefined {
+  private lookupMetadataValue(
+    metadata: Stripe.Metadata,
+    keys: string[],
+  ): string | undefined {
     for (const key of keys) {
       const value = metadata?.[key];
       if (typeof value === 'string' && value.trim().length > 0) {
@@ -316,7 +366,9 @@ export class StripeWebhookService {
     return undefined;
   }
 
-  private extractSubscriptionId(session: Stripe.Checkout.Session): string | undefined {
+  private extractSubscriptionId(
+    session: Stripe.Checkout.Session,
+  ): string | undefined {
     const { subscription } = session;
     if (!subscription) {
       return undefined;
@@ -329,7 +381,9 @@ export class StripeWebhookService {
     return subscription.id ?? undefined;
   }
 
-  private extractPaymentMethodId(session: Stripe.Checkout.Session): string | undefined {
+  private extractPaymentMethodId(
+    session: Stripe.Checkout.Session,
+  ): string | undefined {
     const paymentIntent = session.payment_intent;
     if (!paymentIntent) {
       return undefined;
@@ -339,7 +393,7 @@ export class StripeWebhookService {
       return undefined;
     }
 
-    const method = (paymentIntent as Stripe.PaymentIntent).payment_method;
+    const method = paymentIntent.payment_method;
     if (!method) {
       return undefined;
     }
@@ -373,13 +427,16 @@ export class StripeWebhookService {
       subscriptionId,
       customerId,
       mode: session.mode,
-      metadata: Object.keys(cleanedMetadata).length > 0 ? cleanedMetadata : undefined,
+      metadata:
+        Object.keys(cleanedMetadata).length > 0 ? cleanedMetadata : undefined,
     };
 
     return this.pruneUndefined(context);
   }
 
-  private pruneUndefined(input: Record<string, unknown>): Record<string, unknown> {
+  private pruneUndefined(
+    input: Record<string, unknown>,
+  ): Record<string, unknown> {
     const output: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(input)) {
       if (value !== undefined && value !== null) {
@@ -389,7 +446,10 @@ export class StripeWebhookService {
     return output;
   }
 
-  private splitFullName(fullName: string): { firstName?: string; lastName?: string } {
+  private splitFullName(fullName: string): {
+    firstName?: string;
+    lastName?: string;
+  } {
     const normalized = fullName.trim();
     if (!normalized) {
       return {};

@@ -8,17 +8,17 @@ import {
 describe('appeal.validation', () => {
   describe('validateCreateAppealPayload', () => {
     it('requires a non-empty name', () => {
-      expect(() =>
-        validateCreateAppealPayload({}),
-      ).toThrow(BadRequestException);
+      expect(() => validateCreateAppealPayload({})).toThrow(
+        BadRequestException,
+      );
 
-      expect(() =>
-        validateCreateAppealPayload({ name: '   ' }),
-      ).toThrow(BadRequestException);
+      expect(() => validateCreateAppealPayload({ name: '   ' })).toThrow(
+        BadRequestException,
+      );
 
-      expect(() =>
-        validateCreateAppealPayload({ name: 42 }),
-      ).toThrow(BadRequestException);
+      expect(() => validateCreateAppealPayload({ name: 42 })).toThrow(
+        BadRequestException,
+      );
     });
 
     it('normalises optional fields and currency amounts', () => {
@@ -44,9 +44,9 @@ describe('appeal.validation', () => {
 
   describe('validateUpdateAppealPayload', () => {
     it('requires at least one updatable field', () => {
-      expect(() =>
-        validateUpdateAppealPayload({}),
-      ).toThrow(BadRequestException);
+      expect(() => validateUpdateAppealPayload({})).toThrow(
+        BadRequestException,
+      );
     });
 
     it('accepts partial updates', () => {

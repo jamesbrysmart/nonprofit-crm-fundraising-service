@@ -6,7 +6,10 @@ import {
   GiftStagingStatusUpdate,
 } from './gift-staging.service';
 import { TwentyApiService } from '../twenty/twenty-api.service';
-import { buildTwentyGiftPayload, extractCreateGiftId } from '../gift/gift-payload.util';
+import {
+  buildTwentyGiftPayload,
+  extractCreateGiftId,
+} from '../gift/gift-payload.util';
 import { ensureCreateGiftResponse } from '../gift/gift.validation';
 import type { NormalizedGiftCreatePayload } from '../gift/gift.types';
 import { RecurringAgreementService } from '../recurring-agreement/recurring-agreement.service';
@@ -15,9 +18,15 @@ export interface ProcessGiftArgs {
   stagingId: string;
 }
 
-export type ProcessGiftDeferredReason = 'not_ready' | 'locked' | 'missing_payload';
+export type ProcessGiftDeferredReason =
+  | 'not_ready'
+  | 'locked'
+  | 'missing_payload';
 
-export type ProcessGiftErrorReason = 'fetch_failed' | 'payload_invalid' | 'gift_api_failed';
+export type ProcessGiftErrorReason =
+  | 'fetch_failed'
+  | 'payload_invalid'
+  | 'gift_api_failed';
 
 export type ProcessGiftResult =
   | { status: 'committed'; giftId: string; stagingId: string }
@@ -36,13 +45,18 @@ export class GiftStagingProcessingService {
   ) {}
 
   async processGift(args: ProcessGiftArgs): Promise<ProcessGiftResult> {
-    if (!args || typeof args.stagingId !== 'string' || args.stagingId.trim().length === 0) {
+    if (
+      !args ||
+      typeof args.stagingId !== 'string' ||
+      args.stagingId.trim().length === 0
+    ) {
       throw new BadRequestException('stagingId is required');
     }
 
     const stagingId = args.stagingId.trim();
 
-    const stagingRecord = await this.giftStagingService.getGiftStagingById(stagingId);
+    const stagingRecord =
+      await this.giftStagingService.getGiftStagingById(stagingId);
     if (!stagingRecord) {
       this.structuredLogger.warn(
         'Gift staging record not found or fetch failed',
@@ -108,7 +122,10 @@ export class GiftStagingProcessingService {
         },
         this.logContext,
       );
-      await this.setProcessingError(stagingId, 'Staging record missing raw payload');
+      await this.setProcessingError(
+        stagingId,
+        'Staging record missing raw payload',
+      );
       return {
         status: 'deferred',
         stagingId,
@@ -126,7 +143,10 @@ export class GiftStagingProcessingService {
         },
         this.logContext,
       );
-      await this.setProcessingError(stagingId, 'Failed to parse staging raw payload');
+      await this.setProcessingError(
+        stagingId,
+        'Failed to parse staging raw payload',
+      );
       return {
         status: 'deferred',
         stagingId,
@@ -154,7 +174,9 @@ export class GiftStagingProcessingService {
       };
     }
 
-    await this.updateProcessingStatus(stagingId, { promotionStatus: 'committing' });
+    await this.updateProcessingStatus(stagingId, {
+      promotionStatus: 'committing',
+    });
 
     const requestBody = buildTwentyGiftPayload(parsedPayload);
 
@@ -178,7 +200,10 @@ export class GiftStagingProcessingService {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this.setProcessingError(stagingId, message || 'Failed to create gift in Twenty');
+      await this.setProcessingError(
+        stagingId,
+        message || 'Failed to create gift in Twenty',
+      );
       this.structuredLogger.error(
         'Failed to create gift in Twenty during processing',
         {
@@ -199,7 +224,9 @@ export class GiftStagingProcessingService {
       ensureCreateGiftResponse(createGiftResponse);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Create gift response failed validation';
+        error instanceof Error
+          ? error.message
+          : 'Create gift response failed validation';
       await this.setProcessingError(stagingId, message);
       this.structuredLogger.warn(
         'Create gift response failed validation',
@@ -226,7 +253,10 @@ export class GiftStagingProcessingService {
         },
         this.logContext,
       );
-      await this.setProcessingError(stagingId, 'Create gift response missing gift id');
+      await this.setProcessingError(
+        stagingId,
+        'Create gift response missing gift id',
+      );
       return {
         status: 'error',
         stagingId,
@@ -252,7 +282,8 @@ export class GiftStagingProcessingService {
             stagingId,
             giftId,
             recurringAgreementId: agreementId,
-            errorMessage: error instanceof Error ? error.message : String(error),
+            errorMessage:
+              error instanceof Error ? error.message : String(error),
           },
           this.logContext,
         );
@@ -273,7 +304,10 @@ export class GiftStagingProcessingService {
       return undefined;
     }
 
-    if (typeof stagingRecord.giftId === 'string' && stagingRecord.giftId.trim().length > 0) {
+    if (
+      typeof stagingRecord.giftId === 'string' &&
+      stagingRecord.giftId.trim().length > 0
+    ) {
       this.structuredLogger.info(
         'Staging record already committed',
         {
@@ -300,7 +334,10 @@ export class GiftStagingProcessingService {
     return undefined;
   }
 
-  private async setProcessingError(stagingId: string, errorDetail: string): Promise<void> {
+  private async setProcessingError(
+    stagingId: string,
+    errorDetail: string,
+  ): Promise<void> {
     await this.updateProcessingStatus(stagingId, {
       promotionStatus: 'commit_failed',
       errorDetail,
@@ -334,10 +371,14 @@ export class GiftStagingProcessingService {
     const validationPassed = stagingRecord.validationStatus === 'passed';
     const dedupePassed = stagingRecord.dedupeStatus === 'passed';
 
-    return validationPassed && dedupePassed && eligibleStatuses.has(promotionStatus);
+    return (
+      validationPassed && dedupePassed && eligibleStatuses.has(promotionStatus)
+    );
   }
 
-  private parseRawPayload(rawPayload: string): NormalizedGiftCreatePayload | undefined {
+  private parseRawPayload(
+    rawPayload: string,
+  ): NormalizedGiftCreatePayload | undefined {
     try {
       const parsed = JSON.parse(rawPayload);
       if (this.isPlainObject(parsed)) {
@@ -350,9 +391,14 @@ export class GiftStagingProcessingService {
     return undefined;
   }
 
-  private calculateNextExpectedAt(stagingRecord: GiftStagingEntity): string | undefined {
+  private calculateNextExpectedAt(
+    stagingRecord: GiftStagingEntity,
+  ): string | undefined {
     // If the staging record carries an explicit expectedAt (from provider schedule), honour it.
-    if (typeof stagingRecord.expectedAt === 'string' && stagingRecord.expectedAt.trim().length > 0) {
+    if (
+      typeof stagingRecord.expectedAt === 'string' &&
+      stagingRecord.expectedAt.trim().length > 0
+    ) {
       return stagingRecord.expectedAt.trim();
     }
 
@@ -371,7 +417,9 @@ export class GiftStagingProcessingService {
     return parsedDate.toISOString().slice(0, 10);
   }
 
-  private isValidPreparedPayload(payload: NormalizedGiftCreatePayload): boolean {
+  private isValidPreparedPayload(
+    payload: NormalizedGiftCreatePayload,
+  ): boolean {
     if (!this.isPlainObject(payload.amount)) {
       return false;
     }

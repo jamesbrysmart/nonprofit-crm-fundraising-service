@@ -249,6 +249,42 @@ async function main() {
     });
   }
 
+  console.log('--- Ensuring Person Household Fields ---');
+  await createField({
+    objectMetadataId: personObjectId,
+    name: 'mailingAddress',
+    label: 'Mailing Address',
+    type: 'ADDRESS',
+    isNullable: true,
+  });
+
+  console.log('--- Setting up Household Object ---');
+  const householdObjectId = await ensureObject({
+    nameSingular: 'household',
+    namePlural: 'households',
+    labelSingular: 'Household',
+    labelPlural: 'Households',
+    icon: 'IconUsersGroup',
+    description: 'Grouping of contacts for shared stewardship preferences and mailings.',
+  });
+
+  const householdFields = [
+    { name: 'envelopeName', label: 'Envelope Name', type: 'TEXT' },
+    { name: 'salutationFormal', label: 'Salutation (Formal)', type: 'TEXT' },
+    { name: 'salutationInformal', label: 'Salutation (Informal)', type: 'TEXT' },
+    { name: 'mailingAddress', label: 'Mailing Address', type: 'ADDRESS', isNullable: true },
+  ];
+
+  for (const field of householdFields) {
+    await createField({
+      objectMetadataId: householdObjectId,
+      name: field.name,
+      label: field.label,
+      type: field.type,
+      ...(field.isNullable === true ? { isNullable: true } : {}),
+    });
+  }
+
   console.log('--- Setting up Gift Staging Object ---');
   const giftStagingObjectId = await ensureObject({
     nameSingular: 'giftStaging',
@@ -381,6 +417,8 @@ async function main() {
   console.log('- For Appeal object: "Default Tracking Code" (linking to Tracking Code object, optional)');
   console.log('- For Solicitation Snapshot object: "Appeal" (linking to Appeal object)');
   console.log('- For Solicitation Snapshot object: "Appeal Segment" (linking to Appeal Segment object, optional)');
+  console.log('- For Person object: "Primary Household" lookup pointing to Household');
+  console.log('- For Household object: "Primary Contact" lookup pointing to Person');
 
   console.log('✅ Twenty CRM custom objects and fields setup complete (manual steps for LOOKUP fields pending).');
 }

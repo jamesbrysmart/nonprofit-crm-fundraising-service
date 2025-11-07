@@ -25,13 +25,19 @@ export const validatePeopleDuplicateLookupPayload = (
 
   const { firstName, lastName, email, depth } = body;
 
-  if (typeof firstName !== 'string' || firstName.trim().length < MIN_NAME_LENGTH) {
+  if (
+    typeof firstName !== 'string' ||
+    firstName.trim().length < MIN_NAME_LENGTH
+  ) {
     throw new BadRequestException(
       `firstName must be a string with at least ${MIN_NAME_LENGTH} characters`,
     );
   }
 
-  if (typeof lastName !== 'string' || lastName.trim().length < MIN_NAME_LENGTH) {
+  if (
+    typeof lastName !== 'string' ||
+    lastName.trim().length < MIN_NAME_LENGTH
+  ) {
     throw new BadRequestException(
       `lastName must be a string with at least ${MIN_NAME_LENGTH} characters`,
     );
@@ -40,7 +46,9 @@ export const validatePeopleDuplicateLookupPayload = (
   let normalizedEmail: string | undefined;
   if (email !== undefined) {
     if (typeof email !== 'string' || email.trim().length === 0) {
-      throw new BadRequestException('email, if provided, must be a non-empty string');
+      throw new BadRequestException(
+        'email, if provided, must be a non-empty string',
+      );
     }
     normalizedEmail = email.trim();
   }
@@ -75,17 +83,23 @@ export const ensurePeopleDuplicatesResponse = (body: unknown): void => {
 
   const data = body.data;
   if (!Array.isArray(data)) {
-    throw new BadRequestException('unexpected Twenty response (missing data array)');
+    throw new BadRequestException(
+      'unexpected Twenty response (missing data array)',
+    );
   }
 
   for (const entry of data) {
     if (!isPlainObject(entry)) {
-      throw new BadRequestException('unexpected Twenty response (invalid entry)');
+      throw new BadRequestException(
+        'unexpected Twenty response (invalid entry)',
+      );
     }
 
     const duplicates = entry.personDuplicates;
     if (!Array.isArray(duplicates)) {
-      throw new BadRequestException('unexpected Twenty response (missing personDuplicates array)');
+      throw new BadRequestException(
+        'unexpected Twenty response (missing personDuplicates array)',
+      );
     }
   }
 };

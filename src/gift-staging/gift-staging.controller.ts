@@ -93,18 +93,27 @@ export class GiftStagingController {
   }
 
   @Post()
-  async createGiftStaging(@Body() body: unknown): Promise<GiftStagingCreateResponse> {
+  async createGiftStaging(
+    @Body() body: unknown,
+  ): Promise<GiftStagingCreateResponse> {
     this.ensureEnabled();
 
-    const normalizedPayload = await this.giftService.normalizeCreateGiftPayload(body ?? {});
+    const normalizedPayload = await this.giftService.normalizeCreateGiftPayload(
+      body ?? {},
+    );
     normalizedPayload.autoPromote = false;
 
-    const stagedRecord = await this.giftStagingService.stageGift(normalizedPayload);
+    const stagedRecord =
+      await this.giftStagingService.stageGift(normalizedPayload);
     if (!stagedRecord) {
-      throw new InternalServerErrorException('Failed to create gift staging record');
+      throw new InternalServerErrorException(
+        'Failed to create gift staging record',
+      );
     }
 
-    const stagingEntity = await this.giftStagingService.getGiftStagingById(stagedRecord.id);
+    const stagingEntity = await this.giftStagingService.getGiftStagingById(
+      stagedRecord.id,
+    );
 
     const promotionStatus =
       stagingEntity?.promotionStatus?.trim() ??
@@ -128,13 +137,16 @@ export class GiftStagingController {
       meta: {
         stagedOnly: !stagedRecord.autoPromote,
         rawPayload,
-        rawPayloadAvailable: typeof rawPayload === 'string' && rawPayload.length > 0,
+        rawPayloadAvailable:
+          typeof rawPayload === 'string' && rawPayload.length > 0,
       },
     };
   }
 
   @Post(':id/process')
-  async processGift(@Param('id') stagingId: string): Promise<ProcessGiftResult> {
+  async processGift(
+    @Param('id') stagingId: string,
+  ): Promise<ProcessGiftResult> {
     this.ensureEnabled();
 
     const args: ProcessGiftArgs = {
@@ -151,7 +163,10 @@ export class GiftStagingController {
   ): Promise<{ data: { giftStaging: GiftStagingEntity } }> {
     this.ensureEnabled();
 
-    const entity = await this.giftStagingService.updateGiftStagingPayload(stagingId, body ?? {});
+    const entity = await this.giftStagingService.updateGiftStagingPayload(
+      stagingId,
+      body ?? {},
+    );
     if (!entity) {
       throw new NotFoundException('Gift staging record not found');
     }
@@ -180,7 +195,9 @@ export class GiftStagingController {
     }
   }
 
-  private toOptionalNumber(value: string | string[] | undefined): number | undefined {
+  private toOptionalNumber(
+    value: string | string[] | undefined,
+  ): number | undefined {
     const parsed = this.toOptionalString(value);
     if (!parsed) {
       return undefined;
@@ -190,7 +207,9 @@ export class GiftStagingController {
     return Number.isFinite(num) ? num : undefined;
   }
 
-  private toOptionalString(value: string | string[] | undefined): string | undefined {
+  private toOptionalString(
+    value: string | string[] | undefined,
+  ): string | undefined {
     if (Array.isArray(value)) {
       if (value.length === 0) {
         return undefined;

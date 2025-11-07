@@ -43,7 +43,9 @@ describe('GiftService - staging auto promote', () => {
   });
 
   it('returns staging acknowledgement when autoPromote is false', async () => {
-    const sanitizedPayload = { amount: { currencyCode: 'GBP', value: 15 } } as GiftCreatePayload;
+    const sanitizedPayload = {
+      amount: { currencyCode: 'GBP', value: 15 },
+    } as GiftCreatePayload;
     jest
       .spyOn(giftValidation, 'validateCreateGiftPayload')
       .mockReturnValue(sanitizedPayload);
@@ -58,7 +60,12 @@ describe('GiftService - staging auto promote', () => {
     };
 
     jest
-      .spyOn(giftService as unknown as { prepareGiftPayload: () => Promise<NormalizedGiftCreatePayload> }, 'prepareGiftPayload')
+      .spyOn(
+        giftService as unknown as {
+          prepareGiftPayload: () => Promise<NormalizedGiftCreatePayload>;
+        },
+        'prepareGiftPayload',
+      )
       .mockResolvedValue(preparedPayload);
 
     giftStagingService.isEnabled.mockReturnValue(true);
@@ -90,7 +97,9 @@ describe('GiftService - staging auto promote', () => {
   });
 
   it('commits gift immediately when autoPromote resolves true', async () => {
-    const sanitizedPayload = { amount: { currencyCode: 'GBP', value: 20 } } as GiftCreatePayload;
+    const sanitizedPayload = {
+      amount: { currencyCode: 'GBP', value: 20 },
+    } as GiftCreatePayload;
     jest
       .spyOn(giftValidation, 'validateCreateGiftPayload')
       .mockReturnValue(sanitizedPayload);
@@ -105,7 +114,12 @@ describe('GiftService - staging auto promote', () => {
     };
 
     jest
-      .spyOn(giftService as unknown as { prepareGiftPayload: () => Promise<NormalizedGiftCreatePayload> }, 'prepareGiftPayload')
+      .spyOn(
+        giftService as unknown as {
+          prepareGiftPayload: () => Promise<NormalizedGiftCreatePayload>;
+        },
+        'prepareGiftPayload',
+      )
       .mockResolvedValue(preparedPayload);
 
     giftStagingService.isEnabled.mockReturnValue(true);
@@ -116,7 +130,9 @@ describe('GiftService - staging auto promote', () => {
       payload: preparedPayload,
     });
 
-    twentyApiService.request.mockResolvedValue({ data: { createGift: { id: 'gift-789' } } });
+    twentyApiService.request.mockResolvedValue({
+      data: { createGift: { id: 'gift-789' } },
+    });
 
     const response = await giftService.createGift({});
 
@@ -139,7 +155,9 @@ describe('GiftService - staging auto promote', () => {
   });
 
   it('updates dedupe status when diagnostics present', async () => {
-    const sanitizedPayload = { amount: { currencyCode: 'GBP', value: 30 } } as GiftCreatePayload;
+    const sanitizedPayload = {
+      amount: { currencyCode: 'GBP', value: 30 },
+    } as GiftCreatePayload;
     jest
       .spyOn(giftValidation, 'validateCreateGiftPayload')
       .mockReturnValue(sanitizedPayload);
@@ -160,7 +178,12 @@ describe('GiftService - staging auto promote', () => {
     };
 
     jest
-      .spyOn(giftService as unknown as { prepareGiftPayload: () => Promise<NormalizedGiftCreatePayload> }, 'prepareGiftPayload')
+      .spyOn(
+        giftService as unknown as {
+          prepareGiftPayload: () => Promise<NormalizedGiftCreatePayload>;
+        },
+        'prepareGiftPayload',
+      )
       .mockResolvedValue(preparedPayload);
 
     giftStagingService.isEnabled.mockReturnValue(true);
@@ -186,9 +209,12 @@ describe('GiftService - staging auto promote', () => {
       },
     });
 
-    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith('stg-900', {
-      dedupeStatus: 'matched_existing',
-    });
+    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith(
+      'stg-900',
+      {
+        dedupeStatus: 'matched_existing',
+      },
+    );
   });
 
   it('passes appealId through to the Twenty API payload when present', async () => {
@@ -210,7 +236,12 @@ describe('GiftService - staging auto promote', () => {
     };
 
     jest
-      .spyOn(giftService as unknown as { prepareGiftPayload: () => Promise<NormalizedGiftCreatePayload> }, 'prepareGiftPayload')
+      .spyOn(
+        giftService as unknown as {
+          prepareGiftPayload: () => Promise<NormalizedGiftCreatePayload>;
+        },
+        'prepareGiftPayload',
+      )
       .mockResolvedValue(preparedPayload);
 
     giftStagingService.isEnabled.mockReturnValue(false);

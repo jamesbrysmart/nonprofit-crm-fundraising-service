@@ -16,7 +16,8 @@ export interface AppealWritePayload extends Record<string, unknown> {
   targetSolicitedCount?: number | null;
 }
 
-export interface SolicitationSnapshotCreatePayload extends Record<string, unknown> {
+export interface SolicitationSnapshotCreatePayload
+  extends Record<string, unknown> {
   appealId?: string;
   appealSegmentId?: string | null;
   countSolicited: number;
@@ -187,7 +188,10 @@ const normalizeAppealPayload = (
 
   const result: AppealWritePayload = {};
 
-  if (options.requireName || Object.prototype.hasOwnProperty.call(payload, 'name')) {
+  if (
+    options.requireName ||
+    Object.prototype.hasOwnProperty.call(payload, 'name')
+  ) {
     const value = payload.name;
     if (typeof value !== 'string') {
       throw new BadRequestException('name must be a string');
@@ -199,9 +203,13 @@ const normalizeAppealPayload = (
     result.name = trimmed;
   }
 
-  normalizeOptionalString(result, 'description', payload.description, { allowNull: true });
+  normalizeOptionalString(result, 'description', payload.description, {
+    allowNull: true,
+  });
 
-  normalizeOptionalString(result, 'appealType', payload.appealType, { allowNull: true });
+  normalizeOptionalString(result, 'appealType', payload.appealType, {
+    allowNull: true,
+  });
   normalizeDateString(result, 'startDate', payload.startDate);
   normalizeDateString(result, 'endDate', payload.endDate);
 
@@ -210,21 +218,32 @@ const normalizeAppealPayload = (
     result.goalAmount = goalAmount;
   }
 
-  const budgetAmount = normalizeCurrencyAmount(payload.budgetAmount, 'budgetAmount');
+  const budgetAmount = normalizeCurrencyAmount(
+    payload.budgetAmount,
+    'budgetAmount',
+  );
   if (budgetAmount !== undefined) {
     result.budgetAmount = budgetAmount;
   }
 
-  normalizeTargetCount(result, 'targetSolicitedCount', payload.targetSolicitedCount);
+  normalizeTargetCount(
+    result,
+    'targetSolicitedCount',
+    payload.targetSolicitedCount,
+  );
 
   return result;
 };
 
-export const validateCreateAppealPayload = (payload: unknown): AppealWritePayload => {
+export const validateCreateAppealPayload = (
+  payload: unknown,
+): AppealWritePayload => {
   return normalizeAppealPayload(payload, { requireName: true });
 };
 
-export const validateUpdateAppealPayload = (payload: unknown): AppealWritePayload => {
+export const validateUpdateAppealPayload = (
+  payload: unknown,
+): AppealWritePayload => {
   const normalized = normalizeAppealPayload(payload, { requireName: false });
   if (Object.keys(normalized).length === 0) {
     throw new BadRequestException('No appeal fields provided for update');
@@ -236,11 +255,17 @@ export const validateCreateSolicitationSnapshotPayload = (
   payload: unknown,
 ): SolicitationSnapshotCreatePayload => {
   if (!isPlainObject(payload)) {
-    throw new BadRequestException('Solicitation snapshot payload must be an object');
+    throw new BadRequestException(
+      'Solicitation snapshot payload must be an object',
+    );
   }
 
   const countRaw =
-    payload.countSolicited ?? payload.count ?? payload.total ?? payload.recipients ?? undefined;
+    payload.countSolicited ??
+    payload.count ??
+    payload.total ??
+    payload.recipients ??
+    undefined;
 
   const count =
     typeof countRaw === 'number'
@@ -262,8 +287,12 @@ export const validateCreateSolicitationSnapshotPayload = (
     capturedAt: new Date().toISOString(),
   };
 
-  normalizeOptionalString(result, 'source', payload.source, { allowNull: true });
-  normalizeOptionalString(result, 'appealSegmentId', payload.appealSegmentId, { allowNull: true });
+  normalizeOptionalString(result, 'source', payload.source, {
+    allowNull: true,
+  });
+  normalizeOptionalString(result, 'appealSegmentId', payload.appealSegmentId, {
+    allowNull: true,
+  });
   normalizeOptionalString(result, 'notes', payload.notes, { allowNull: true });
 
   if (typeof payload.capturedAt === 'string') {
@@ -271,7 +300,9 @@ export const validateCreateSolicitationSnapshotPayload = (
     if (trimmed.length > 0) {
       const parsed = new Date(trimmed);
       if (Number.isNaN(parsed.getTime())) {
-        throw new BadRequestException('capturedAt must be a valid ISO date-time string');
+        throw new BadRequestException(
+          'capturedAt must be a valid ISO date-time string',
+        );
       }
       result.capturedAt = parsed.toISOString();
     }
@@ -287,9 +318,11 @@ export const ensureCreateAppealResponse = (body: unknown): void => {
     throw new BadRequestException('unexpected Twenty response (missing data)');
   }
 
-  const createAppeal = (body.data as Record<string, unknown>).createAppeal;
+  const createAppeal = body.data.createAppeal;
   if (!isPlainObject(createAppeal) || typeof createAppeal.id !== 'string') {
-    throw new BadRequestException('unexpected Twenty response (missing createAppeal)');
+    throw new BadRequestException(
+      'unexpected Twenty response (missing createAppeal)',
+    );
   }
 };
 
@@ -298,9 +331,11 @@ export const ensureAppealListResponse = (body: unknown): void => {
     throw new BadRequestException('unexpected Twenty response (missing data)');
   }
 
-  const appeals = (body.data as Record<string, unknown>).appeals;
+  const appeals = body.data.appeals;
   if (!Array.isArray(appeals)) {
-    throw new BadRequestException('unexpected Twenty response (missing appeals array)');
+    throw new BadRequestException(
+      'unexpected Twenty response (missing appeals array)',
+    );
   }
 };
 
@@ -309,9 +344,11 @@ export const ensureGetAppealResponse = (body: unknown): void => {
     throw new BadRequestException('unexpected Twenty response (missing data)');
   }
 
-  const appeal = (body.data as Record<string, unknown>).appeal;
+  const appeal = body.data.appeal;
   if (!isPlainObject(appeal) || typeof appeal.id !== 'string') {
-    throw new BadRequestException('unexpected Twenty response (missing appeal)');
+    throw new BadRequestException(
+      'unexpected Twenty response (missing appeal)',
+    );
   }
 };
 
@@ -320,18 +357,22 @@ export const ensureUpdateAppealResponse = (body: unknown): void => {
     throw new BadRequestException('unexpected Twenty response (missing data)');
   }
 
-  const updateAppeal = (body.data as Record<string, unknown>).updateAppeal;
+  const updateAppeal = body.data.updateAppeal;
   if (!isPlainObject(updateAppeal) || typeof updateAppeal.id !== 'string') {
-    throw new BadRequestException('unexpected Twenty response (missing updateAppeal)');
+    throw new BadRequestException(
+      'unexpected Twenty response (missing updateAppeal)',
+    );
   }
 };
 
-export const ensureCreateSolicitationSnapshotResponse = (body: unknown): void => {
+export const ensureCreateSolicitationSnapshotResponse = (
+  body: unknown,
+): void => {
   if (!isPlainObject(body) || !isPlainObject(body.data)) {
     throw new BadRequestException('unexpected Twenty response (missing data)');
   }
 
-  const createSnapshot = (body.data as Record<string, unknown>).createSolicitationSnapshot;
+  const createSnapshot = body.data.createSolicitationSnapshot;
   if (!isPlainObject(createSnapshot) || typeof createSnapshot.id !== 'string') {
     throw new BadRequestException(
       'unexpected Twenty response (missing createSolicitationSnapshot)',
@@ -344,8 +385,10 @@ export const ensureSolicitationSnapshotListResponse = (body: unknown): void => {
     throw new BadRequestException('unexpected Twenty response (missing data)');
   }
 
-  const snapshots = (body.data as Record<string, unknown>).solicitationSnapshots;
+  const snapshots = body.data.solicitationSnapshots;
   if (!Array.isArray(snapshots)) {
-    throw new BadRequestException('unexpected Twenty response (missing solicitationSnapshots)');
+    throw new BadRequestException(
+      'unexpected Twenty response (missing solicitationSnapshots)',
+    );
   }
 };

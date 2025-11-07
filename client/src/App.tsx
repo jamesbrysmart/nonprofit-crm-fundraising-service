@@ -3,8 +3,9 @@ import { ManualGiftEntry } from './components/ManualGiftEntry';
 import { StagingQueue } from './components/StagingQueue';
 import { RecurringAgreementList } from './components/RecurringAgreementList';
 import { AppealsView } from './components/AppealsView';
+import { HouseholdManager } from './components/HouseholdManager';
 
-type ViewMode = 'manual' | 'queue' | 'agreements' | 'appeals';
+type ViewMode = 'manual' | 'queue' | 'agreements' | 'appeals' | 'households';
 
 export function App(): JSX.Element {
   const [view, setView] = useState<ViewMode>('manual');
@@ -49,6 +50,13 @@ export function App(): JSX.Element {
           >
             Appeals
           </button>
+          <button
+            type="button"
+            onClick={() => setView('households')}
+            disabled={view === 'households'}
+          >
+            Households
+          </button>
         </nav>
 
         {view === 'manual' ? (
@@ -57,8 +65,10 @@ export function App(): JSX.Element {
           <StagingQueue />
         ) : view === 'agreements' ? (
           <RecurringAgreementList />
-        ) : (
+        ) : view === 'appeals' ? (
           <AppealsView />
+        ) : (
+          <HouseholdManager />
         )}
       </main>
     </div>

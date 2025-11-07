@@ -13,7 +13,10 @@ describe('gift.validation', () => {
       });
 
       expect(result.amount).toEqual({ currencyCode: 'GBP', value: 10 });
-      expect(result.contact).toEqual({ firstName: 'Ada', lastName: 'Lovelace' });
+      expect(result.contact).toEqual({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+      });
       expect(result.amountMinor).toBe(1000);
       expect(result.currency).toBe('GBP');
     });
@@ -21,7 +24,11 @@ describe('gift.validation', () => {
     it('retains optional email on contact', () => {
       const result = validateCreateGiftPayload({
         amount: { currencyCode: 'USD', value: 25 },
-        contact: { firstName: 'Alan', lastName: 'Turing', email: 'alan@example.org ' },
+        contact: {
+          firstName: 'Alan',
+          lastName: 'Turing',
+          email: 'alan@example.org ',
+        },
       });
 
       expect(result.contact).toEqual({
@@ -35,7 +42,10 @@ describe('gift.validation', () => {
 
     it('throws when contact fields are missing', () => {
       expect(() =>
-        validateCreateGiftPayload({ amount: { currencyCode: 'GBP', value: 10 }, contact: {} }),
+        validateCreateGiftPayload({
+          amount: { currencyCode: 'GBP', value: 10 },
+          contact: {},
+        }),
       ).toThrow(BadRequestException);
     });
 

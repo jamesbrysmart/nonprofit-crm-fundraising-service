@@ -55,7 +55,10 @@ export type GiftUpdatePayload = Partial<GiftCreatePayload>;
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const parseAmount = (input: unknown, context: 'create' | 'update'): GiftAmount => {
+const parseAmount = (
+  input: unknown,
+  context: 'create' | 'update',
+): GiftAmount => {
   if (!isPlainObject(input)) {
     throw new BadRequestException('amount must be an object');
   }
@@ -63,7 +66,9 @@ const parseAmount = (input: unknown, context: 'create' | 'update'): GiftAmount =
   const { currencyCode, value } = input;
 
   if (typeof currencyCode !== 'string' || currencyCode.trim() === '') {
-    throw new BadRequestException('amount.currencyCode must be a non-empty string');
+    throw new BadRequestException(
+      'amount.currencyCode must be a non-empty string',
+    );
   }
 
   if (value === undefined || value === null) {
@@ -172,7 +177,9 @@ const collectAllowedFields = (
       ) {
         result.providerContext = value;
       } else {
-        throw new BadRequestException('providerContext must be an object or JSON string');
+        throw new BadRequestException(
+          'providerContext must be an object or JSON string',
+        );
       }
       continue;
     }
@@ -223,7 +230,9 @@ const normalizeContact = (
     normalized.lastName = normalizedLastName;
   }
   if (email !== undefined && normalizedEmail === undefined) {
-    throw new BadRequestException('contact.email, if provided, must be a non-empty string');
+    throw new BadRequestException(
+      'contact.email, if provided, must be a non-empty string',
+    );
   }
   if (normalizedEmail) {
     normalized.email = normalizedEmail;
@@ -238,9 +247,7 @@ const normalizeContact = (
   return Object.keys(normalized).length > 0 ? normalized : undefined;
 };
 
-export const validateCreateGiftPayload = (
-  body: unknown,
-): GiftCreatePayload => {
+export const validateCreateGiftPayload = (body: unknown): GiftCreatePayload => {
   if (!isPlainObject(body)) {
     throw new BadRequestException('payload must be an object');
   }
@@ -268,15 +275,15 @@ export const validateCreateGiftPayload = (
   return sanitized as GiftCreatePayload;
 };
 
-export const validateUpdateGiftPayload = (
-  body: unknown,
-): GiftUpdatePayload => {
+export const validateUpdateGiftPayload = (body: unknown): GiftUpdatePayload => {
   if (!isPlainObject(body)) {
     throw new BadRequestException('payload must be an object');
   }
 
   if (Object.keys(body).length === 0) {
-    throw new BadRequestException('update payload must include at least one field');
+    throw new BadRequestException(
+      'update payload must include at least one field',
+    );
   }
 
   const sanitized: Record<string, unknown> = collectAllowedFields(
@@ -305,7 +312,9 @@ export const ensureCreateGiftResponse = (body: unknown): void => {
 
   const createGift = body.data?.createGift;
   if (!isPlainObject(createGift) || typeof createGift.id !== 'string') {
-    throw new BadRequestException('unexpected Twenty response (missing createGift)');
+    throw new BadRequestException(
+      'unexpected Twenty response (missing createGift)',
+    );
   }
 };
 
@@ -316,7 +325,9 @@ export const ensureUpdateGiftResponse = (body: unknown): void => {
 
   const updateGift = body.data?.updateGift;
   if (!isPlainObject(updateGift) || typeof updateGift.id !== 'string') {
-    throw new BadRequestException('unexpected Twenty response (missing updateGift)');
+    throw new BadRequestException(
+      'unexpected Twenty response (missing updateGift)',
+    );
   }
 };
 
@@ -327,7 +338,9 @@ export const ensureDeleteGiftResponse = (body: unknown): void => {
 
   const deleteGift = body.data?.deleteGift;
   if (!isPlainObject(deleteGift) || typeof deleteGift.id !== 'string') {
-    throw new BadRequestException('unexpected Twenty response (missing deleteGift)');
+    throw new BadRequestException(
+      'unexpected Twenty response (missing deleteGift)',
+    );
   }
 };
 
@@ -336,9 +349,11 @@ export const ensureGiftListResponse = (body: unknown): void => {
     throw new BadRequestException('unexpected Twenty response (missing data)');
   }
 
-  const gifts = (body.data as Record<string, unknown>).gifts;
+  const gifts = body.data.gifts;
   if (!Array.isArray(gifts)) {
-    throw new BadRequestException('unexpected Twenty response (missing gifts array)');
+    throw new BadRequestException(
+      'unexpected Twenty response (missing gifts array)',
+    );
   }
 };
 
@@ -347,7 +362,7 @@ export const ensureGiftGetResponse = (body: unknown): void => {
     throw new BadRequestException('unexpected Twenty response (missing data)');
   }
 
-  const gift = (body.data as Record<string, unknown>).gift;
+  const gift = body.data.gift;
   if (!isPlainObject(gift) || typeof gift.id !== 'string') {
     throw new BadRequestException('unexpected Twenty response (missing gift)');
   }

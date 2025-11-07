@@ -1,5 +1,8 @@
 import { ConfigService } from '@nestjs/config';
-import { GiftStagingService, GiftStagingListResult } from './gift-staging.service';
+import {
+  GiftStagingService,
+  GiftStagingListResult,
+} from './gift-staging.service';
 import { StructuredLoggerService } from '../logging/structured-logger.service';
 import { TwentyApiService } from '../twenty/twenty-api.service';
 

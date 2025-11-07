@@ -10,7 +10,10 @@ export class RecurringAgreementService {
   constructor(private readonly twentyApiService: TwentyApiService) {}
 
   async createAgreement(payload: unknown): Promise<unknown> {
-    const sanitized = this.ensurePayload(payload, 'Recurring agreement create payload must be an object.');
+    const sanitized = this.ensurePayload(
+      payload,
+      'Recurring agreement create payload must be an object.',
+    );
     return this.twentyApiService.request(
       'POST',
       '/recurringAgreements',
@@ -21,24 +24,50 @@ export class RecurringAgreementService {
 
   async listAgreements(query: Record<string, unknown>): Promise<unknown> {
     const path = this.buildPath('/recurringAgreements', query);
-    return this.twentyApiService.request('GET', path, undefined, this.logContext);
+    return this.twentyApiService.request(
+      'GET',
+      path,
+      undefined,
+      this.logContext,
+    );
   }
 
-  async getAgreement(id: string, query: Record<string, unknown>): Promise<unknown> {
+  async getAgreement(
+    id: string,
+    query: Record<string, unknown>,
+  ): Promise<unknown> {
     const basePath = `/recurringAgreements/${encodeURIComponent(id)}`;
     const path = this.buildPath(basePath, query);
-    return this.twentyApiService.request('GET', path, undefined, this.logContext);
+    return this.twentyApiService.request(
+      'GET',
+      path,
+      undefined,
+      this.logContext,
+    );
   }
 
   async updateAgreement(id: string, payload: unknown): Promise<unknown> {
-    const sanitized = this.ensurePayload(payload, 'Recurring agreement update payload must be an object.');
+    const sanitized = this.ensurePayload(
+      payload,
+      'Recurring agreement update payload must be an object.',
+    );
     const path = `/recurringAgreements/${encodeURIComponent(id)}`;
-    return this.twentyApiService.request('PATCH', path, sanitized, this.logContext);
+    return this.twentyApiService.request(
+      'PATCH',
+      path,
+      sanitized,
+      this.logContext,
+    );
   }
 
   async deleteAgreement(id: string): Promise<unknown> {
     const path = `/recurringAgreements/${encodeURIComponent(id)}`;
-    return this.twentyApiService.request('DELETE', path, undefined, this.logContext);
+    return this.twentyApiService.request(
+      'DELETE',
+      path,
+      undefined,
+      this.logContext,
+    );
   }
 
   private ensurePayload(
@@ -63,7 +92,7 @@ export class RecurringAgreementService {
         continue;
       }
       if (Array.isArray(value)) {
-        value.forEach(item => searchParams.append(key, String(item)));
+        value.forEach((item) => searchParams.append(key, String(item)));
       } else {
         searchParams.append(key, String(value));
       }

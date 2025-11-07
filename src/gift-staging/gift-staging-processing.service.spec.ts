@@ -70,9 +70,9 @@ describe('GiftStagingProcessingService (manual processing)', () => {
   });
 
   it('rejects when stagingId contains only whitespace', async () => {
-    await expect(service.processGift({ stagingId: '   ' })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.processGift({ stagingId: '   ' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('returns error when the staging record cannot be fetched', async () => {
@@ -85,7 +85,9 @@ describe('GiftStagingProcessingService (manual processing)', () => {
       stagingId: 'stg-404',
       error: 'fetch_failed',
     });
-    expect(giftStagingService.getGiftStagingById).toHaveBeenCalledWith('stg-404');
+    expect(giftStagingService.getGiftStagingById).toHaveBeenCalledWith(
+      'stg-404',
+    );
   });
 
   it('returns committed immediately when the staging record is already committed', async () => {
@@ -97,7 +99,11 @@ describe('GiftStagingProcessingService (manual processing)', () => {
 
     const result = await service.processGift({ stagingId: 'stg-123' });
 
-    expect(result).toEqual({ status: 'committed', stagingId: 'stg-123', giftId: 'gift-789' });
+    expect(result).toEqual({
+      status: 'committed',
+      stagingId: 'stg-123',
+      giftId: 'gift-789',
+    });
     expect(twentyApiService.request).not.toHaveBeenCalled();
     expect(giftStagingService.markCommittedById).not.toHaveBeenCalled();
   });
@@ -151,10 +157,13 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     });
     expect(twentyApiService.request).not.toHaveBeenCalled();
     expect(giftStagingService.updateStatusById).toHaveBeenCalledTimes(1);
-    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith('stg-123', {
-      promotionStatus: 'commit_failed',
-      errorDetail: 'Staging record missing raw payload',
-    });
+    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith(
+      'stg-123',
+      {
+        promotionStatus: 'commit_failed',
+        errorDetail: 'Staging record missing raw payload',
+      },
+    );
   });
 
   it('defers when raw payload cannot be parsed', async () => {
@@ -172,10 +181,13 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     });
     expect(twentyApiService.request).not.toHaveBeenCalled();
     expect(giftStagingService.updateStatusById).toHaveBeenCalledTimes(1);
-    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith('stg-123', {
-      promotionStatus: 'commit_failed',
-      errorDetail: 'Failed to parse staging raw payload',
-    });
+    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith(
+      'stg-123',
+      {
+        promotionStatus: 'commit_failed',
+        errorDetail: 'Failed to parse staging raw payload',
+      },
+    );
   });
 
   it('returns error when parsed payload misses required fields', async () => {
@@ -196,10 +208,14 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     });
     expect(twentyApiService.request).not.toHaveBeenCalled();
     expect(giftStagingService.updateStatusById).toHaveBeenCalledTimes(1);
-    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith('stg-123', {
-      promotionStatus: 'commit_failed',
-      errorDetail: 'Staging payload missing required fields for gift creation',
-    });
+    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith(
+      'stg-123',
+      {
+        promotionStatus: 'commit_failed',
+        errorDetail:
+          'Staging payload missing required fields for gift creation',
+      },
+    );
   });
 
   it('returns error when Twenty API call fails', async () => {
@@ -220,13 +236,21 @@ describe('GiftStagingProcessingService (manual processing)', () => {
       'GiftStagingProcessingService',
     );
     expect(giftStagingService.updateStatusById).toHaveBeenCalledTimes(2);
-    expect(giftStagingService.updateStatusById).toHaveBeenNthCalledWith(1, 'stg-123', {
-      promotionStatus: 'committing',
-    });
-    expect(giftStagingService.updateStatusById).toHaveBeenNthCalledWith(2, 'stg-123', {
-      promotionStatus: 'commit_failed',
-      errorDetail: 'network error',
-    });
+    expect(giftStagingService.updateStatusById).toHaveBeenNthCalledWith(
+      1,
+      'stg-123',
+      {
+        promotionStatus: 'committing',
+      },
+    );
+    expect(giftStagingService.updateStatusById).toHaveBeenNthCalledWith(
+      2,
+      'stg-123',
+      {
+        promotionStatus: 'commit_failed',
+        errorDetail: 'network error',
+      },
+    );
   });
 
   it('returns error when create gift response is invalid', async () => {
@@ -242,9 +266,13 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     });
     expect(giftStagingService.markCommittedById).not.toHaveBeenCalled();
     expect(giftStagingService.updateStatusById).toHaveBeenCalledTimes(2);
-    expect(giftStagingService.updateStatusById).toHaveBeenNthCalledWith(1, 'stg-123', {
-      promotionStatus: 'committing',
-    });
+    expect(giftStagingService.updateStatusById).toHaveBeenNthCalledWith(
+      1,
+      'stg-123',
+      {
+        promotionStatus: 'committing',
+      },
+    );
     expect(giftStagingService.updateStatusById).toHaveBeenNthCalledWith(
       2,
       'stg-123',
@@ -268,9 +296,13 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     });
     expect(giftStagingService.markCommittedById).not.toHaveBeenCalled();
     expect(giftStagingService.updateStatusById).toHaveBeenCalledTimes(2);
-    expect(giftStagingService.updateStatusById).toHaveBeenNthCalledWith(1, 'stg-123', {
-      promotionStatus: 'committing',
-    });
+    expect(giftStagingService.updateStatusById).toHaveBeenNthCalledWith(
+      1,
+      'stg-123',
+      {
+        promotionStatus: 'committing',
+      },
+    );
     expect(giftStagingService.updateStatusById).toHaveBeenNthCalledWith(
       2,
       'stg-123',
@@ -281,42 +313,66 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     );
   });
 
-it('creates gift, marks staging committed, and returns success when eligible', async () => {
-  giftStagingService.getGiftStagingById.mockResolvedValue(baseStaging);
-  twentyApiService.request.mockResolvedValue({ data: { createGift: { id: 'gift-100' } } });
+  it('creates gift, marks staging committed, and returns success when eligible', async () => {
+    giftStagingService.getGiftStagingById.mockResolvedValue(baseStaging);
+    twentyApiService.request.mockResolvedValue({
+      data: { createGift: { id: 'gift-100' } },
+    });
 
-  const result = await service.processGift({ stagingId: 'stg-123' });
+    const result = await service.processGift({ stagingId: 'stg-123' });
 
-  expect(result).toEqual({ status: 'committed', stagingId: 'stg-123', giftId: 'gift-100' });
-  expect(twentyApiService.request).toHaveBeenCalledWith(
-    'POST',
-    '/gifts',
-    expect.objectContaining({ amount: basePayload.amount }),
-    'GiftStagingProcessingService',
-  );
-  expect(giftStagingService.markCommittedById).toHaveBeenCalledWith('stg-123', 'gift-100');
-  expect(giftStagingService.updateStatusById).toHaveBeenCalledTimes(1);
-  expect(giftStagingService.updateStatusById).toHaveBeenCalledWith('stg-123', {
-    promotionStatus: 'committing',
+    expect(result).toEqual({
+      status: 'committed',
+      stagingId: 'stg-123',
+      giftId: 'gift-100',
+    });
+    expect(twentyApiService.request).toHaveBeenCalledWith(
+      'POST',
+      '/gifts',
+      expect.objectContaining({ amount: basePayload.amount }),
+      'GiftStagingProcessingService',
+    );
+    expect(giftStagingService.markCommittedById).toHaveBeenCalledWith(
+      'stg-123',
+      'gift-100',
+    );
+    expect(giftStagingService.updateStatusById).toHaveBeenCalledTimes(1);
+    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith(
+      'stg-123',
+      {
+        promotionStatus: 'committing',
+      },
+    );
+    expect(recurringAgreementService.updateAgreement).not.toHaveBeenCalled();
   });
-  expect(recurringAgreementService.updateAgreement).not.toHaveBeenCalled();
-});
 
-it('updates recurring agreement when staging is linked', async () => {
-  giftStagingService.getGiftStagingById.mockResolvedValue({
-    ...baseStaging,
-    recurringAgreementId: 'ra-123',
-    expectedAt: '2025-12-01',
+  it('updates recurring agreement when staging is linked', async () => {
+    giftStagingService.getGiftStagingById.mockResolvedValue({
+      ...baseStaging,
+      recurringAgreementId: 'ra-123',
+      expectedAt: '2025-12-01',
+    });
+    twentyApiService.request.mockResolvedValue({
+      data: { createGift: { id: 'gift-101' } },
+    });
+
+    const result = await service.processGift({ stagingId: 'stg-123' });
+
+    expect(result).toEqual({
+      status: 'committed',
+      stagingId: 'stg-123',
+      giftId: 'gift-101',
+    });
+    expect(giftStagingService.markCommittedById).toHaveBeenCalledWith(
+      'stg-123',
+      'gift-101',
+    );
+    expect(recurringAgreementService.updateAgreement).toHaveBeenCalledWith(
+      'ra-123',
+      {
+        nextExpectedAt: '2025-12-01',
+        status: 'active',
+      },
+    );
   });
-  twentyApiService.request.mockResolvedValue({ data: { createGift: { id: 'gift-101' } } });
-
-  const result = await service.processGift({ stagingId: 'stg-123' });
-
-  expect(result).toEqual({ status: 'committed', stagingId: 'stg-123', giftId: 'gift-101' });
-  expect(giftStagingService.markCommittedById).toHaveBeenCalledWith('stg-123', 'gift-101');
-  expect(recurringAgreementService.updateAgreement).toHaveBeenCalledWith('ra-123', {
-    nextExpectedAt: '2025-12-01',
-    status: 'active',
-  });
-});
 });

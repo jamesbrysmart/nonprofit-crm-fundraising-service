@@ -17,7 +17,10 @@ import {
 } from './gift.validation';
 import type { GiftCreatePayload } from './gift.validation';
 import { GiftStagingService } from '../gift-staging/gift-staging.service';
-import { buildTwentyGiftPayload, extractCreateGiftId } from './gift-payload.util';
+import {
+  buildTwentyGiftPayload,
+  extractCreateGiftId,
+} from './gift-payload.util';
 import {
   GiftDedupeDiagnostics,
   GiftStagingRecord,
@@ -42,7 +45,6 @@ export class GiftService {
     private readonly giftStagingService: GiftStagingService,
   ) {}
 
-
   async normalizeCreateGiftPayload(
     payload: unknown,
   ): Promise<NormalizedGiftCreatePayload> {
@@ -59,7 +61,10 @@ export class GiftService {
     try {
       stagingRecord = await this.giftStagingService.stageGift(preparedPayload);
       if (this.giftStagingService.isEnabled() && stagingRecord) {
-        await this.applyDedupeStatusToStaging(stagingRecord.id, preparedPayload);
+        await this.applyDedupeStatusToStaging(
+          stagingRecord.id,
+          preparedPayload,
+        );
         if (!stagingRecord.autoPromote) {
           shouldPromoteImmediately = false;
         }
@@ -91,7 +96,12 @@ export class GiftService {
 
   async listGifts(query: Record<string, unknown>): Promise<unknown> {
     const path = this.buildPath('/gifts', query);
-    const response = await this.twentyApiService.request('GET', path, undefined, this.logContext);
+    const response = await this.twentyApiService.request(
+      'GET',
+      path,
+      undefined,
+      this.logContext,
+    );
     ensureGiftListResponse(response);
     return response;
   }
@@ -99,7 +109,12 @@ export class GiftService {
   async getGift(id: string, query: Record<string, unknown>): Promise<unknown> {
     const basePath = `/gifts/${encodeURIComponent(id)}`;
     const path = this.buildPath(basePath, query);
-    const response = await this.twentyApiService.request('GET', path, undefined, this.logContext);
+    const response = await this.twentyApiService.request(
+      'GET',
+      path,
+      undefined,
+      this.logContext,
+    );
     ensureGiftGetResponse(response);
     return response;
   }
@@ -143,9 +158,12 @@ export class GiftService {
           ? contactPayload.firstName.trim()
           : undefined;
       contactLastName =
-        typeof contactPayload.lastName === 'string' ? contactPayload.lastName.trim() : undefined;
+        typeof contactPayload.lastName === 'string'
+          ? contactPayload.lastName.trim()
+          : undefined;
       contactEmail =
-        typeof contactPayload.email === 'string' && contactPayload.email.trim().length > 0
+        typeof contactPayload.email === 'string' &&
+        contactPayload.email.trim().length > 0
           ? contactPayload.email.trim()
           : undefined;
     }
@@ -155,7 +173,7 @@ export class GiftService {
       currency:
         typeof payload.currency === 'string'
           ? payload.currency
-          : payload.amount?.currencyCode ?? 'GBP',
+          : (payload.amount?.currencyCode ?? 'GBP'),
       amountMinor:
         typeof payload.amountMinor === 'number'
           ? payload.amountMinor
@@ -174,7 +192,8 @@ export class GiftService {
       const contactInput = prepared.contact as Record<string, unknown>;
       delete prepared.contact;
 
-      const existingPersonMatch = await this.findExistingPersonMatch(contactInput);
+      const existingPersonMatch =
+        await this.findExistingPersonMatch(contactInput);
 
       if (existingPersonMatch) {
         this.loggerInstance.log(
@@ -183,7 +202,8 @@ export class GiftService {
         );
         prepared.donorId = existingPersonMatch.personId;
         dedupeDiagnostics = {
-          matchType: existingPersonMatch.matchedBy === 'email' ? 'email' : 'name',
+          matchType:
+            existingPersonMatch.matchedBy === 'email' ? 'email' : 'name',
           matchedDonorId: existingPersonMatch.personId,
           matchedBy: existingPersonMatch.matchedBy,
           confidence: existingPersonMatch.confidence,
@@ -217,7 +237,10 @@ export class GiftService {
       delete prepared.contactId;
     }
 
-    if (typeof prepared.giftDate === 'string' && typeof prepared.dateReceived !== 'string') {
+    if (
+      typeof prepared.giftDate === 'string' &&
+      typeof prepared.dateReceived !== 'string'
+    ) {
       prepared.dateReceived = prepared.giftDate;
     }
 
@@ -262,7 +285,10 @@ export class GiftService {
       prepared.expectedAt = trimmed.length > 0 ? trimmed : undefined;
     }
 
-    if (typeof prepared.intakeSource !== 'string' || prepared.intakeSource.trim().length === 0) {
+    if (
+      typeof prepared.intakeSource !== 'string' ||
+      prepared.intakeSource.trim().length === 0
+    ) {
       prepared.intakeSource = 'manual_ui';
     } else {
       prepared.intakeSource = prepared.intakeSource.trim();
@@ -282,7 +308,10 @@ export class GiftService {
         .filter((value) => typeof value === 'string' && value.length > 0)
         .join('|');
 
-      prepared.sourceFingerprint = fingerprintSeed.length > 0 ? fingerprintSeed : this.generateFallbackFingerprint();
+      prepared.sourceFingerprint =
+        fingerprintSeed.length > 0
+          ? fingerprintSeed
+          : this.generateFallbackFingerprint();
     } else {
       prepared.sourceFingerprint = prepared.sourceFingerprint.trim();
     }
@@ -294,18 +323,26 @@ export class GiftService {
     return prepared;
   }
 
-  private async createPerson(contact: Record<string, unknown>): Promise<string> {
+  private async createPerson(
+    contact: Record<string, unknown>,
+  ): Promise<string> {
     const firstName =
-      typeof contact.firstName === 'string' ? contact.firstName.trim() : undefined;
+      typeof contact.firstName === 'string'
+        ? contact.firstName.trim()
+        : undefined;
     const lastName =
-      typeof contact.lastName === 'string' ? contact.lastName.trim() : undefined;
+      typeof contact.lastName === 'string'
+        ? contact.lastName.trim()
+        : undefined;
     const email =
       typeof contact.email === 'string' && contact.email.trim().length > 0
         ? contact.email.trim()
         : undefined;
 
     if (!firstName || !lastName) {
-      throw new BadRequestException('contact.firstName and contact.lastName must be provided');
+      throw new BadRequestException(
+        'contact.firstName and contact.lastName must be provided',
+      );
     }
 
     const personPayload: Record<string, unknown> = {
@@ -343,9 +380,13 @@ export class GiftService {
     contact: Record<string, unknown>,
   ): Promise<ExistingPersonMatch | undefined> {
     const firstName =
-      typeof contact.firstName === 'string' ? contact.firstName.trim() : undefined;
+      typeof contact.firstName === 'string'
+        ? contact.firstName.trim()
+        : undefined;
     const lastName =
-      typeof contact.lastName === 'string' ? contact.lastName.trim() : undefined;
+      typeof contact.lastName === 'string'
+        ? contact.lastName.trim()
+        : undefined;
     const email =
       typeof contact.email === 'string' && contact.email.trim().length > 0
         ? contact.email.trim()
@@ -393,7 +434,9 @@ export class GiftService {
       }
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'unknown error resolving existing person';
+        error instanceof Error
+          ? error.message
+          : 'unknown error resolving existing person';
       this.loggerInstance.warn(
         `Failed to query duplicates for contact email=${email}: ${message}`,
         this.logContext,
@@ -446,7 +489,8 @@ export class GiftService {
         if (normalizedEmail) {
           const emails = (duplicate as Record<string, unknown>).emails;
           if (emails && typeof emails === 'object') {
-            const primaryEmail = (emails as Record<string, unknown>).primaryEmail;
+            const primaryEmail = (emails as Record<string, unknown>)
+              .primaryEmail;
             if (
               typeof primaryEmail === 'string' &&
               primaryEmail.trim().toLowerCase() === normalizedEmail
@@ -496,7 +540,9 @@ export class GiftService {
       if (!serialized) {
         return '[empty response]';
       }
-      return serialized.length > 500 ? `${serialized.slice(0, 500)}…` : serialized;
+      return serialized.length > 500
+        ? `${serialized.slice(0, 500)}…`
+        : serialized;
     } catch (error) {
       return `[unserializable response: ${error instanceof Error ? error.message : error}]`;
     }
@@ -533,15 +579,19 @@ export class GiftService {
     return undefined;
   }
 
-  private async createGiftInTwenty(payload: NormalizedGiftCreatePayload): Promise<unknown> {
+  private async createGiftInTwenty(
+    payload: NormalizedGiftCreatePayload,
+  ): Promise<unknown> {
     const requestBody = buildTwentyGiftPayload(payload);
-    return this.twentyApiService.request('POST', '/gifts', requestBody, this.logContext);
+    return this.twentyApiService.request(
+      'POST',
+      '/gifts',
+      requestBody,
+      this.logContext,
+    );
   }
 
-  private buildPath(
-    basePath: string,
-    query: Record<string, unknown>,
-  ): string {
+  private buildPath(basePath: string, query: Record<string, unknown>): string {
     const params = new URLSearchParams();
 
     for (const [key, value] of Object.entries(query ?? {})) {

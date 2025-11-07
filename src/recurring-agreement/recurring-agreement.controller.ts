@@ -14,7 +14,9 @@ import { RecurringAgreementService } from './recurring-agreement.service';
 
 @Controller('recurring-agreements')
 export class RecurringAgreementController {
-  constructor(private readonly recurringAgreementService: RecurringAgreementService) {}
+  constructor(
+    private readonly recurringAgreementService: RecurringAgreementService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.OK)
@@ -23,7 +25,9 @@ export class RecurringAgreementController {
   }
 
   @Get()
-  async listAgreements(@Query() query: Record<string, unknown>): Promise<unknown> {
+  async listAgreements(
+    @Query() query: Record<string, unknown>,
+  ): Promise<unknown> {
     return this.recurringAgreementService.listAgreements(query ?? {});
   }
 

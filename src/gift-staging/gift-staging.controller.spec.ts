@@ -4,7 +4,10 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { GiftStagingController } from './gift-staging.controller';
-import { GiftStagingService, GiftStagingListResult } from './gift-staging.service';
+import {
+  GiftStagingService,
+  GiftStagingListResult,
+} from './gift-staging.service';
 import {
   GiftStagingProcessingService,
   ProcessGiftResult,
@@ -110,7 +113,9 @@ describe('GiftStagingController', () => {
     giftStagingService.isEnabled.mockReturnValue(true);
     giftStagingService.getGiftStagingById.mockResolvedValue(undefined);
 
-    await expect(controller.getGiftStaging('missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(controller.getGiftStaging('missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('delegates to processing service when enabled', async () => {
@@ -124,7 +129,9 @@ describe('GiftStagingController', () => {
 
     await expect(controller.processGift('stg-123')).resolves.toEqual(result);
 
-    expect(giftStagingProcessingService.processGift).toHaveBeenCalledWith({ stagingId: 'stg-123' });
+    expect(giftStagingProcessingService.processGift).toHaveBeenCalledWith({
+      stagingId: 'stg-123',
+    });
   });
 
   it('propagates errors from the processing service', async () => {
@@ -146,11 +153,14 @@ describe('GiftStagingController', () => {
       }),
     ).resolves.toEqual({ ok: true });
 
-    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith('stg-123', {
-      promotionStatus: 'ready_for_commit',
-      validationStatus: 'passed',
-      dedupeStatus: 'passed',
-    });
+    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith(
+      'stg-123',
+      {
+        promotionStatus: 'ready_for_commit',
+        validationStatus: 'passed',
+        dedupeStatus: 'passed',
+      },
+    );
   });
 
   it('throws when staging disabled for status update', async () => {
@@ -194,26 +204,30 @@ describe('GiftStagingController', () => {
       autoPromote: false,
     });
 
-    await expect(controller.createGiftStaging({ amount: { currencyCode: 'GBP', value: 25 } })).resolves.toEqual(
-      {
-        data: {
-          giftStaging: {
-            id: 'stg-111',
-            autoPromote: false,
-            promotionStatus: 'pending',
-            validationStatus: 'pending',
-            dedupeStatus: 'pending',
-          },
-        },
-        meta: {
-          stagedOnly: true,
-          rawPayload: undefined,
-          rawPayloadAvailable: false,
+    await expect(
+      controller.createGiftStaging({
+        amount: { currencyCode: 'GBP', value: 25 },
+      }),
+    ).resolves.toEqual({
+      data: {
+        giftStaging: {
+          id: 'stg-111',
+          autoPromote: false,
+          promotionStatus: 'pending',
+          validationStatus: 'pending',
+          dedupeStatus: 'pending',
         },
       },
-    );
+      meta: {
+        stagedOnly: true,
+        rawPayload: undefined,
+        rawPayloadAvailable: false,
+      },
+    });
 
-    expect(giftService.normalizeCreateGiftPayload).toHaveBeenCalledWith({ amount: { currencyCode: 'GBP', value: 25 } });
+    expect(giftService.normalizeCreateGiftPayload).toHaveBeenCalledWith({
+      amount: { currencyCode: 'GBP', value: 25 },
+    });
     expect(giftStagingService.stageGift).toHaveBeenCalledWith(
       expect.objectContaining({ autoPromote: false }),
     );

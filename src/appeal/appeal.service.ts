@@ -20,16 +20,29 @@ export class AppealService {
 
   async listAppeals(query: Record<string, unknown>): Promise<unknown> {
     const path = this.buildPath('/appeals', query ?? {});
-    const response = await this.twentyApiService.request('GET', path, undefined, this.logContext);
+    const response = await this.twentyApiService.request(
+      'GET',
+      path,
+      undefined,
+      this.logContext,
+    );
     ensureAppealListResponse(response);
     return response;
   }
 
-  async getAppeal(id: string, query: Record<string, unknown>): Promise<unknown> {
+  async getAppeal(
+    id: string,
+    query: Record<string, unknown>,
+  ): Promise<unknown> {
     const normalizedId = this.normalizeId(id, 'id');
     const basePath = `/appeals/${encodeURIComponent(normalizedId)}`;
     const path = this.buildPath(basePath, query ?? {});
-    const response = await this.twentyApiService.request('GET', path, undefined, this.logContext);
+    const response = await this.twentyApiService.request(
+      'GET',
+      path,
+      undefined,
+      this.logContext,
+    );
     ensureGetAppealResponse(response);
     return response;
   }
@@ -59,7 +72,10 @@ export class AppealService {
     return response;
   }
 
-  async createSolicitationSnapshot(id: string, payload: unknown): Promise<unknown> {
+  async createSolicitationSnapshot(
+    id: string,
+    payload: unknown,
+  ): Promise<unknown> {
     const normalizedId = this.normalizeId(id, 'appealId');
     const sanitizedPayload = validateCreateSolicitationSnapshotPayload(payload);
     sanitizedPayload.appealId = normalizedId;
@@ -83,7 +99,12 @@ export class AppealService {
       ...query,
       appealId: normalizedId,
     });
-    const response = await this.twentyApiService.request('GET', path, undefined, this.logContext);
+    const response = await this.twentyApiService.request(
+      'GET',
+      path,
+      undefined,
+      this.logContext,
+    );
     ensureSolicitationSnapshotListResponse(response);
     return response;
   }

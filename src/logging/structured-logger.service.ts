@@ -7,9 +7,7 @@ type LogMetadata = Record<string, unknown> | undefined;
 
 @Injectable()
 export class StructuredLoggerService {
-  constructor(
-    private readonly requestContextService: RequestContextService,
-  ) {}
+  constructor(private readonly requestContextService: RequestContextService) {}
 
   debug(message: string, metadata?: LogMetadata, context?: string): void {
     this.write('debug', message, metadata, context);

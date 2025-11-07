@@ -108,7 +108,9 @@ export class TwentyApiService {
       };
 
       if (!response.ok) {
-        const bodyPreview = rawBody ? this.formatBodyForLogs(rawBody) : undefined;
+        const bodyPreview = rawBody
+          ? this.formatBodyForLogs(rawBody)
+          : undefined;
 
         if (this.shouldRetry(response.status) && attempt < this.maxAttempts) {
           const delayMs = this.computeRetryDelay(response, attempt);
@@ -222,12 +224,22 @@ export class TwentyApiService {
 
   private nextDelay(attempt: number): number {
     const index = attempt - 1;
-    return this.retryDelaysMs[index] ?? this.retryDelaysMs[this.retryDelaysMs.length - 1] ?? 0;
+    return (
+      this.retryDelaysMs[index] ??
+      this.retryDelaysMs[this.retryDelaysMs.length - 1] ??
+      0
+    );
   }
 
   private async sleepWithLog(
     ms: number,
-    attemptDetails: { method: string; path: string; url: string; attempt: number; maxAttempts: number },
+    attemptDetails: {
+      method: string;
+      path: string;
+      url: string;
+      attempt: number;
+      maxAttempts: number;
+    },
     durationMs: number,
     context: string,
   ): Promise<void> {

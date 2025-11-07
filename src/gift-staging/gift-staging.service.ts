@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { StructuredLoggerService } from '../logging/structured-logger.service';
 import { TwentyApiService } from '../twenty/twenty-api.service';
-import { GiftStagingRecord, NormalizedGiftCreatePayload } from '../gift/gift.types';
+import {
+  GiftStagingRecord,
+  NormalizedGiftCreatePayload,
+} from '../gift/gift.types';
 
 export interface GiftStagingEntity {
   id: string;
@@ -152,7 +155,9 @@ export class GiftStagingService {
       false,
     );
     this.autoPromoteDefault = this.resolveBooleanFlag(
-      this.configService.get<string>('FUNDRAISING_STAGING_AUTO_PROMOTE_DEFAULT'),
+      this.configService.get<string>(
+        'FUNDRAISING_STAGING_AUTO_PROMOTE_DEFAULT',
+      ),
       true,
     );
   }
@@ -161,13 +166,17 @@ export class GiftStagingService {
     return this.enabled;
   }
 
-  async stageGift(payload: NormalizedGiftCreatePayload): Promise<GiftStagingRecord | undefined> {
+  async stageGift(
+    payload: NormalizedGiftCreatePayload,
+  ): Promise<GiftStagingRecord | undefined> {
     if (!this.enabled) {
       return undefined;
     }
 
     const autoPromote =
-      typeof payload.autoPromote === 'boolean' ? payload.autoPromote : this.autoPromoteDefault;
+      typeof payload.autoPromote === 'boolean'
+        ? payload.autoPromote
+        : this.autoPromoteDefault;
 
     const requestBody = this.buildCreatePayload(payload, autoPromote);
 
@@ -182,9 +191,12 @@ export class GiftStagingService {
       const created = response?.data?.createGiftStaging;
       const stagingId = created?.id;
       const resolvedAutoPromote =
-        typeof created?.autoPromote === 'boolean' ? created.autoPromote : autoPromote;
+        typeof created?.autoPromote === 'boolean'
+          ? created.autoPromote
+          : autoPromote;
       const resolvedPromotionStatus =
-        typeof created?.promotionStatus === 'string' && created.promotionStatus.trim().length > 0
+        typeof created?.promotionStatus === 'string' &&
+        created.promotionStatus.trim().length > 0
           ? created.promotionStatus
           : resolvedAutoPromote
             ? 'committing'
@@ -234,7 +246,9 @@ export class GiftStagingService {
     }
   }
 
-  async getGiftStagingById(stagingId: string): Promise<GiftStagingEntity | undefined> {
+  async getGiftStagingById(
+    stagingId: string,
+  ): Promise<GiftStagingEntity | undefined> {
     if (typeof stagingId !== 'string' || stagingId.trim().length === 0) {
       return undefined;
     }
@@ -275,7 +289,9 @@ export class GiftStagingService {
     }
   }
 
-  async listGiftStaging(query: GiftStagingListQuery): Promise<GiftStagingListResult> {
+  async listGiftStaging(
+    query: GiftStagingListQuery,
+  ): Promise<GiftStagingListResult> {
     if (!this.enabled) {
       return {
         data: [],
@@ -296,7 +312,10 @@ export class GiftStagingService {
       recurringAgreementId: this.normalizeId(query.recurringAgreementId),
     };
 
-    const path = this.buildPath('/giftStagings', this.buildListQueryParams(sanitizedQuery));
+    const path = this.buildPath(
+      '/giftStagings',
+      this.buildListQueryParams(sanitizedQuery),
+    );
 
     const response = await this.twentyApiService.request(
       'GET',
@@ -320,7 +339,10 @@ export class GiftStagingService {
     };
   }
 
-  async markCommitted(record: GiftStagingRecord | undefined, giftId: string): Promise<void> {
+  async markCommitted(
+    record: GiftStagingRecord | undefined,
+    giftId: string,
+  ): Promise<void> {
     if (!this.enabled || !record?.id) {
       return;
     }
@@ -329,7 +351,11 @@ export class GiftStagingService {
   }
 
   async markCommittedById(stagingId: string, giftId: string): Promise<void> {
-    if (!this.enabled || typeof stagingId !== 'string' || stagingId.trim().length === 0) {
+    if (
+      !this.enabled ||
+      typeof stagingId !== 'string' ||
+      stagingId.trim().length === 0
+    ) {
       return;
     }
 
@@ -340,11 +366,15 @@ export class GiftStagingService {
     stagingId: string,
     updates: GiftStagingStatusUpdate,
   ): Promise<void> {
-    if (!this.enabled || typeof stagingId !== 'string' || stagingId.trim().length === 0) {
+    if (
+      !this.enabled ||
+      typeof stagingId !== 'string' ||
+      stagingId.trim().length === 0
+    ) {
       return;
     }
 
-    let resolvedUpdates = { ...updates };
+    const resolvedUpdates = { ...updates };
 
     if (resolvedUpdates.rawPayload === undefined) {
       const existing = await this.getGiftStagingById(stagingId);
@@ -378,7 +408,11 @@ export class GiftStagingService {
     stagingId: string,
     updates: GiftStagingUpdateInput,
   ): Promise<GiftStagingEntity | undefined> {
-    if (!this.enabled || typeof stagingId !== 'string' || stagingId.trim().length === 0) {
+    if (
+      !this.enabled ||
+      typeof stagingId !== 'string' ||
+      stagingId.trim().length === 0
+    ) {
       return undefined;
     }
 
@@ -389,7 +423,12 @@ export class GiftStagingService {
 
     const mergedPayload = this.mergePayloadForUpdate(existing, updates);
     const rawPayload = this.safeStringify(mergedPayload);
-    const patchBody = this.buildPayloadUpdateBody(existing, mergedPayload, updates, rawPayload);
+    const patchBody = this.buildPayloadUpdateBody(
+      existing,
+      mergedPayload,
+      updates,
+      rawPayload,
+    );
 
     await this.twentyApiService.request(
       'PATCH',
@@ -412,7 +451,10 @@ export class GiftStagingService {
     return this.getGiftStagingById(stagingId);
   }
 
-  private async patchCommitted(stagingId: string, giftId: string): Promise<void> {
+  private async patchCommitted(
+    stagingId: string,
+    giftId: string,
+  ): Promise<void> {
     try {
       await this.twentyApiService.request(
         'PATCH',
@@ -454,11 +496,17 @@ export class GiftStagingService {
     updates: GiftStagingUpdateInput,
   ): NormalizedGiftCreatePayload {
     const basePayload =
-      this.parseRawPayload(existing.rawPayload) ?? this.buildPayloadFromEntity(existing);
+      this.parseRawPayload(existing.rawPayload) ??
+      this.buildPayloadFromEntity(existing);
 
     const merged: NormalizedGiftCreatePayload = {
       ...basePayload,
-      amount: { ...(basePayload.amount ?? { currencyCode: existing.currency ?? 'GBP', value: basePayload.amountMajor ?? 0 }) },
+      amount: {
+        ...(basePayload.amount ?? {
+          currencyCode: existing.currency ?? 'GBP',
+          value: basePayload.amountMajor ?? 0,
+        }),
+      },
       providerContext: basePayload.providerContext,
     };
 
@@ -491,17 +539,17 @@ export class GiftStagingService {
     }
 
     if (updates.donorEmail !== undefined) {
-    merged.donorEmail = normalizeString(updates.donorEmail);
-  }
+      merged.donorEmail = normalizeString(updates.donorEmail);
+    }
 
     let amountMinor =
       updates.amountMinor !== undefined
-        ? updates.amountMinor ?? undefined
-        : merged.amountMinor ?? existing.amountMinor;
+        ? (updates.amountMinor ?? undefined)
+        : (merged.amountMinor ?? existing.amountMinor);
     let amountMajor =
       updates.amountMajor !== undefined
-        ? updates.amountMajor ?? undefined
-        : merged.amountMajor ?? existing.amount;
+        ? (updates.amountMajor ?? undefined)
+        : (merged.amountMajor ?? existing.amount);
 
     if (amountMinor === undefined && amountMajor !== undefined) {
       amountMinor = Math.round(amountMajor * 100);
@@ -633,7 +681,8 @@ export class GiftStagingService {
       donorEmail: payload.donorEmail,
       amountMinor: payload.amountMinor,
       amount: payload.amount,
-      dateReceived: payload.dateReceived ?? payload.giftDate ?? existing.dateReceived,
+      dateReceived:
+        payload.dateReceived ?? payload.giftDate ?? existing.dateReceived,
       expectedAt: payload.expectedAt,
       fundId: payload.fundId,
       appealId: payload.appealId,
@@ -647,7 +696,7 @@ export class GiftStagingService {
       giftBatchId:
         updates.giftBatchId !== undefined
           ? this.normalizeNullableString(updates.giftBatchId)
-          : payload.giftBatchId ?? existing.giftBatchId,
+          : (payload.giftBatchId ?? existing.giftBatchId),
       promotionStatus: updates.promotionStatus,
       validationStatus: updates.validationStatus,
       dedupeStatus: updates.dedupeStatus,
@@ -658,7 +707,9 @@ export class GiftStagingService {
     return this.pruneUndefinedValues(body);
   }
 
-  private parseRawPayload(rawPayload?: string): NormalizedGiftCreatePayload | undefined {
+  private parseRawPayload(
+    rawPayload?: string,
+  ): NormalizedGiftCreatePayload | undefined {
     if (!rawPayload || rawPayload.trim().length === 0) {
       return undefined;
     }
@@ -680,7 +731,9 @@ export class GiftStagingService {
     return undefined;
   }
 
-  private buildPayloadFromEntity(entity: GiftStagingEntity): NormalizedGiftCreatePayload {
+  private buildPayloadFromEntity(
+    entity: GiftStagingEntity,
+  ): NormalizedGiftCreatePayload {
     const inferredAmountMinor =
       typeof entity.amountMinor === 'number'
         ? entity.amountMinor
@@ -740,7 +793,10 @@ export class GiftStagingService {
     return trimmed.length > 0 ? trimmed : undefined;
   }
 
-  private resolveBooleanFlag(value: string | undefined, fallback: boolean): boolean {
+  private resolveBooleanFlag(
+    value: string | undefined,
+    fallback: boolean,
+  ): boolean {
     if (typeof value !== 'string') {
       return fallback;
     }
@@ -755,7 +811,9 @@ export class GiftStagingService {
     return fallback;
   }
 
-  private extractGiftStagingFromResponse(response: unknown): GiftStagingEntity | undefined {
+  private extractGiftStagingFromResponse(
+    response: unknown,
+  ): GiftStagingEntity | undefined {
     if (!this.isPlainObject(response)) {
       return undefined;
     }
@@ -765,7 +823,7 @@ export class GiftStagingService {
       return undefined;
     }
 
-    return this.parseGiftStagingRecord((data as Record<string, unknown>).giftStaging);
+    return this.parseGiftStagingRecord(data.giftStaging);
   }
 
   private isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -832,13 +890,13 @@ export class GiftStagingService {
     value: Record<string, unknown> | string | undefined,
   ): Record<string, unknown> | undefined {
     if (this.isPlainObject(value)) {
-      return value as Record<string, unknown>;
+      return value;
     }
     if (typeof value === 'string') {
       try {
         const parsed = JSON.parse(value);
         if (this.isPlainObject(parsed)) {
-          return parsed as Record<string, unknown>;
+          return parsed;
         }
       } catch {
         this.structuredLogger.warn(
@@ -869,12 +927,14 @@ export class GiftStagingService {
     }
   }
 
-  private parseGiftStagingRecord(record: unknown): GiftStagingEntity | undefined {
+  private parseGiftStagingRecord(
+    record: unknown,
+  ): GiftStagingEntity | undefined {
     if (!this.isPlainObject(record)) {
       return undefined;
     }
 
-    const recordObj = record as Record<string, unknown>;
+    const recordObj = record;
 
     const id = recordObj.id;
     if (typeof id !== 'string' || id.trim().length === 0) {
@@ -884,59 +944,116 @@ export class GiftStagingService {
     const entity: GiftStagingEntity = {
       id,
       promotionStatus:
-        typeof recordObj.promotionStatus === 'string' ? recordObj.promotionStatus : undefined,
+        typeof recordObj.promotionStatus === 'string'
+          ? recordObj.promotionStatus
+          : undefined,
       validationStatus:
-        typeof recordObj.validationStatus === 'string' ? recordObj.validationStatus : undefined,
-      dedupeStatus: typeof recordObj.dedupeStatus === 'string' ? recordObj.dedupeStatus : undefined,
-      giftId: typeof recordObj.giftId === 'string' ? recordObj.giftId : undefined,
-      autoPromote: typeof recordObj.autoPromote === 'boolean' ? recordObj.autoPromote : undefined,
-      giftBatchId: typeof recordObj.giftBatchId === 'string' ? recordObj.giftBatchId : undefined,
-      createdAt: typeof recordObj.createdAt === 'string' ? recordObj.createdAt : undefined,
-      updatedAt: typeof recordObj.updatedAt === 'string' ? recordObj.updatedAt : undefined,
+        typeof recordObj.validationStatus === 'string'
+          ? recordObj.validationStatus
+          : undefined,
+      dedupeStatus:
+        typeof recordObj.dedupeStatus === 'string'
+          ? recordObj.dedupeStatus
+          : undefined,
+      giftId:
+        typeof recordObj.giftId === 'string' ? recordObj.giftId : undefined,
+      autoPromote:
+        typeof recordObj.autoPromote === 'boolean'
+          ? recordObj.autoPromote
+          : undefined,
+      giftBatchId:
+        typeof recordObj.giftBatchId === 'string'
+          ? recordObj.giftBatchId
+          : undefined,
+      createdAt:
+        typeof recordObj.createdAt === 'string'
+          ? recordObj.createdAt
+          : undefined,
+      updatedAt:
+        typeof recordObj.updatedAt === 'string'
+          ? recordObj.updatedAt
+          : undefined,
       amount:
-        typeof recordObj.amount === 'number' && Number.isFinite(recordObj.amount)
+        typeof recordObj.amount === 'number' &&
+        Number.isFinite(recordObj.amount)
           ? recordObj.amount
           : undefined,
       amountMinor:
-        typeof recordObj.amountMinor === 'number' && Number.isFinite(recordObj.amountMinor)
+        typeof recordObj.amountMinor === 'number' &&
+        Number.isFinite(recordObj.amountMinor)
           ? recordObj.amountMinor
           : undefined,
-      currency: typeof recordObj.currency === 'string' ? recordObj.currency : undefined,
-      intakeSource: typeof recordObj.intakeSource === 'string' ? recordObj.intakeSource : undefined,
+      currency:
+        typeof recordObj.currency === 'string' ? recordObj.currency : undefined,
+      intakeSource:
+        typeof recordObj.intakeSource === 'string'
+          ? recordObj.intakeSource
+          : undefined,
       sourceFingerprint:
         typeof recordObj.sourceFingerprint === 'string'
           ? recordObj.sourceFingerprint
           : undefined,
-      externalId: typeof recordObj.externalId === 'string' ? recordObj.externalId : undefined,
+      externalId:
+        typeof recordObj.externalId === 'string'
+          ? recordObj.externalId
+          : undefined,
       paymentMethod:
-        typeof recordObj.paymentMethod === 'string' ? recordObj.paymentMethod : undefined,
-      dateReceived: typeof recordObj.dateReceived === 'string' ? recordObj.dateReceived : undefined,
-      expectedAt: typeof recordObj.expectedAt === 'string' ? recordObj.expectedAt : undefined,
-      provider: typeof recordObj.provider === 'string' ? recordObj.provider : undefined,
+        typeof recordObj.paymentMethod === 'string'
+          ? recordObj.paymentMethod
+          : undefined,
+      dateReceived:
+        typeof recordObj.dateReceived === 'string'
+          ? recordObj.dateReceived
+          : undefined,
+      expectedAt:
+        typeof recordObj.expectedAt === 'string'
+          ? recordObj.expectedAt
+          : undefined,
+      provider:
+        typeof recordObj.provider === 'string' ? recordObj.provider : undefined,
       providerPaymentId:
         typeof recordObj.providerPaymentId === 'string'
           ? recordObj.providerPaymentId
           : undefined,
       giftAidEligible:
-        typeof recordObj.giftAidEligible === 'boolean' ? recordObj.giftAidEligible : undefined,
-      donorId: typeof recordObj.donorId === 'string' ? recordObj.donorId : undefined,
+        typeof recordObj.giftAidEligible === 'boolean'
+          ? recordObj.giftAidEligible
+          : undefined,
+      donorId:
+        typeof recordObj.donorId === 'string' ? recordObj.donorId : undefined,
       donorFirstName:
-        typeof recordObj.donorFirstName === 'string' ? recordObj.donorFirstName : undefined,
+        typeof recordObj.donorFirstName === 'string'
+          ? recordObj.donorFirstName
+          : undefined,
       donorLastName:
-        typeof recordObj.donorLastName === 'string' ? recordObj.donorLastName : undefined,
-      donorEmail: typeof recordObj.donorEmail === 'string' ? recordObj.donorEmail : undefined,
-      fundId: typeof recordObj.fundId === 'string' ? recordObj.fundId : undefined,
-      appealId: typeof recordObj.appealId === 'string' ? recordObj.appealId : undefined,
+        typeof recordObj.donorLastName === 'string'
+          ? recordObj.donorLastName
+          : undefined,
+      donorEmail:
+        typeof recordObj.donorEmail === 'string'
+          ? recordObj.donorEmail
+          : undefined,
+      fundId:
+        typeof recordObj.fundId === 'string' ? recordObj.fundId : undefined,
+      appealId:
+        typeof recordObj.appealId === 'string' ? recordObj.appealId : undefined,
       appealSegmentId:
-        typeof recordObj.appealSegmentId === 'string' ? recordObj.appealSegmentId : undefined,
+        typeof recordObj.appealSegmentId === 'string'
+          ? recordObj.appealSegmentId
+          : undefined,
       trackingCodeId:
-        typeof recordObj.trackingCodeId === 'string' ? recordObj.trackingCodeId : undefined,
+        typeof recordObj.trackingCodeId === 'string'
+          ? recordObj.trackingCodeId
+          : undefined,
       recurringAgreementId:
         typeof recordObj.recurringAgreementId === 'string'
           ? recordObj.recurringAgreementId
           : undefined,
       notes: typeof recordObj.notes === 'string' ? recordObj.notes : undefined,
-      errorDetail: typeof recordObj.errorDetail === 'string' ? recordObj.errorDetail : undefined,
+      errorDetail:
+        typeof recordObj.errorDetail === 'string'
+          ? recordObj.errorDetail
+          : undefined,
     };
 
     const rawPayload = recordObj.rawPayload;
@@ -959,12 +1076,12 @@ export class GiftStagingService {
 
     const providerContextRaw = recordObj.providerContext;
     if (this.isPlainObject(providerContextRaw)) {
-      entity.providerContext = providerContextRaw as Record<string, unknown>;
+      entity.providerContext = providerContextRaw;
     } else if (typeof providerContextRaw === 'string') {
       try {
         const parsed = JSON.parse(providerContextRaw);
         if (this.isPlainObject(parsed)) {
-          entity.providerContext = parsed as Record<string, unknown>;
+          entity.providerContext = parsed;
         }
       } catch {
         this.structuredLogger.warn(
@@ -995,7 +1112,7 @@ export class GiftStagingService {
       return { records: [], hasMore: false };
     }
 
-    const giftStagings = (data as Record<string, unknown>).giftStagings;
+    const giftStagings = data.giftStagings;
 
     const records: GiftStagingEntity[] = Array.isArray(giftStagings)
       ? giftStagings
@@ -1003,8 +1120,8 @@ export class GiftStagingService {
           .filter((entry): entry is GiftStagingEntity => Boolean(entry))
       : [];
 
-    const pageInfo = this.isPlainObject((data as Record<string, unknown>).pageInfo)
-      ? ((data as Record<string, unknown>).pageInfo as Record<string, unknown>)
+    const pageInfo = this.isPlainObject(data.pageInfo)
+      ? data.pageInfo
       : undefined;
 
     const hasMore =
@@ -1091,7 +1208,10 @@ export class GiftStagingService {
     });
   }
 
-  private applySort(records: GiftStagingEntity[], sort?: string): GiftStagingEntity[] {
+  private applySort(
+    records: GiftStagingEntity[],
+    sort?: string,
+  ): GiftStagingEntity[] {
     if (records.length <= 1) {
       return records;
     }
@@ -1126,7 +1246,10 @@ export class GiftStagingService {
     return sorted;
   }
 
-  private getSortableValue(entity: GiftStagingEntity, field?: string): string | number | undefined {
+  private getSortableValue(
+    entity: GiftStagingEntity,
+    field?: string,
+  ): string | number | undefined {
     switch (field) {
       case 'amountMinor':
         return entity.amountMinor;
@@ -1171,7 +1294,9 @@ export class GiftStagingService {
       providerPaymentId: entity.providerPaymentId,
       providerContext: entity.providerContext,
       recurringAgreementId: entity.recurringAgreementId,
-      rawPayloadAvailable: Boolean(entity.rawPayload && entity.rawPayload.length > 0),
+      rawPayloadAvailable: Boolean(
+        entity.rawPayload && entity.rawPayload.length > 0,
+      ),
       notes: entity.notes,
     };
   }
@@ -1210,7 +1335,9 @@ export class GiftStagingService {
       return undefined;
     }
     const [field, direction] = trimmed.split(':');
-    const normalizedField = ['createdAt', 'updatedAt', 'amountMinor'].includes(field)
+    const normalizedField = ['createdAt', 'updatedAt', 'amountMinor'].includes(
+      field,
+    )
       ? field
       : 'createdAt';
     const normalizedDirection = direction === 'asc' ? 'asc' : 'desc';
