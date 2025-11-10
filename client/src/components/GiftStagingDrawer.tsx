@@ -9,6 +9,22 @@ import {
 import { useAppealOptions } from '../hooks/useAppealOptions';
 import { useGiftStagingDetail } from '../hooks/useGiftStagingDetail';
 
+type GiftIntentOption = 'standard' | 'grant' | 'legacy' | 'corporateInKind';
+
+const INTENT_LABELS: Record<GiftIntentOption, string> = {
+  standard: 'Standard',
+  grant: 'Grant',
+  legacy: 'Legacy',
+  corporateInKind: 'Corporate',
+};
+
+function getIntentLabel(intent?: string | null): string | undefined {
+  if (!intent) {
+    return undefined;
+  }
+  return INTENT_LABELS[intent as GiftIntentOption] ?? intent;
+}
+
 export type GiftDrawerFocus = 'overview' | 'duplicates' | 'recurring';
 
 interface GiftStagingDrawerProps {
@@ -27,6 +43,11 @@ type EditFormState = {
   trackingCodeId: string;
   giftBatchId: string;
   notes: string;
+  giftIntent: string;
+  opportunityId: string;
+  inKindDescription: string;
+  estimatedValue: string;
+  isInKind: boolean;
 };
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -79,6 +100,11 @@ export function GiftStagingDrawer({
     trackingCodeId: '',
     giftBatchId: '',
     notes: '',
+    giftIntent: 'standard',
+    opportunityId: '',
+    inKindDescription: '',
+    estimatedValue: '',
+    isInKind: false,
   });
   const {
     options: appealOptions,
@@ -153,6 +179,14 @@ export function GiftStagingDrawer({
       trackingCodeId: detail.trackingCodeId ?? '',
       giftBatchId: detail.giftBatchId ?? '',
       notes: detail.notes ?? '',
+      giftIntent: detail.giftIntent ?? 'standard',
+      opportunityId: detail.opportunityId ?? '',
+      inKindDescription: detail.inKindDescription ?? '',
+      estimatedValue:
+        typeof detail.estimatedValue === 'number'
+          ? detail.estimatedValue.toString()
+          : '',
+      isInKind: Boolean(detail.isInKind),
     });
   }, [detail]);
 
@@ -175,6 +209,14 @@ export function GiftStagingDrawer({
       },
     [],
   );
+
+  const handleInKindEditToggle = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const { checked } = event.target;
+    setEditForm((prev) => ({
+      ...prev,
+      isInKind: checked,
+    }));
+  }, []);
 
   const handleResetEdits = useCallback(() => {
     initializeEditForm();
@@ -246,6 +288,43 @@ export function GiftStagingDrawer({
       payload.notes = notesValue;
     } else if (detail.notes) {
       payload.notes = null;
+    }
+
+    const intentValue = editForm.giftIntent.trim();
+    if (intentValue.length > 0 && intentValue !== 'standard') {
+      payload.giftIntent = intentValue;
+    } else if (detail.giftIntent && detail.giftIntent !== 'standard') {
+      payload.giftIntent = null;
+    }
+
+    const opportunityValue = editForm.opportunityId.trim();
+    if (opportunityValue.length > 0) {
+      payload.opportunityId = opportunityValue;
+    } else if (detail.opportunityId) {
+      payload.opportunityId = null;
+    }
+
+    const inKindDescription = editForm.inKindDescription.trim();
+    if (inKindDescription.length > 0) {
+      payload.inKindDescription = inKindDescription;
+    } else if (detail.inKindDescription) {
+      payload.inKindDescription = null;
+    }
+
+    const estimatedValueInput = editForm.estimatedValue.trim();
+    if (estimatedValueInput.length > 0) {
+      const parsedValue = Number.parseFloat(estimatedValueInput);
+      if (Number.isNaN(parsedValue)) {
+        setActionError('Estimated value must be numeric.');
+        return;
+      }
+      payload.estimatedValue = parsedValue;
+    } else if (typeof detail.estimatedValue === 'number') {
+      payload.estimatedValue = null;
+    }
+
+    if (editForm.isInKind !== Boolean(detail.isInKind)) {
+      payload.isInKind = editForm.isInKind;
     }
 
     if (Object.keys(payload).length === 0) {
@@ -460,6 +539,18 @@ export function GiftStagingDrawer({
                   <dt>Error detail</dt>
                   <dd>{detail.errorDetail ?? '—'}</dd>
                 </div>
+                <div>
+                  <dt>Intent</dt>
+                  <dd>{getIntentLabel(detail.giftIntent) ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt>Opportunity</dt>
+                  <dd>{detail.opportunityId ? <code>{detail.opportunityId}</code> : '—'}</dd>
+                </div>
+                <div>
+                  <dt>In-kind</dt>
+                  <dd>{detail.isInKind ? 'Yes' : 'No'}</dd>
+                </div>
               </dl>
             </section>
 
@@ -565,6 +656,34 @@ export function GiftStagingDrawer({
                       />
                     </label>
                     <label className="drawer-field">
+                      <span>Gift intent</span>
+                      <select
+                        value={editForm.giftIntent}
+                        onChange={(event) =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            giftIntent: event.target.value as GiftIntentOption,
+                          }))
+                        }
+                        disabled={actionBusy === 'update' || loading}
+                      >
+                        {Object.entries(INTENT_LABELS).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="drawer-field">
+                      <span>Opportunity ID</span>
+                      <input
+                        type="text"
+                        value={editForm.opportunityId}
+                        onChange={handleEditFieldChange('opportunityId')}
+                        disabled={actionBusy === 'update' || loading}
+                      />
+                    </label>
+                    <label className="drawer-field">
                       <span>Batch ID</span>
                       <input
                         type="text"
@@ -582,6 +701,38 @@ export function GiftStagingDrawer({
                         disabled={actionBusy === 'update' || loading}
                       />
                     </label>
+                    <label className="drawer-field drawer-field--checkbox">
+                      <input
+                        type="checkbox"
+                        checked={editForm.isInKind}
+                        onChange={handleInKindEditToggle}
+                        disabled={actionBusy === 'update' || loading}
+                      />
+                      <span>Includes in-kind component</span>
+                    </label>
+                    {editForm.isInKind ? (
+                      <>
+                        <label className="drawer-field drawer-field--textarea">
+                          <span>In-kind description</span>
+                          <textarea
+                            rows={3}
+                            value={editForm.inKindDescription}
+                            onChange={handleEditFieldChange('inKindDescription')}
+                            disabled={actionBusy === 'update' || loading}
+                          />
+                        </label>
+                        <label className="drawer-field">
+                          <span>Estimated value</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editForm.estimatedValue}
+                            onChange={handleEditFieldChange('estimatedValue')}
+                            disabled={actionBusy === 'update' || loading}
+                          />
+                        </label>
+                      </>
+                    ) : null}
                   </div>
                   <div className="drawer-edit-actions">
                     <button

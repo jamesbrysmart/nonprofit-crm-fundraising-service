@@ -6,6 +6,7 @@ const ALLOWED_STRING_FIELDS = new Set([
   'appealSegmentId',
   'trackingCodeId',
   'fundId',
+  'opportunityId',
   'date',
   'giftDate',
   'name',
@@ -22,11 +23,21 @@ const ALLOWED_STRING_FIELDS = new Set([
   'providerPaymentId',
   'expectedAt',
   'recurringStatus',
+  'giftIntent',
+  'inKindDescription',
 ]);
 
-const ALLOWED_NUMBER_FIELDS = new Set(['amountMicros', 'amountMinor']);
+const ALLOWED_NUMBER_FIELDS = new Set([
+  'amountMicros',
+  'amountMinor',
+  'estimatedValue',
+]);
 
-const ALLOWED_BOOLEAN_FIELDS = new Set(['giftAidEligible', 'autoPromote']);
+const ALLOWED_BOOLEAN_FIELDS = new Set([
+  'giftAidEligible',
+  'autoPromote',
+  'isInKind',
+]);
 
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
 

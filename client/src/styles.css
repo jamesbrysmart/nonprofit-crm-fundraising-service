@@ -358,6 +358,16 @@ form {
   resize: vertical;
 }
 
+.drawer-field--checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.drawer-field--checkbox input {
+  width: auto;
+}
+
 .drawer-hint {
   display: block;
   margin-top: 0.35rem;
@@ -614,6 +624,40 @@ form {
   border-color: #94a3b8;
 }
 
+.option-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.option-list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.selected-company {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid #cbd5f5;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: #f1f5f9;
+}
+
+.opportunity-suggestions {
+  margin-top: -0.5rem;
+}
+
 .queue-header {
   display: flex;
   justify-content: space-between;
@@ -781,6 +825,32 @@ form {
   border-bottom: 1px solid #e2e8f0;
   color: #334155;
   vertical-align: top;
+}
+
+.queue-row--high-value {
+  background-color: #fff7ed;
+}
+
+.queue-row--high-value:hover {
+  background-color: #ffedd5;
+}
+
+.queue-amount {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.intent-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background-color: #e0e7ff;
+  color: #312e81;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .queue-source {

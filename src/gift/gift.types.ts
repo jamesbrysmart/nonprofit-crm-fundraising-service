@@ -19,6 +19,7 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   appealSegmentId?: string;
   trackingCodeId?: string;
   fundId?: string;
+  opportunityId?: string;
   giftDate?: string;
   dateReceived?: string;
   giftBatchId?: string;
@@ -32,6 +33,10 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   providerContext?: Record<string, unknown> | string;
   recurringStatus?: string;
   recurringMetadata?: Record<string, unknown>;
+  giftIntent?: string;
+  isInKind?: boolean;
+  inKindDescription?: string;
+  estimatedValue?: number;
 }
 
 export interface GiftStagingRecord {

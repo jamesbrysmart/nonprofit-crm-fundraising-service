@@ -39,6 +39,11 @@ export interface GiftStagingEntity {
   appealId?: string;
   appealSegmentId?: string;
   trackingCodeId?: string;
+  opportunityId?: string;
+  giftIntent?: string;
+  isInKind?: boolean;
+  inKindDescription?: string;
+  estimatedValue?: number;
   recurringAgreementId?: string;
   notes?: string;
   errorDetail?: string;
@@ -67,6 +72,11 @@ export interface GiftStagingUpdateInput {
   appealId?: string | null;
   appealSegmentId?: string | null;
   trackingCodeId?: string | null;
+  opportunityId?: string | null;
+  giftIntent?: string | null;
+  inKindDescription?: string | null;
+  isInKind?: boolean;
+  estimatedValue?: number | null;
   notes?: string | null;
   giftAidEligible?: boolean;
   promotionStatus?: string;
@@ -114,6 +124,11 @@ export interface GiftStagingListItem {
   appealId?: string;
   appealSegmentId?: string;
   trackingCodeId?: string;
+  opportunityId?: string;
+  giftIntent?: string;
+  isInKind?: boolean;
+  inKindDescription?: string;
+  estimatedValue?: number;
   provider?: string;
   providerPaymentId?: string;
   providerContext?: Record<string, unknown>;
@@ -643,6 +658,49 @@ export class GiftStagingService {
       }
     }
 
+    if (updates.opportunityId !== undefined) {
+      const opportunityId = normalizeString(updates.opportunityId);
+      if (opportunityId) {
+        merged.opportunityId = opportunityId;
+      } else {
+        delete merged.opportunityId;
+      }
+    }
+
+    if (updates.giftIntent !== undefined) {
+      const intent = normalizeString(updates.giftIntent);
+      if (intent) {
+        merged.giftIntent = intent;
+      } else {
+        delete merged.giftIntent;
+      }
+    }
+
+    if (updates.inKindDescription !== undefined) {
+      const description = normalizeString(updates.inKindDescription);
+      if (description) {
+        merged.inKindDescription = description;
+      } else {
+        delete merged.inKindDescription;
+      }
+    }
+
+    if (updates.isInKind !== undefined) {
+      merged.isInKind =
+        updates.isInKind === null ? undefined : updates.isInKind;
+    }
+
+    if (updates.estimatedValue !== undefined) {
+      if (
+        typeof updates.estimatedValue === 'number' &&
+        Number.isFinite(updates.estimatedValue)
+      ) {
+        merged.estimatedValue = updates.estimatedValue;
+      } else {
+        delete merged.estimatedValue;
+      }
+    }
+
     if (updates.notes !== undefined) {
       const notes = normalizeString(updates.notes);
       if (notes) {
@@ -688,6 +746,14 @@ export class GiftStagingService {
       appealId: payload.appealId,
       appealSegmentId: payload.appealSegmentId,
       trackingCodeId: payload.trackingCodeId,
+      opportunityId: payload.opportunityId,
+      giftIntent: payload.giftIntent,
+      isInKind:
+        updates.isInKind !== undefined
+          ? updates.isInKind ?? undefined
+          : payload.isInKind,
+      inKindDescription: payload.inKindDescription,
+      estimatedValue: payload.estimatedValue,
       notes: payload.notes,
       giftAidEligible:
         typeof updates.giftAidEligible === 'boolean'
@@ -777,6 +843,11 @@ export class GiftStagingService {
       recurringAgreementId: entity.recurringAgreementId,
       giftBatchId: entity.giftBatchId,
       autoPromote: entity.autoPromote,
+      opportunityId: entity.opportunityId,
+      giftIntent: entity.giftIntent,
+      isInKind: entity.isInKind,
+      inKindDescription: entity.inKindDescription,
+      estimatedValue: entity.estimatedValue,
     };
 
     return payload;
@@ -870,6 +941,11 @@ export class GiftStagingService {
       providerContext: this.normalizeProviderContext(payload.providerContext),
       recurringAgreementId: payload.recurringAgreementId,
       notes: payload.notes,
+      opportunityId: payload.opportunityId,
+      giftIntent: payload.giftIntent,
+      isInKind: payload.isInKind,
+      inKindDescription: payload.inKindDescription,
+      estimatedValue: payload.estimatedValue,
       rawPayload,
     };
 
@@ -1044,6 +1120,27 @@ export class GiftStagingService {
       trackingCodeId:
         typeof recordObj.trackingCodeId === 'string'
           ? recordObj.trackingCodeId
+          : undefined,
+      opportunityId:
+        typeof recordObj.opportunityId === 'string'
+          ? recordObj.opportunityId
+          : undefined,
+      giftIntent:
+        typeof recordObj.giftIntent === 'string'
+          ? recordObj.giftIntent
+          : undefined,
+      isInKind:
+        typeof recordObj.isInKind === 'boolean'
+          ? recordObj.isInKind
+          : undefined,
+      inKindDescription:
+        typeof recordObj.inKindDescription === 'string'
+          ? recordObj.inKindDescription
+          : undefined,
+      estimatedValue:
+        typeof recordObj.estimatedValue === 'number' &&
+        Number.isFinite(recordObj.estimatedValue)
+          ? recordObj.estimatedValue
           : undefined,
       recurringAgreementId:
         typeof recordObj.recurringAgreementId === 'string'
@@ -1290,6 +1387,11 @@ export class GiftStagingService {
       appealId: entity.appealId,
       appealSegmentId: entity.appealSegmentId,
       trackingCodeId: entity.trackingCodeId,
+      opportunityId: entity.opportunityId,
+      giftIntent: entity.giftIntent,
+      isInKind: entity.isInKind ?? false,
+      inKindDescription: entity.inKindDescription,
+      estimatedValue: entity.estimatedValue,
       provider: entity.provider,
       providerPaymentId: entity.providerPaymentId,
       providerContext: entity.providerContext,

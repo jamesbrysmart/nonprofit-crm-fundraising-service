@@ -11,6 +11,8 @@ import { RecurringAgreementModule } from './recurring-agreement/recurring-agreem
 import { GoCardlessModule } from './gocardless/gocardless.module';
 import { AppealModule } from './appeal/appeal.module';
 import { HouseholdModule } from './household/household.module';
+import { OpportunityModule } from './opportunity/opportunity.module';
+import { CompanyModule } from './company/company.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { HouseholdModule } from './household/household.module';
     GoCardlessModule,
     AppealModule,
     HouseholdModule,
+    OpportunityModule,
+    CompanyModule,
   ],
   controllers: [HealthController],
   providers: [],

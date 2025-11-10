@@ -17,6 +17,13 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 const currencyFormatters = new Map<string, Intl.NumberFormat>();
+const HIGH_VALUE_THRESHOLD = 100000;
+const intentLabels: Record<string, string> = {
+  grant: 'Grant',
+  legacy: 'Legacy',
+  corporateInKind: 'Corporate',
+  standard: 'Standard',
+};
 
 type StagingStatusTone = 'info' | 'success' | 'warning' | 'danger';
 
@@ -63,7 +70,17 @@ function getAlertFlags(item: GiftStagingListItem): string[] {
   if (item.recurringAgreementId) {
     alerts.add('Recurring');
   }
+  if (typeof item.amountMinor === 'number' && item.amountMinor >= HIGH_VALUE_THRESHOLD) {
+    alerts.add('High value');
+  }
   return Array.from(alerts);
+}
+
+function getIntentLabel(intent?: string): string | undefined {
+  if (!intent) {
+    return undefined;
+  }
+  return intentLabels[intent] ?? intent;
 }
 
 function statusToneClass(tone: StagingStatusTone): string {
@@ -167,6 +184,7 @@ export function StagingQueue(): JSX.Element {
   const [actionError, setActionError] = useState<string | null>(null);
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
+  const [highValueOnly, setHighValueOnly] = useState(false);
 
   const openDrawer = useCallback((stagingId: string, focus: GiftDrawerFocus = 'overview') => {
     setSelectedStagingId(stagingId);
@@ -212,6 +230,7 @@ export function StagingQueue(): JSX.Element {
     Boolean(activeBatchId) ||
     activeIntakeSources.length > 0 ||
     showDuplicatesOnly ||
+    highValueOnly ||
     Boolean(activeFilters.recurringAgreementId) ||
     Boolean(activeFilters.search);
 
@@ -239,6 +258,7 @@ export function StagingQueue(): JSX.Element {
     }
     setActiveBatchId(null);
     setShowDuplicatesOnly(false);
+    setHighValueOnly(false);
   };
 
   const derivedRows = useMemo(
@@ -260,6 +280,9 @@ export function StagingQueue(): JSX.Element {
         hasGiftDuplicate:
           typeof item.errorDetail === 'string' && item.errorDetail.toLowerCase().includes('duplicate'),
         alertFlags: getAlertFlags(item),
+        isHighValue:
+          typeof item.amountMinor === 'number' && item.amountMinor >= HIGH_VALUE_THRESHOLD,
+        intentLabel: getIntentLabel(item.giftIntent),
       })),
     [items],
   );
@@ -276,8 +299,11 @@ export function StagingQueue(): JSX.Element {
           row.hasGiftDuplicate,
       );
     }
+    if (highValueOnly) {
+      rows = rows.filter((row) => row.isHighValue);
+    }
     return rows;
-  }, [derivedRows, activeBatchId, showDuplicatesOnly]);
+  }, [derivedRows, activeBatchId, showDuplicatesOnly, highValueOnly]);
 
   useEffect(() => {
     if (activeBatchId && !derivedRows.some((row) => row.giftBatchId === activeBatchId)) {
@@ -514,6 +540,13 @@ export function StagingQueue(): JSX.Element {
           >
             Duplicates
           </button>
+          <button
+            type="button"
+            className={`chip ${highValueOnly ? 'chip--active' : ''}`}
+            onClick={() => setHighValueOnly((prev) => !prev)}
+          >
+            High value (≥ £1k)
+          </button>
         </div>
         <div className="queue-tools-right">
           <div className="queue-tools-recurring">
@@ -580,12 +613,22 @@ export function StagingQueue(): JSX.Element {
             </thead>
             <tbody>
               {filteredRows.map((row) => (
-                <tr key={row.id}>
+                <tr
+                  key={row.id}
+                  className={row.isHighValue ? 'queue-row queue-row--high-value' : 'queue-row'}
+                >
                   <td className="queue-cell-id">
                     <code>{row.id}</code>
                   </td>
-                  <td>{row.formattedAmount}</td>
                   <td>{row.donorSummary}</td>
+                  <td>
+                    <div className="queue-amount">
+                      <span>{row.formattedAmount}</span>
+                      {row.intentLabel ? (
+                        <span className="intent-pill">{row.intentLabel}</span>
+                      ) : null}
+                    </div>
+                  </td>
                   <td>{row.formattedDate}</td>
                   <td>
                     <span className={`status-pill ${statusToneClass(row.statusMeta.tone)}`}>

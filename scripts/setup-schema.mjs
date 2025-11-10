@@ -214,6 +214,10 @@ async function main() {
     { name: "notes", label: "Notes", type: "TEXT" },
     { name: "recurringStatus", label: "Recurring Status Snapshot", type: "TEXT" },
     { name: "recurringMetadata", label: "Recurring Metadata", type: "RAW_JSON" },
+    { name: "giftIntent", label: "Gift Intent", type: "TEXT" },
+    { name: "isInKind", label: "Is In-Kind", type: "BOOLEAN" },
+    { name: "inKindDescription", label: "In-Kind Description", type: "TEXT" },
+    { name: "estimatedValue", label: "Estimated Value", type: "NUMBER" },
   ];
 
   for (const field of giftFields) {
@@ -248,6 +252,30 @@ async function main() {
       type: field.type,
     });
   }
+
+  console.log('--- Ensuring Opportunity Fields ---');
+  const opportunityObjectId = await findObjectByNameSingular('opportunity');
+  if (!opportunityObjectId) {
+    throw new Error('Unable to locate core Opportunity object via metadata API; cannot create opportunity fields.');
+  }
+
+  const opportunityFields = [
+    { name: 'opportunityType', label: 'Opportunity Type', type: 'TEXT' },
+    { name: 'giftsCount', label: 'Gifts Count', type: 'NUMBER' },
+    { name: 'giftsReceivedAmount', label: 'Gifts Received Amount', type: 'CURRENCY' },
+  ];
+
+  for (const field of opportunityFields) {
+    await createField({
+      objectMetadataId: opportunityObjectId,
+      name: field.name,
+      label: field.label,
+      type: field.type,
+    });
+  }
+  console.log(
+    'NOTE: Default Fund / Default Appeal lookups on Opportunity must still be created manually via the Twenty UI (see docs/METADATA_RUNBOOK.md).',
+  );
 
   console.log('--- Ensuring Person Household Fields ---');
   await createField({
@@ -320,6 +348,10 @@ async function main() {
     { name: 'notes', label: 'Notes', type: 'TEXT' },
     { name: 'errorDetail', label: 'Error Detail', type: 'RAW_JSON' },
     { name: 'rawPayload', label: 'Raw Payload', type: 'RAW_JSON' },
+    { name: 'giftIntent', label: 'Gift Intent', type: 'TEXT' },
+    { name: 'isInKind', label: 'Is In-Kind', type: 'BOOLEAN' },
+    { name: 'inKindDescription', label: 'In-Kind Description', type: 'TEXT' },
+    { name: 'estimatedValue', label: 'Estimated Value', type: 'NUMBER' },
   ];
 
   for (const field of giftStagingFields) {

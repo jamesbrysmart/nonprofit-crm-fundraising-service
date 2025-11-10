@@ -5,6 +5,10 @@ import {
   fetchGiftStagingList,
   fetchRecurringAgreements,
   PersonDuplicate,
+  OpportunityRecord,
+  searchOpportunities,
+  CompanyRecord,
+  searchCompanies,
 } from '../api';
 import type {
   GiftCreatePayload,
@@ -23,7 +27,23 @@ interface GiftFormState {
   contactLastName: string;
   contactEmail: string;
   appealId: string;
+  giftIntent: GiftIntentOption;
+  opportunityId: string;
+  companyId: string;
+  companyName: string;
+  isInKind: boolean;
+  inKindDescription: string;
+  estimatedValue: string;
 }
+
+type GiftIntentOption = 'standard' | 'grant' | 'legacy' | 'corporateInKind';
+
+const GIFT_INTENT_OPTIONS: Array<{ value: GiftIntentOption; label: string }> = [
+  { value: 'standard', label: 'Standard gift' },
+  { value: 'grant', label: 'Grant installment' },
+  { value: 'legacy', label: 'Legacy / Bequest' },
+  { value: 'corporateInKind', label: 'Corporate / In-kind' },
+];
 
 const defaultFormState = (): GiftFormState => ({
   amountValue: '',
@@ -34,6 +54,13 @@ const defaultFormState = (): GiftFormState => ({
   contactLastName: '',
   contactEmail: '',
   appealId: '',
+  giftIntent: 'standard',
+  opportunityId: '',
+  companyId: '',
+  companyName: '',
+  isInKind: false,
+  inKindDescription: '',
+  estimatedValue: '',
 });
 
 type FormStatus =
@@ -56,6 +83,15 @@ export function ManualGiftEntry(): JSX.Element {
   const [recurringSearch, setRecurringSearch] = useState('');
   const [selectedRecurringId, setSelectedRecurringId] = useState<string | null>(null);
   const [recurringOptions, setRecurringOptions] = useState<RecurringAgreementListItem[]>([]);
+  const [opportunityOptions, setOpportunityOptions] = useState<OpportunityRecord[]>([]);
+  const [opportunitySearchTerm, setOpportunitySearchTerm] = useState('');
+  const [opportunityLoading, setOpportunityLoading] = useState(false);
+  const [opportunityLookupError, setOpportunityLookupError] = useState<string | null>(null);
+  const [companySearchTerm, setCompanySearchTerm] = useState('');
+  const [companyResults, setCompanyResults] = useState<CompanyRecord[]>([]);
+  const [companyLookupBusy, setCompanyLookupBusy] = useState(false);
+  const [companyLookupError, setCompanyLookupError] = useState<string | null>(null);
+  const [pinnedOpportunity, setPinnedOpportunity] = useState<OpportunityRecord | null>(null);
   const duplicateLookupTimeout = useRef<number | undefined>(undefined);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -175,6 +211,139 @@ export function ManualGiftEntry(): JSX.Element {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const trimmedCompanyId = formState.companyId.trim();
+    const trimmedSearch = opportunitySearchTerm.trim();
+    const shouldFetch =
+      formState.giftIntent !== 'standard' ||
+      trimmedCompanyId.length > 0 ||
+      trimmedSearch.length > 0 ||
+      Boolean(selectedDuplicateId);
+
+    if (!shouldFetch) {
+      setOpportunityOptions([]);
+      setOpportunityLookupError(null);
+      return;
+    }
+
+    const params: Record<string, unknown> = {
+      limit: 15,
+    };
+
+    if (selectedDuplicateId) {
+      params.pointOfContactId = selectedDuplicateId;
+    }
+
+    if (trimmedCompanyId.length > 0) {
+      params.companyId = trimmedCompanyId;
+    }
+
+    if (trimmedSearch.length > 0) {
+      params.search = trimmedSearch;
+    }
+
+    switch (formState.giftIntent) {
+      case 'grant':
+        params.opportunityType = 'Grant';
+        break;
+      case 'legacy':
+        params.opportunityType = 'Legacy';
+        break;
+      case 'corporateInKind':
+        params.opportunityType = 'Corporate';
+        break;
+      default:
+        break;
+    }
+
+    setOpportunityLoading(true);
+    setOpportunityLookupError(null);
+
+    void searchOpportunities(params)
+      .then((records) => {
+        if (!cancelled) {
+          const normalizedSearch = trimmedSearch.toLowerCase();
+          const filtered = records.filter((record) => {
+            if (selectedDuplicateId) {
+              if (!record.pointOfContactId) {
+                return false;
+              }
+              if (record.pointOfContactId !== selectedDuplicateId) {
+                return false;
+              }
+            }
+            if (trimmedCompanyId.length > 0) {
+              if (!record.companyId) {
+                return false;
+              }
+              if (record.companyId !== trimmedCompanyId) {
+                return false;
+              }
+            }
+            if (formState.giftIntent === 'grant') {
+              if (
+                record.opportunityType &&
+                record.opportunityType.toLowerCase() !== 'grant'
+              ) {
+                return false;
+              }
+            }
+            if (formState.giftIntent === 'legacy') {
+              if (
+                record.opportunityType &&
+                record.opportunityType.toLowerCase() !== 'legacy'
+              ) {
+                return false;
+              }
+            }
+            if (formState.giftIntent === 'corporateInKind') {
+              if (
+                record.opportunityType &&
+                record.opportunityType.toLowerCase() !== 'corporate'
+              ) {
+                return false;
+              }
+            }
+            if (normalizedSearch.length > 0) {
+              const haystacks = [record.name, record.companyName, record.id]
+                .filter(Boolean)
+                .map((value) => value!.toLowerCase());
+              return haystacks.some((value) =>
+                value.includes(normalizedSearch),
+              );
+            }
+            return true;
+          });
+          setOpportunityOptions(filtered);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setOpportunityLookupError(
+            error instanceof Error
+              ? error.message
+              : 'Unable to load opportunities.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setOpportunityLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedDuplicateId,
+    formState.companyId,
+    formState.giftIntent,
+    opportunitySearchTerm,
+  ]);
 
   useEffect(() => {
     if (duplicateLookupTimeout.current) {
@@ -311,7 +480,22 @@ export function ManualGiftEntry(): JSX.Element {
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => {
     const { name, value } = event.target;
+    if (name === 'giftIntent') {
+      setFormState((prev) => ({
+        ...prev,
+        giftIntent: value as GiftIntentOption,
+      }));
+      return;
+    }
     setFormState((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleInKindToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { checked } = event.target;
+    setFormState((prev) => ({
+      ...prev,
+      isInKind: checked,
+    }));
   };
 
   const buildDuplicateLookupPayload = () => {
@@ -332,7 +516,11 @@ export function ManualGiftEntry(): JSX.Element {
       state: 'success',
       giftId,
     });
-    setFormState({ ...defaultFormState(), appealId: formState.appealId });
+    setFormState({
+      ...defaultFormState(),
+      appealId: formState.appealId,
+      giftIntent: formState.giftIntent,
+    });
     setShowDuplicates(false);
     setDuplicateMatches([]);
     setSelectedDuplicateId(null);
@@ -438,6 +626,83 @@ export function ManualGiftEntry(): JSX.Element {
 
   const giftLink = status.state === 'success' ? '/objects/gifts' : undefined;
 
+  const handleSelectOpportunity = (record: OpportunityRecord) => {
+    if (!record?.id) {
+      return;
+    }
+    setFormState((prev) => ({
+      ...prev,
+      opportunityId: record.id,
+      companyId: record.companyId ?? prev.companyId,
+      companyName: record.companyName ?? prev.companyName,
+    }));
+    setPinnedOpportunity(record);
+    if (record.name) {
+      setOpportunitySearchTerm(record.name);
+    }
+  };
+
+  const handleClearOpportunity = () => {
+    setFormState((prev) => ({
+      ...prev,
+      opportunityId: '',
+    }));
+    setPinnedOpportunity(null);
+  };
+
+  const handleCompanyLookup = async () => {
+    const trimmed = companySearchTerm.trim();
+    if (trimmed.length === 0) {
+      setCompanyLookupError('Enter a company name to search.');
+      setCompanyResults([]);
+      return;
+    }
+
+    setCompanyLookupBusy(true);
+    setCompanyLookupError(null);
+    try {
+      const results = await searchCompanies({ search: trimmed, limit: 10 });
+      const normalizedTerm = trimmed.toLowerCase();
+      const filtered = results.filter((company) => {
+        const name = company.name?.toLowerCase() ?? '';
+        return name.includes(normalizedTerm);
+      });
+      setCompanyResults(filtered);
+      if (filtered.length === 0) {
+        setCompanyLookupError('No matching companies found.');
+      }
+    } catch (error) {
+      setCompanyResults([]);
+      setCompanyLookupError(
+        error instanceof Error ? error.message : 'Search failed.',
+      );
+    } finally {
+      setCompanyLookupBusy(false);
+    }
+  };
+
+  const handleSelectCompany = (company: CompanyRecord) => {
+    if (!company?.id) {
+      return;
+    }
+    setFormState((prev) => ({
+      ...prev,
+      companyId: company.id,
+      companyName: company.name ?? company.id,
+    }));
+    setCompanyResults([]);
+    setCompanyLookupError(null);
+  };
+
+  const handleClearCompany = () => {
+    setFormState((prev) => ({
+      ...prev,
+      companyId: '',
+      companyName: '',
+    }));
+    setCompanyResults([]);
+  };
+
   const filteredRecurringOptions = useMemo(() => {
     const query = recurringSearch.trim().toLowerCase();
     if (query.length === 0) {
@@ -478,6 +743,18 @@ export function ManualGiftEntry(): JSX.Element {
     }
     return merged[selectedDuplicateId];
   }, [duplicateMatches, searchResults, selectedDuplicateId]);
+
+  const selectedOpportunity = useMemo(() => {
+    if (!formState.opportunityId) {
+      return null;
+    }
+    if (pinnedOpportunity && pinnedOpportunity.id === formState.opportunityId) {
+      return pinnedOpportunity;
+    }
+    return (
+      opportunityOptions.find((option) => option.id === formState.opportunityId) ?? null
+    );
+  }, [formState.opportunityId, opportunityOptions, pinnedOpportunity]);
 
   return (
     <section>
@@ -551,6 +828,201 @@ export function ManualGiftEntry(): JSX.Element {
               </span>
             ) : null}
           </div>
+
+          <legend style={{ fontSize: '1.125rem', fontWeight: 600, margin: '2rem 0 1rem' }}>
+            Gift context
+          </legend>
+
+          <div className="form-row">
+            <label htmlFor="giftIntent">Gift intent</label>
+            <select
+              id="giftIntent"
+              name="giftIntent"
+              value={formState.giftIntent}
+              onChange={handleChange}
+            >
+              {GIFT_INTENT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className="small-text">
+              Intent tags help surface the right workflows and keep reporting tidy.
+            </p>
+          </div>
+
+          {formState.giftIntent === 'grant' ? (
+            <div className="form-row">
+              <label>Organisation</label>
+              {formState.companyId ? (
+                <div className="selected-company">
+                  <p className="small-text">
+                    Linked to <strong>{formState.companyName || formState.companyId}</strong>
+                  </p>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={handleClearCompany}
+                    disabled={status.state === 'submitting'}
+                  >
+                    Clear organisation
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="form-row-inline">
+                    <input
+                      type="text"
+                      value={companySearchTerm}
+                      onChange={(event) => setCompanySearchTerm(event.target.value)}
+                      placeholder="Search companies by name"
+                      disabled={status.state === 'submitting'}
+                    />
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={handleCompanyLookup}
+                      disabled={companyLookupBusy}
+                    >
+                      {companyLookupBusy ? 'Searching…' : 'Search'}
+                    </button>
+                  </div>
+                  <p className="small-text">
+                    Link the organisation first, then choose the grant opportunity.
+                  </p>
+                </>
+              )}
+              {companyLookupError ? (
+                <div className="form-alert form-alert-warning" role="alert">
+                  {companyLookupError}
+                </div>
+              ) : null}
+              {companyResults.length > 0 ? (
+                <ul className="option-list">
+                  {companyResults.slice(0, 5).map((company) => (
+                    <li key={company.id}>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => handleSelectCompany(company)}
+                      >
+                        {company.name ?? company.id}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="form-row">
+            <label htmlFor="opportunitySearch">Related opportunity</label>
+            <input
+              id="opportunitySearch"
+              type="text"
+              value={opportunitySearchTerm}
+              onChange={(event) => setOpportunitySearchTerm(event.target.value)}
+              placeholder="Search open opportunities"
+              disabled={status.state === 'submitting'}
+            />
+            {selectedOpportunity ? (
+              <p className="small-text">
+                Linked to{' '}
+                <strong>{selectedOpportunity.name ?? selectedOpportunity.id}</strong>
+                {selectedOpportunity.stage ? ` · ${selectedOpportunity.stage}` : ''}{' '}
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={handleClearOpportunity}
+                  disabled={status.state === 'submitting'}
+                >
+                  Remove
+                </button>
+              </p>
+            ) : (
+              <p className="small-text">
+                Linking keeps pledges, grants, and stewardship plans in sync.
+              </p>
+            )}
+          </div>
+
+          <div className="opportunity-suggestions">
+            {opportunityLoading ? (
+              <p className="small-text">Loading opportunity suggestions…</p>
+            ) : opportunityLookupError ? (
+              <div className="form-alert form-alert-warning" role="alert">
+                {opportunityLookupError}
+              </div>
+            ) : opportunityOptions.length === 0 ? (
+              <p className="small-text">No matching opportunities yet.</p>
+            ) : (
+              <ul className="option-list">
+                {opportunityOptions.slice(0, 6).map((record) => (
+                  <li key={record.id}>
+                    <div className="option-list-row">
+                      <div>
+                        <strong>{record.name ?? record.id}</strong>
+                        <div className="small-text">
+                          {record.stage ?? 'Stage unknown'}
+                          {record.companyName ? ` · ${record.companyName}` : ''}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => handleSelectOpportunity(record)}
+                      >
+                        {formState.opportunityId === record.id ? 'Linked' : 'Link'}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {(formState.giftIntent === 'corporateInKind' || formState.isInKind) ? (
+            <>
+              <div className="form-row">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={formState.isInKind}
+                    onChange={handleInKindToggle}
+                  />
+                  Includes in-kind component
+                </label>
+                <p className="small-text">Add a description and estimated fair value.</p>
+              </div>
+              {formState.isInKind ? (
+                <>
+                  <div className="form-row">
+                    <label htmlFor="inKindDescription">In-kind description</label>
+                    <textarea
+                      id="inKindDescription"
+                      name="inKindDescription"
+                      rows={3}
+                      value={formState.inKindDescription}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div className="form-row">
+                    <label htmlFor="estimatedValue">Estimated value</label>
+                    <input
+                      id="estimatedValue"
+                      name="estimatedValue"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formState.estimatedValue}
+                      onChange={handleChange}
+                    />
+                  </div>
+                </>
+              ) : null}
+            </>
+          ) : null}
 
           <div className="form-row">
             <label htmlFor="giftName">Gift name (optional)</label>
@@ -1026,6 +1498,32 @@ function buildGiftPayload(state: GiftFormState, existingContactId?: string): Gif
   const appealId = state.appealId.trim();
   if (appealId.length > 0) {
     payload.appealId = appealId;
+  }
+
+  const intent = state.giftIntent;
+  if (intent && intent !== 'standard') {
+    payload.giftIntent = intent;
+  }
+
+  const trimmedOpportunityId = state.opportunityId.trim();
+  if (trimmedOpportunityId.length > 0) {
+    payload.opportunityId = trimmedOpportunityId;
+  }
+
+  if (state.isInKind || intent === 'corporateInKind') {
+    payload.isInKind = state.isInKind || intent === 'corporateInKind';
+    const description = state.inKindDescription.trim();
+    if (description.length > 0) {
+      payload.inKindDescription = description;
+    }
+    const estimatedValueInput = state.estimatedValue.trim();
+    if (estimatedValueInput.length > 0) {
+      const estimatedNumber = Number.parseFloat(estimatedValueInput);
+      if (Number.isNaN(estimatedNumber)) {
+        throw new Error('Estimated value must be numeric');
+      }
+      payload.estimatedValue = estimatedNumber;
+    }
   }
 
   if (existingContactId) {

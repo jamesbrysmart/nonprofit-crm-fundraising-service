@@ -12,6 +12,7 @@ import {
 } from '../src/gift-staging/gift-staging.service';
 import { NormalizedGiftCreatePayload } from '../src/gift/gift.types';
 import { RecurringAgreementService } from '../src/recurring-agreement/recurring-agreement.service';
+import { TwentyApiService } from '../src/twenty/twenty-api.service';
 
 type SeededStagingSummary = {
   id: string;
@@ -21,6 +22,8 @@ type SeededStagingSummary = {
   intakeSource?: string;
   recurringAgreementId?: string;
   provider?: string;
+  giftIntent?: string;
+  opportunityId?: string;
 };
 
 async function main(): Promise<void> {
@@ -36,6 +39,7 @@ async function main(): Promise<void> {
     const giftService = app.get(GiftService);
     const giftStagingService = app.get(GiftStagingService);
     const recurringAgreementService = app.get(RecurringAgreementService);
+    const twentyApiService = app.get(TwentyApiService);
 
     if (!giftStagingService.isEnabled()) {
       throw new Error(
@@ -46,6 +50,10 @@ async function main(): Promise<void> {
     const runId = randomUUID().slice(0, 8);
     const today = new Date().toISOString().slice(0, 10);
     const stagingSummaries: SeededStagingSummary[] = [];
+    const { companyId, companyName, opportunityId } = await ensureTestOpportunity(
+      twentyApiService,
+      runId,
+    );
 
     const pendingReview = await seedManualStaging({
       label: 'pending-review',
@@ -60,6 +68,9 @@ async function main(): Promise<void> {
         dedupeStatus: 'needs_review',
       },
       notes: 'Seeded test fixture (pending review)',
+      giftIntent: 'standard',
+      opportunityId,
+      isInKind: false,
     });
     stagingSummaries.push({
       id: pendingReview.entity.id,
@@ -67,6 +78,8 @@ async function main(): Promise<void> {
       scenario: 'Pending review',
       status: pendingReview.entity.promotionStatus,
       intakeSource: pendingReview.entity.intakeSource,
+      giftIntent: pendingReview.preparedPayload.giftIntent,
+      opportunityId,
     });
 
     const readyForCommit = await seedManualStaging({
@@ -82,6 +95,8 @@ async function main(): Promise<void> {
         dedupeStatus: 'passed',
       },
       notes: 'Seeded test fixture (ready for commit)',
+      giftIntent: 'standard',
+      opportunityId,
     });
     stagingSummaries.push({
       id: readyForCommit.entity.id,
@@ -89,6 +104,8 @@ async function main(): Promise<void> {
       scenario: 'Ready for commit',
       status: readyForCommit.entity.promotionStatus,
       intakeSource: readyForCommit.entity.intakeSource,
+      giftIntent: readyForCommit.preparedPayload.giftIntent,
+      opportunityId,
     });
 
     const commitFailed = await seedManualStaging({
@@ -104,6 +121,7 @@ async function main(): Promise<void> {
       dedupeStatus: 'matched_existing',
     },
     notes: 'Seeded test fixture (commit failed)',
+    giftIntent: 'legacy',
   });
     stagingSummaries.push({
       id: commitFailed.entity.id,
@@ -111,6 +129,7 @@ async function main(): Promise<void> {
       scenario: 'Commit failed',
       status: commitFailed.entity.promotionStatus,
       intakeSource: commitFailed.entity.intakeSource,
+      giftIntent: commitFailed.preparedPayload.giftIntent,
     });
 
     const recurringAgreementId = await seedRecurringAgreement({
@@ -120,6 +139,59 @@ async function main(): Promise<void> {
       basePreparedPayload: readyForCommit.preparedPayload,
       runId,
       today,
+    });
+
+    const grantHighValue = await seedManualStaging({
+      label: 'grant-high-value',
+      giftService,
+      giftStagingService,
+      amountMinor: 250000,
+      giftDate: today,
+      runId,
+      giftIntent: 'grant',
+      opportunityId,
+      notes: `High-value grant staged gift (${companyName ?? 'company'})`,
+      statuses: {
+        promotionStatus: 'ready_for_commit',
+        validationStatus: 'passed',
+        dedupeStatus: 'passed',
+      },
+    });
+    stagingSummaries.push({
+      id: grantHighValue.entity.id,
+      donorId: grantHighValue.preparedPayload.donorId,
+      scenario: 'Grant high value',
+      status: grantHighValue.entity.promotionStatus,
+      intakeSource: grantHighValue.entity.intakeSource,
+      giftIntent: 'grant',
+      opportunityId,
+    });
+
+    const corporateInKind = await seedManualStaging({
+      label: 'corporate-in-kind',
+      giftService,
+      giftStagingService,
+      amountMinor: 7800,
+      giftDate: today,
+      runId,
+      giftIntent: 'corporateInKind',
+      inKindDescription: 'Seeded equipment donation',
+      estimatedValue: 4800,
+      isInKind: true,
+      notes: 'Corporate in-kind test fixture',
+      statuses: {
+        promotionStatus: 'pending',
+        validationStatus: 'pending',
+        dedupeStatus: 'needs_review',
+      },
+    });
+    stagingSummaries.push({
+      id: corporateInKind.entity.id,
+      donorId: corporateInKind.preparedPayload.donorId,
+      scenario: 'Corporate in-kind',
+      status: corporateInKind.entity.promotionStatus,
+      intakeSource: corporateInKind.entity.intakeSource,
+      giftIntent: 'corporateInKind',
     });
 
     const recurringRow = await seedManualStaging({
@@ -142,6 +214,7 @@ async function main(): Promise<void> {
         dedupeStatus: 'passed',
       },
       notes: 'Seeded recurring webhook fixture',
+      giftIntent: 'standard',
     });
     stagingSummaries.push({
       id: recurringRow.entity.id,
@@ -151,6 +224,7 @@ async function main(): Promise<void> {
       intakeSource: recurringRow.entity.intakeSource,
       recurringAgreementId: recurringRow.entity.recurringAgreementId,
       provider: recurringRow.entity.provider,
+      giftIntent: recurringRow.preparedPayload.giftIntent,
     });
 
   const committedGift = await giftService.createGift({
@@ -178,6 +252,11 @@ async function main(): Promise<void> {
       if (summary.recurringAgreementId || summary.provider) {
         console.log(
           `      recurringAgreement=${summary.recurringAgreementId ?? '—'}, provider=${summary.provider ?? '—'}`,
+        );
+      }
+      if (summary.giftIntent || summary.opportunityId) {
+        console.log(
+          `      intent=${summary.giftIntent ?? '—'}, opportunity=${summary.opportunityId ?? '—'}`,
         );
       }
     }
@@ -211,6 +290,11 @@ async function seedManualStaging(options: {
     expectedAt?: string;
     intakeSource?: string;
   };
+  giftIntent?: string;
+  opportunityId?: string;
+  inKindDescription?: string;
+  isInKind?: boolean;
+  estimatedValue?: number;
 }): Promise<{
   entity: GiftStagingEntity;
   preparedPayload: NormalizedGiftCreatePayload;
@@ -222,10 +306,15 @@ async function seedManualStaging(options: {
     amountMinor,
     giftDate,
     runId,
-    statuses,
-    notes,
-    recurringAgreementId,
-    providerMetadata = {},
+  statuses,
+  notes,
+  recurringAgreementId,
+  providerMetadata = {},
+  giftIntent,
+  opportunityId,
+  inKindDescription,
+  isInKind,
+  estimatedValue,
   } =
     options;
 
@@ -251,7 +340,21 @@ async function seedManualStaging(options: {
     provider: providerMetadata.provider,
     providerPaymentId: providerMetadata.providerPaymentId,
     expectedAt: providerMetadata.expectedAt,
+    giftIntent,
+    opportunityId,
   } as Record<string, unknown>;
+
+  if (typeof inKindDescription === 'string' && inKindDescription.trim().length > 0) {
+    payload.inKindDescription = inKindDescription.trim();
+  }
+
+  if (typeof isInKind === 'boolean') {
+    payload.isInKind = isInKind;
+  }
+
+  if (typeof estimatedValue === 'number') {
+    payload.estimatedValue = estimatedValue;
+  }
 
   const prepared = await giftService.normalizeCreateGiftPayload(payload);
   prepared.autoPromote = false;
@@ -352,6 +455,75 @@ function extractFirstId(payload: unknown): string | undefined {
   }
 
   return undefined;
+}
+
+async function ensureTestOpportunity(
+  twentyApiService: TwentyApiService,
+  runId: string,
+): Promise<{ companyId?: string; companyName?: string; opportunityId?: string }> {
+  let companyId: string | undefined;
+  let companyName: string | undefined;
+  const companyPayload = {
+    name: `Seeded Org ${runId}`,
+    domainName: {
+      primaryLinkUrl: `https://seeded-org-${runId}.example.org`,
+    },
+  };
+
+  try {
+    const response = await twentyApiService.request(
+      'POST',
+      '/companies',
+      companyPayload,
+      'SeedTestFixtures',
+    );
+    companyId = extractFirstId(response);
+    companyName = companyPayload.name;
+    if (companyId) {
+      console.log(`Created seeded company with id ${companyId}`);
+    }
+  } catch (error) {
+    console.warn(
+      `Unable to create company via Twenty API: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  let opportunityId: string | undefined;
+  if (companyId) {
+    const opportunityPayload = {
+      name: `Seeded Grant ${runId}`,
+      stage: 'NEW',
+      companyId,
+      opportunityType: 'Grant',
+      amount: {
+        amountMicros: 500000000,
+        currencyCode: 'GBP',
+      },
+    };
+
+    try {
+      const response = await twentyApiService.request(
+        'POST',
+        '/opportunities',
+        opportunityPayload,
+        'SeedTestFixtures',
+      );
+      opportunityId = extractFirstId(response);
+      if (opportunityId) {
+        console.log(`Created seeded opportunity with id ${opportunityId}`);
+      }
+    } catch (error) {
+      console.warn(
+        `Unable to create opportunity via Twenty API: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  return { companyId, companyName, opportunityId };
 }
 
 main().catch((error) => {
