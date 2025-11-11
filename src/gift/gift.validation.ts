@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 
 const ALLOWED_STRING_FIELDS = new Set([
   'contactId',
+  'companyId',
   'appealId',
   'appealSegmentId',
   'trackingCodeId',
@@ -283,6 +284,35 @@ export const validateCreateGiftPayload = (body: unknown): GiftCreatePayload => {
     sanitized.currency = parsedAmount.currencyCode;
   }
 
+  const giftIntent =
+    typeof sanitized.giftIntent === 'string' ? sanitized.giftIntent : undefined;
+  const companyId =
+    typeof sanitized.companyId === 'string' ? sanitized.companyId : undefined;
+  const hasContactId =
+    typeof sanitized.contactId === 'string' &&
+    sanitized.contactId.trim().length > 0;
+  const hasInlineContact = sanitized.contact !== undefined;
+  const isOrgIntent =
+    giftIntent !== undefined && COMPANY_ORG_INTENTS.has(giftIntent);
+
+  if (isOrgIntent) {
+    if (!companyId) {
+      throw new BadRequestException(
+        'companyId is required when giftIntent is grant or corporateInKind',
+      );
+    }
+    if (hasContactId) {
+      delete sanitized.contactId;
+    }
+    if (hasInlineContact) {
+      delete sanitized.contact;
+    }
+  } else if (!hasContactId && !hasInlineContact) {
+    throw new BadRequestException(
+      'contact or contactId is required unless giftIntent is grant or corporateInKind with companyId',
+    );
+  }
+
   return sanitized as GiftCreatePayload;
 };
 
@@ -378,3 +408,4 @@ export const ensureGiftGetResponse = (body: unknown): void => {
     throw new BadRequestException('unexpected Twenty response (missing gift)');
   }
 };
+const COMPANY_ORG_INTENTS = new Set(['grant', 'corporateInKind']);

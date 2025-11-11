@@ -7,6 +7,7 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   amountMinor: number;
   currency: string;
   donorId?: string;
+  companyId?: string;
   donorFirstName?: string;
   donorLastName?: string;
   donorEmail?: string;

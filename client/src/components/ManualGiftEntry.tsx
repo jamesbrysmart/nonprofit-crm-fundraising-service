@@ -26,6 +26,7 @@ export function ManualGiftEntry(): JSX.Element {
     selectedDonor,
     potentialDuplicateMessage,
     isSubmitDisabled,
+    isOrganisationFlow,
     isRecurring,
     recurringSearch,
     selectedRecurringId,
@@ -88,8 +89,6 @@ export function ManualGiftEntry(): JSX.Element {
     />
   );
 
-  const isOrganisationFlow =
-    formState.giftIntent === 'grant' || formState.giftIntent === 'corporateInKind';
   const hasOrganisationLink = formState.companyId.trim().length > 0;
   const canSearchOpportunities = isOrganisationFlow
     ? hasOrganisationLink
@@ -166,65 +165,59 @@ export function ManualGiftEntry(): JSX.Element {
             </OrganisationDetailsCard>
           ) : null}
 
-          <DonorContactCard
-            eyebrow={isOrganisationFlow ? 'Section 3' : undefined}
-            title={isOrganisationFlow ? 'Point of contact' : undefined}
-            description={
-              isOrganisationFlow
-                ? 'Capture the person we should liaise with for this organisation gift.'
-                : undefined
-            }
-          >
-            <div className="f-field">
-              <label htmlFor="contactFirstName" className="f-field-label">
-                First name
-              </label>
-              <input
-                id="contactFirstName"
-                name="contactFirstName"
-                type="text"
-                autoComplete="given-name"
-                autoFocus
-                required
-                value={formState.contactFirstName}
-                onChange={handleChange}
-                className="f-input"
-              />
-            </div>
+          {!isOrganisationFlow ? (
+            <DonorContactCard>
+              <div className="f-field">
+                <label htmlFor="contactFirstName" className="f-field-label">
+                  First name
+                </label>
+                <input
+                  id="contactFirstName"
+                  name="contactFirstName"
+                  type="text"
+                  autoComplete="given-name"
+                  autoFocus
+                  required
+                  value={formState.contactFirstName}
+                  onChange={handleChange}
+                  className="f-input"
+                />
+              </div>
 
-            <div className="f-field">
-              <label htmlFor="contactLastName" className="f-field-label">
-                Last name
-              </label>
-              <input
-                id="contactLastName"
-                name="contactLastName"
-                type="text"
-                autoComplete="family-name"
-                required
-                value={formState.contactLastName}
-                onChange={handleChange}
-                className="f-input"
-              />
-            </div>
+              <div className="f-field">
+                <label htmlFor="contactLastName" className="f-field-label">
+                  Last name
+                </label>
+                <input
+                  id="contactLastName"
+                  name="contactLastName"
+                  type="text"
+                  autoComplete="family-name"
+                  required
+                  value={formState.contactLastName}
+                  onChange={handleChange}
+                  className="f-input"
+                />
+              </div>
 
-            <div className="f-field">
-              <label htmlFor="contactEmail" className="f-field-label">
-                Email (optional)
-              </label>
-              <input
-                id="contactEmail"
-                name="contactEmail"
-                type="email"
-                autoComplete="email"
-                value={formState.contactEmail}
-                onChange={handleChange}
-                className="f-input"
-              />
-            </div>
+              <div className="f-field">
+                <label htmlFor="contactEmail" className="f-field-label">
+                  Email (optional)
+                </label>
+                <input
+                  id="contactEmail"
+                  name="contactEmail"
+                  type="email"
+                  autoComplete="email"
+                  value={formState.contactEmail}
+                  onChange={handleChange}
+                  className="f-input"
+                />
+              </div>
 
-            {donorSelection}
-          </DonorContactCard>
+              {donorSelection}
+            </DonorContactCard>
+          ) : null}
 
           <GiftBasicsCard>
             <div className="f-field">

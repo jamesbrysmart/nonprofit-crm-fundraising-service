@@ -186,6 +186,15 @@ export class GiftService {
             : undefined,
     };
 
+    if (
+      typeof payload.companyId === 'string' &&
+      payload.companyId.trim().length > 0
+    ) {
+      prepared.companyId = payload.companyId.trim();
+    } else {
+      delete prepared.companyId;
+    }
+
     let dedupeDiagnostics: GiftDedupeDiagnostics | undefined;
 
     if (prepared.contact && typeof prepared.contact === 'object') {
@@ -301,6 +310,7 @@ export class GiftService {
       const fingerprintSeed = [
         prepared.externalId,
         prepared.donorId,
+        prepared.companyId,
         prepared.recurringAgreementId,
         prepared.amountMinor?.toString(),
         prepared.currency,

@@ -428,13 +428,18 @@ export class GiftStagingProcessingService {
     const currencyCode = amount.currencyCode;
     const value = amount.value;
 
+    const hasDonor =
+      typeof payload.donorId === 'string' && payload.donorId.trim().length > 0;
+    const hasCompany =
+      typeof payload.companyId === 'string' &&
+      payload.companyId.trim().length > 0;
+
     return (
       typeof payload.amountMinor === 'number' &&
       Number.isFinite(payload.amountMinor) &&
       typeof payload.currency === 'string' &&
       payload.currency.trim().length > 0 &&
-      typeof payload.donorId === 'string' &&
-      payload.donorId.trim().length > 0 &&
+      (hasDonor || hasCompany) &&
       typeof currencyCode === 'string' &&
       currencyCode.trim().length > 0 &&
       typeof value === 'number' &&

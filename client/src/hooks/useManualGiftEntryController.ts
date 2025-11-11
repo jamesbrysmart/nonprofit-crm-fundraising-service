@@ -99,6 +99,8 @@ export function useManualGiftEntryController() {
   const [searchResults, setSearchResults] = useState<PersonDuplicate[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const isOrganisationFlow =
+    formState.giftIntent === 'grant' || formState.giftIntent === 'corporateInKind';
 
   const {
     options: appealOptions,
@@ -118,6 +120,14 @@ export function useManualGiftEntryController() {
     setIsSearchModalOpen(false);
     setSearchLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (isOrganisationFlow) {
+      setShowDuplicates(false);
+      setDuplicateMatches([]);
+      setSelectedDuplicateId(null);
+    }
+  }, [isOrganisationFlow]);
 
   const handleSelectDonor = useCallback(
     (donorId: string | null | undefined, options: { closeModal?: boolean } = {}) => {
@@ -336,6 +346,13 @@ export function useManualGiftEntryController() {
   ]);
 
   useEffect(() => {
+    if (isOrganisationFlow) {
+      setDuplicateLookupError(null);
+      setDuplicateMatches([]);
+      setSelectedDuplicateId(null);
+      return;
+    }
+
     if (duplicateLookupTimeout.current) {
       window.clearTimeout(duplicateLookupTimeout.current);
     }
@@ -388,9 +405,15 @@ export function useManualGiftEntryController() {
     formState.contactEmail,
     showDuplicates,
     selectedDuplicateId,
+    isOrganisationFlow,
   ]);
 
   useEffect(() => {
+    if (isOrganisationFlow) {
+      setPotentialDuplicateMessage(null);
+      return;
+    }
+
     setPotentialDuplicateMessage(null);
     const donorId = selectedDuplicateId;
     if (!donorId) {
@@ -445,13 +468,17 @@ export function useManualGiftEntryController() {
     return () => {
       cancelled = true;
     };
-  }, [selectedDuplicateId, formState.amountValue, formState.giftDate]);
+  }, [selectedDuplicateId, formState.amountValue, formState.giftDate, isOrganisationFlow]);
 
   const isSubmitDisabled = useMemo(() => {
     if (!formState.amountValue || Number.isNaN(Number.parseFloat(formState.amountValue))) {
       return true;
     }
-    if (!formState.contactFirstName.trim() || !formState.contactLastName.trim()) {
+    if (isOrganisationFlow) {
+      if (!formState.companyId.trim()) {
+        return true;
+      }
+    } else if (!formState.contactFirstName.trim() || !formState.contactLastName.trim()) {
       return true;
     }
     if (isRecurring && !selectedRecurringId) {
@@ -462,6 +489,8 @@ export function useManualGiftEntryController() {
     formState.amountValue,
     formState.contactFirstName,
     formState.contactLastName,
+    formState.companyId,
+    isOrganisationFlow,
     isRecurring,
     selectedRecurringId,
   ]);
@@ -633,7 +662,7 @@ export function useManualGiftEntryController() {
         return;
       }
 
-      if (showDuplicates) {
+      if (!isOrganisationFlow && showDuplicates) {
         setStatus({
           state: 'error',
           message: 'Select an existing donor below or create a new one to continue.',
@@ -644,16 +673,18 @@ export function useManualGiftEntryController() {
       setStatus({ state: 'submitting' });
 
       try {
-        const matches = await findPersonDuplicates(buildDuplicateLookupPayload(formState));
-        const filtered = matches.filter(
-          (match): match is PersonDuplicate & { id: string } => typeof match?.id === 'string',
-        );
+        if (!isOrganisationFlow) {
+          const matches = await findPersonDuplicates(buildDuplicateLookupPayload(formState));
+          const filtered = matches.filter(
+            (match): match is PersonDuplicate & { id: string } => typeof match?.id === 'string',
+          );
 
-        if (filtered.length > 0) {
-          setDuplicateMatches(filtered);
-          setShowDuplicates(true);
-          setStatus({ state: 'idle' });
-          return;
+          if (filtered.length > 0) {
+            setDuplicateMatches(filtered);
+            setShowDuplicates(true);
+            setStatus({ state: 'idle' });
+            return;
+          }
         }
 
         const giftId = await createGiftForContact();
@@ -664,7 +695,14 @@ export function useManualGiftEntryController() {
         setStatus({ state: 'error', message });
       }
     },
-    [createGiftForContact, formState, handleSuccess, isSubmitDisabled, showDuplicates],
+    [
+      createGiftForContact,
+      formState,
+      handleSuccess,
+      isOrganisationFlow,
+      isSubmitDisabled,
+      showDuplicates,
+    ],
   );
 
   const handleUseExistingContact = useCallback(async () => {
@@ -765,6 +803,7 @@ export function useManualGiftEntryController() {
     selectedDonor,
     potentialDuplicateMessage,
     isSubmitDisabled,
+    isOrganisationFlow,
     isRecurring,
     recurringSearch,
     selectedRecurringId,

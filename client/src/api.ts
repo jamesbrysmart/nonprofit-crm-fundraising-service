@@ -25,6 +25,7 @@ export interface GiftCreatePayload {
     email?: string;
   };
   contactId?: string;
+  companyId?: string;
   autoPromote?: boolean;
   opportunityId?: string;
   giftIntent?: string;
@@ -325,6 +326,7 @@ export interface GiftStagingListItem {
   autoPromote?: boolean;
   giftAidEligible?: boolean;
   donorId?: string;
+  companyId?: string;
   donorFirstName?: string;
   donorLastName?: string;
   donorEmail?: string;

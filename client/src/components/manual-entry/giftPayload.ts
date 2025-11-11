@@ -10,6 +10,7 @@ export function buildGiftPayload(state: GiftFormState, existingContactId?: strin
   const contactFirstName = state.contactFirstName.trim();
   const contactLastName = state.contactLastName.trim();
   const contactEmail = state.contactEmail.trim();
+  const companyId = state.companyId.trim();
 
   const payload: GiftCreatePayload = {
     amount: {
@@ -51,6 +52,10 @@ export function buildGiftPayload(state: GiftFormState, existingContactId?: strin
     }
   }
 
+  if (companyId.length > 0) {
+    payload.companyId = companyId;
+  }
+
   if (existingContactId) {
     return {
       ...payload,
@@ -58,12 +63,16 @@ export function buildGiftPayload(state: GiftFormState, existingContactId?: strin
     };
   }
 
-  return {
-    ...payload,
-    contact: {
-      firstName: contactFirstName,
-      lastName: contactLastName,
-      ...(contactEmail.length > 0 ? { email: contactEmail } : {}),
-    },
-  };
+  if (contactFirstName.length > 0 && contactLastName.length > 0) {
+    return {
+      ...payload,
+      contact: {
+        firstName: contactFirstName,
+        lastName: contactLastName,
+        ...(contactEmail.length > 0 ? { email: contactEmail } : {}),
+      },
+    };
+  }
+
+  return payload;
 }

@@ -32,6 +32,7 @@ export interface GiftStagingEntity {
   providerContext?: Record<string, unknown>;
   giftAidEligible?: boolean;
   donorId?: string;
+  companyId?: string;
   donorFirstName?: string;
   donorLastName?: string;
   donorEmail?: string;
@@ -60,6 +61,7 @@ export interface GiftStagingStatusUpdate {
 
 export interface GiftStagingUpdateInput {
   donorId?: string | null;
+  companyId?: string | null;
   donorFirstName?: string | null;
   donorLastName?: string | null;
   donorEmail?: string | null;
@@ -117,6 +119,7 @@ export interface GiftStagingListItem {
   paymentMethod?: string;
   giftAidEligible: boolean;
   donorId?: string;
+  companyId?: string;
   donorFirstName?: string;
   donorLastName?: string;
   donorEmail?: string;
@@ -734,6 +737,7 @@ export class GiftStagingService {
   ): Record<string, unknown> {
     const body: Record<string, unknown> = {
       donorId: payload.donorId,
+      companyId: payload.companyId,
       donorFirstName: payload.donorFirstName,
       donorLastName: payload.donorLastName,
       donorEmail: payload.donorEmail,
@@ -1097,6 +1101,10 @@ export class GiftStagingService {
           : undefined,
       donorId:
         typeof recordObj.donorId === 'string' ? recordObj.donorId : undefined,
+      companyId:
+        typeof recordObj.companyId === 'string'
+          ? recordObj.companyId
+          : undefined,
       donorFirstName:
         typeof recordObj.donorFirstName === 'string'
           ? recordObj.donorFirstName
