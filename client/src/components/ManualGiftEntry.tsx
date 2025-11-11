@@ -4,7 +4,9 @@ import { GiftBasicsCard } from './manual-entry/GiftBasicsCard';
 import { DonorContactCard } from './manual-entry/DonorContactCard';
 import { DonorSearchModal } from './manual-entry/DonorSearchModal';
 import { DonorSelectionPanel } from './manual-entry/DonorSelectionPanel';
+import { GiftTypeCard } from './manual-entry/GiftTypeCard';
 import { OpportunityCompanyCard } from './manual-entry/OpportunityCompanyCard';
+import { OrganisationDetailsCard } from './manual-entry/OrganisationDetailsCard';
 import { RecurringAssociationsCard } from './manual-entry/RecurringAssociationsCard';
 import { ManualGiftStatus } from './manual-entry/ManualGiftStatus';
 import { RecurringAgreementSelector } from './manual-entry/RecurringAgreementSelector';
@@ -86,6 +88,16 @@ export function ManualGiftEntry(): JSX.Element {
     />
   );
 
+  const isOrganisationFlow =
+    formState.giftIntent === 'grant' || formState.giftIntent === 'corporateInKind';
+  const hasOrganisationLink = formState.companyId.trim().length > 0;
+  const canSearchOpportunities = isOrganisationFlow
+    ? hasOrganisationLink
+    : Boolean(selectedDuplicateId);
+  const opportunityBlockedMessage = isOrganisationFlow
+    ? 'Link an organisation to surface related opportunities.'
+    : 'Select a donor to surface related opportunities.';
+
   return (
     <div className="f-space-y-6">
       <form onSubmit={handleSubmit} className="f-space-y-6">
@@ -93,6 +105,127 @@ export function ManualGiftEntry(): JSX.Element {
           disabled={status.state === 'submitting'}
           className="f-space-y-6 f-border-0 f-p-0 f-m-0"
         >
+          <GiftTypeCard>
+            <div className="f-field">
+              <label htmlFor="giftIntent" className="f-field-label">
+                Gift intent
+              </label>
+              <select
+                id="giftIntent"
+                name="giftIntent"
+                value={formState.giftIntent}
+                onChange={handleChange}
+                className="f-input"
+              >
+                {GIFT_INTENT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="f-help-text">
+                This choice keeps the workflow focused on either donors or organisations.
+              </p>
+            </div>
+          </GiftTypeCard>
+
+          {isOrganisationFlow ? (
+            <OrganisationDetailsCard>
+              <OpportunityCompanyCard
+                giftIntent={formState.giftIntent}
+                showCompanyLookup
+                canSearchOpportunities={canSearchOpportunities}
+                opportunityBlockedMessage={opportunityBlockedMessage}
+                companyId={formState.companyId}
+                companyName={formState.companyName}
+                companySearchTerm={companySearchTerm}
+                companyLookupBusy={companyLookupBusy}
+                companyLookupError={companyLookupError}
+                companyResults={companyResults}
+                onCompanySearchTermChange={setCompanySearchTerm}
+                onCompanyLookup={handleCompanyLookup}
+                onSelectCompany={handleSelectCompany}
+                onClearCompany={handleClearCompany}
+                opportunitySearchTerm={opportunitySearchTerm}
+                onOpportunitySearchTermChange={setOpportunitySearchTerm}
+                opportunityLoading={opportunityLoading}
+                opportunityLookupError={opportunityLookupError}
+                opportunityOptions={opportunityOptions}
+                onSelectOpportunity={handleSelectOpportunity}
+                onClearOpportunity={handleClearOpportunity}
+                selectedOpportunity={selectedOpportunity}
+                disabled={status.state === 'submitting'}
+                formState={{
+                  isInKind: formState.isInKind,
+                  inKindDescription: formState.inKindDescription,
+                  estimatedValue: formState.estimatedValue,
+                }}
+                onToggleInKind={handleInKindToggle}
+                onFieldChange={handleChange}
+              />
+            </OrganisationDetailsCard>
+          ) : null}
+
+          <DonorContactCard
+            eyebrow={isOrganisationFlow ? 'Section 3' : undefined}
+            title={isOrganisationFlow ? 'Point of contact' : undefined}
+            description={
+              isOrganisationFlow
+                ? 'Capture the person we should liaise with for this organisation gift.'
+                : undefined
+            }
+          >
+            <div className="f-field">
+              <label htmlFor="contactFirstName" className="f-field-label">
+                First name
+              </label>
+              <input
+                id="contactFirstName"
+                name="contactFirstName"
+                type="text"
+                autoComplete="given-name"
+                autoFocus
+                required
+                value={formState.contactFirstName}
+                onChange={handleChange}
+                className="f-input"
+              />
+            </div>
+
+            <div className="f-field">
+              <label htmlFor="contactLastName" className="f-field-label">
+                Last name
+              </label>
+              <input
+                id="contactLastName"
+                name="contactLastName"
+                type="text"
+                autoComplete="family-name"
+                required
+                value={formState.contactLastName}
+                onChange={handleChange}
+                className="f-input"
+              />
+            </div>
+
+            <div className="f-field">
+              <label htmlFor="contactEmail" className="f-field-label">
+                Email (optional)
+              </label>
+              <input
+                id="contactEmail"
+                name="contactEmail"
+                type="email"
+                autoComplete="email"
+                value={formState.contactEmail}
+                onChange={handleChange}
+                className="f-input"
+              />
+            </div>
+
+            {donorSelection}
+          </DonorContactCard>
+
           <GiftBasicsCard>
             <div className="f-field">
               <label htmlFor="amountValue" className="f-field-label">
@@ -168,57 +301,40 @@ export function ManualGiftEntry(): JSX.Element {
 
             <p className="f-text-sm f-font-semibold f-text-ink f-mt-4 f-mb-0">Gift context</p>
 
-            <div className="f-field">
-              <label htmlFor="giftIntent" className="f-field-label">
-                Gift intent
-              </label>
-              <select
-                id="giftIntent"
-                name="giftIntent"
-                value={formState.giftIntent}
-                onChange={handleChange}
-                className="f-input"
-              >
-                {GIFT_INTENT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <p className="f-help-text">
-                Intent tags help surface the right workflows and keep reporting tidy.
-              </p>
-            </div>
-
-            <OpportunityCompanyCard
-              giftIntent={formState.giftIntent}
-              companyId={formState.companyId}
-              companyName={formState.companyName}
-              companySearchTerm={companySearchTerm}
-              companyLookupBusy={companyLookupBusy}
-              companyLookupError={companyLookupError}
-              companyResults={companyResults}
-              onCompanySearchTermChange={setCompanySearchTerm}
-              onCompanyLookup={handleCompanyLookup}
-              onSelectCompany={handleSelectCompany}
-              onClearCompany={handleClearCompany}
-              opportunitySearchTerm={opportunitySearchTerm}
-              onOpportunitySearchTermChange={setOpportunitySearchTerm}
-              opportunityLoading={opportunityLoading}
-              opportunityLookupError={opportunityLookupError}
-              opportunityOptions={opportunityOptions}
-              onSelectOpportunity={handleSelectOpportunity}
-              onClearOpportunity={handleClearOpportunity}
-              selectedOpportunity={selectedOpportunity}
-              disabled={status.state === 'submitting'}
-              formState={{
-                isInKind: formState.isInKind,
-                inKindDescription: formState.inKindDescription,
-                estimatedValue: formState.estimatedValue,
-              }}
-              onToggleInKind={handleInKindToggle}
-              onFieldChange={handleChange}
-            />
+            {!isOrganisationFlow ? (
+              <OpportunityCompanyCard
+                giftIntent={formState.giftIntent}
+                showCompanyLookup={false}
+                canSearchOpportunities={canSearchOpportunities}
+                opportunityBlockedMessage={opportunityBlockedMessage}
+                companyId={formState.companyId}
+                companyName={formState.companyName}
+                companySearchTerm={companySearchTerm}
+                companyLookupBusy={companyLookupBusy}
+                companyLookupError={companyLookupError}
+                companyResults={companyResults}
+                onCompanySearchTermChange={setCompanySearchTerm}
+                onCompanyLookup={handleCompanyLookup}
+                onSelectCompany={handleSelectCompany}
+                onClearCompany={handleClearCompany}
+                opportunitySearchTerm={opportunitySearchTerm}
+                onOpportunitySearchTermChange={setOpportunitySearchTerm}
+                opportunityLoading={opportunityLoading}
+                opportunityLookupError={opportunityLookupError}
+                opportunityOptions={opportunityOptions}
+                onSelectOpportunity={handleSelectOpportunity}
+                onClearOpportunity={handleClearOpportunity}
+                selectedOpportunity={selectedOpportunity}
+                disabled={status.state === 'submitting'}
+                formState={{
+                  isInKind: formState.isInKind,
+                  inKindDescription: formState.inKindDescription,
+                  estimatedValue: formState.estimatedValue,
+                }}
+                onToggleInKind={handleInKindToggle}
+                onFieldChange={handleChange}
+              />
+            ) : null}
 
             <div className="f-field">
               <label htmlFor="giftName" className="f-field-label">
@@ -235,57 +351,6 @@ export function ManualGiftEntry(): JSX.Element {
               />
             </div>
           </GiftBasicsCard>
-
-          <DonorContactCard>
-            <div className="f-field">
-              <label htmlFor="contactFirstName" className="f-field-label">
-                First name
-              </label>
-              <input
-                id="contactFirstName"
-                name="contactFirstName"
-                type="text"
-                autoComplete="given-name"
-                required
-                value={formState.contactFirstName}
-                onChange={handleChange}
-                className="f-input"
-              />
-            </div>
-
-            <div className="f-field">
-              <label htmlFor="contactLastName" className="f-field-label">
-                Last name
-              </label>
-              <input
-                id="contactLastName"
-                name="contactLastName"
-                type="text"
-                autoComplete="family-name"
-                required
-                value={formState.contactLastName}
-                onChange={handleChange}
-                className="f-input"
-              />
-            </div>
-
-            <div className="f-field">
-              <label htmlFor="contactEmail" className="f-field-label">
-                Email (optional)
-              </label>
-              <input
-                id="contactEmail"
-                name="contactEmail"
-                type="email"
-                autoComplete="email"
-                value={formState.contactEmail}
-                onChange={handleChange}
-                className="f-input"
-              />
-            </div>
-
-            {donorSelection}
-          </DonorContactCard>
           <RecurringAssociationsCard>
             <RecurringAgreementSelector
               isRecurring={isRecurring}

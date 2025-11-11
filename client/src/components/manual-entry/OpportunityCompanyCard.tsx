@@ -2,6 +2,9 @@ import { CompanyRecord, OpportunityRecord } from '../../api';
 
 interface OpportunityCompanyCardProps {
   giftIntent: string;
+  showCompanyLookup: boolean;
+  canSearchOpportunities: boolean;
+  opportunityBlockedMessage?: string;
   companyId: string;
   companyName: string;
   companySearchTerm: string;
@@ -32,6 +35,9 @@ interface OpportunityCompanyCardProps {
 
 export function OpportunityCompanyCard({
   giftIntent,
+  showCompanyLookup,
+  canSearchOpportunities,
+  opportunityBlockedMessage,
   companyId,
   companyName,
   companySearchTerm,
@@ -57,7 +63,7 @@ export function OpportunityCompanyCard({
 }: OpportunityCompanyCardProps): JSX.Element {
   return (
     <>
-      {giftIntent === 'grant' ? (
+      {showCompanyLookup ? (
         <div className="f-field">
           <label className="f-field-label">Organisation</label>
           {companyId ? (
@@ -95,7 +101,7 @@ export function OpportunityCompanyCard({
                 </button>
               </div>
               <p className="f-help-text">
-                Link the organisation first, then choose the grant opportunity.
+                Link the organisation first, then choose the appropriate opportunity.
               </p>
             </>
           )}
@@ -131,7 +137,7 @@ export function OpportunityCompanyCard({
           value={opportunitySearchTerm}
           onChange={(event) => onOpportunitySearchTermChange(event.target.value)}
           placeholder="Search open opportunities"
-          disabled={disabled}
+          disabled={disabled || !canSearchOpportunities}
           className="f-input"
         />
         {selectedOpportunity ? (
@@ -148,6 +154,8 @@ export function OpportunityCompanyCard({
               Remove
             </button>
           </p>
+        ) : !canSearchOpportunities && opportunityBlockedMessage ? (
+          <p className="f-help-text">{opportunityBlockedMessage}</p>
         ) : (
           <p className="f-help-text">
             Linking keeps pledges, grants, and stewardship plans in sync.
@@ -155,41 +163,43 @@ export function OpportunityCompanyCard({
         )}
       </div>
 
-      <div className="f-space-y-2">
-        {opportunityLoading ? (
-          <p className="f-help-text">Loading opportunity suggestions…</p>
-        ) : opportunityLookupError ? (
-          <div className="f-alert f-alert--warning" role="alert">
-            {opportunityLookupError}
-          </div>
-        ) : opportunityOptions.length === 0 ? (
-          <p className="f-help-text">No matching opportunities yet.</p>
-        ) : (
-          <div className="f-flex f-flex-col f-gap-2">
-            {opportunityOptions.slice(0, 6).map((record) => (
-              <div
-                key={record.id}
-                className="f-flex f-flex-col sm:f-flex-row sm:f-items-center f-justify-between f-gap-2 f-rounded-lg f-border f-border-slate-200 f-px-3 f-py-2"
-              >
-                <div>
-                  <strong>{record.name ?? record.id}</strong>
-                  <div className="f-help-text">
-                    {record.stage ?? 'Stage unknown'}
-                    {record.companyName ? ` · ${record.companyName}` : ''}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className={selectedOpportunity?.id === record.id ? 'f-btn--secondary' : 'f-btn--ghost'}
-                  onClick={() => onSelectOpportunity(record)}
+      {canSearchOpportunities ? (
+        <div className="f-space-y-2">
+          {opportunityLoading ? (
+            <p className="f-help-text">Loading opportunity suggestions…</p>
+          ) : opportunityLookupError ? (
+            <div className="f-alert f-alert--warning" role="alert">
+              {opportunityLookupError}
+            </div>
+          ) : opportunityOptions.length === 0 ? (
+            <p className="f-help-text">No matching opportunities yet.</p>
+          ) : (
+            <div className="f-flex f-flex-col f-gap-2">
+              {opportunityOptions.slice(0, 6).map((record) => (
+                <div
+                  key={record.id}
+                  className="f-flex f-flex-col sm:f-flex-row sm:f-items-center f-justify-between f-gap-2 f-rounded-lg f-border f-border-slate-200 f-px-3 f-py-2"
                 >
-                  {selectedOpportunity?.id === record.id ? 'Linked' : 'Link'}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                  <div>
+                    <strong>{record.name ?? record.id}</strong>
+                    <div className="f-help-text">
+                      {record.stage ?? 'Stage unknown'}
+                      {record.companyName ? ` · ${record.companyName}` : ''}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={selectedOpportunity?.id === record.id ? 'f-btn--secondary' : 'f-btn--ghost'}
+                    onClick={() => onSelectOpportunity(record)}
+                  >
+                    {selectedOpportunity?.id === record.id ? 'Linked' : 'Link'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {(formState.isInKind || giftIntent === 'corporateInKind') ? (
         <div className="f-space-y-4">

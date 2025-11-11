@@ -4,7 +4,7 @@ import { StagingQueue } from './components/gift-staging/StagingQueue';
 import { RecurringAgreementList } from './components/RecurringAgreementList';
 import { AppealsView } from './components/AppealsView';
 import { HouseholdManager } from './components/HouseholdManager';
-import { OperationsWorkspace } from './components/OperationsWorkspace';
+import { ManualGiftEntryDrawer } from './components/manual-entry/ManualGiftEntryDrawer';
 
 type ViewMode = 'manual' | 'queue' | 'agreements' | 'appeals' | 'households';
 
@@ -60,7 +60,32 @@ const classNames = (...classes: Array<string | false | undefined>): string =>
 
 export function App(): JSX.Element {
   const [view, setView] = useState<ViewMode>('queue');
+  const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
   const activeConfig = VIEW_CONFIG[view];
+
+  const renderMainContent = () => {
+    if (view === 'queue') {
+      return <StagingQueue />;
+    }
+
+    if (view === 'manual') {
+      return (
+        <section className="f-card f-p-6">
+          <ManualGiftEntry />
+        </section>
+      );
+    }
+
+    if (view === 'agreements') {
+      return <RecurringAgreementList />;
+    }
+
+    if (view === 'appeals') {
+      return <AppealsView />;
+    }
+
+    return <HouseholdManager />;
+  };
 
   return (
     <div className="f-flex f-min-h-screen f-bg-canvas f-text-ink f-antialiased lg:f-flex-row f-flex-col">
@@ -119,7 +144,7 @@ export function App(): JSX.Element {
       </aside>
 
       <main className="f-flex f-flex-col f-flex-1 f-bg-canvas">
-        <header className="f-border-b f-border-slate-200 f-px-6 lg:f-px-10 f-py-8 lg:f-py-10">
+        <header className="f-border-b f-border-slate-200 f-px-6 lg:f-px-10 f-py-6 lg:f-py-8">
           <p className="f-text-xs f-uppercase f-tracking-[0.08em] f-text-slate-500 f-m-0">
             {activeConfig.group}
           </p>
@@ -129,31 +154,31 @@ export function App(): JSX.Element {
               <span className="f-badge f-bg-primary f-text-white">{activeConfig.badge}</span>
             ) : null}
           </div>
-          <p className="small-text f-mt-1">{activeConfig.description}</p>
+          <div className="f-flex f-flex-col lg:f-flex-row f-items-start lg:f-items-center f-justify-between f-gap-4 f-mt-2">
+            <p className="small-text f-m-0">{activeConfig.description}</p>
+            {view === 'queue' ? (
+              <button
+                type="button"
+                className="f-btn--primary"
+                onClick={() => setIsManualEntryOpen(true)}
+              >
+                Log manual gift
+              </button>
+            ) : null}
+          </div>
         </header>
 
-        <div className="f-flex-1 f-px-6 lg:f-px-10 f-py-8 lg:f-py-10 f-overflow-y-auto f-space-y-6">
-          {view === 'queue' || view === 'manual' ? (
-            <OperationsWorkspace
-              leftColumn={<StagingQueue />}
-              rightColumn={<ManualGiftEntry />}
-              leftTitle="Staging queue"
-              rightTitle="Manual gift entry"
-              description={
-                <p className="f-m-0">
-                  Review staged gifts, resolve duplicates, and process ready records while keeping manual entry within reach.
-                </p>
-              }
-            />
-          ) : view === 'agreements' ? (
-            <RecurringAgreementList />
-          ) : view === 'appeals' ? (
-            <AppealsView />
-          ) : (
-            <HouseholdManager />
-          )}
+        <div className="f-flex-1 f-px-6 lg:f-px-10 f-py-6 lg:f-py-8 f-overflow-y-auto f-space-y-6">
+          {renderMainContent()}
         </div>
       </main>
+
+      <ManualGiftEntryDrawer
+        open={isManualEntryOpen}
+        onClose={() => {
+          setIsManualEntryOpen(false);
+        }}
+      />
     </div>
   );
 }

@@ -16,19 +16,26 @@ interface SummaryProps {
   actionError: string | null;
   loading: boolean;
   isRefreshing: boolean;
+  showDuplicatesOnly: boolean;
+  highValueOnly: boolean;
   refresh(): Promise<void>;
   onClearFilters(): void;
   onToggleIntakeSource(label: string): void;
   onSelectBatch(label: string): void;
+  onToggleDuplicates(): void;
+  onToggleHighValue(): void;
 }
 
 const chipBaseClasses =
-  'f-chip f-text-sm f-font-medium f-bg-white f-border f-border-slate-200 f-text-slate-600 hover:f-border-slate-400';
+  'f-chip f-text-xs f-font-semibold f-bg-white f-border f-border-slate-200 f-text-slate-600 hover:f-border-slate-400';
 const chipActiveClasses = 'f-border-primary f-bg-primary/10 f-text-primary';
 const pillClasses =
-  'f-inline-flex f-items-center f-gap-1.5 f-rounded-full f-bg-slate-100 f-text-slate-700 f-text-sm f-font-medium f-px-3 f-py-1';
+  'f-inline-flex f-items-center f-gap-1 f-rounded-full f-bg-slate-100 f-text-slate-700 f-text-xs f-font-semibold f-px-3 f-py-1';
 const countBadgeClasses =
-  'f-inline-flex f-items-center f-justify-center f-rounded-full f-bg-slate-200 f-text-ink f-text-xs f-font-semibold f-px-2 f-py-0.5';
+  'f-inline-flex f-items-center f-justify-center f-rounded-full f-bg-slate-200 f-text-ink f-text-[11px] f-font-semibold f-px-2 f-py-0.5';
+const toggleChipBase =
+  'f-inline-flex f-items-center f-rounded-full f-border f-border-slate-200 f-bg-white f-px-3 f-py-1.5 f-text-sm f-font-medium f-text-slate-600 hover:f-border-slate-400';
+const toggleChipActive = 'f-border-primary f-bg-primary/10 f-text-primary';
 
 export function StagingQueueSummary({
   statusSummary,
@@ -40,36 +47,41 @@ export function StagingQueueSummary({
   actionError,
   loading,
   isRefreshing,
+  showDuplicatesOnly,
+  highValueOnly,
   refresh,
   onClearFilters,
   onToggleIntakeSource,
   onSelectBatch,
+  onToggleDuplicates,
+  onToggleHighValue,
 }: SummaryProps): JSX.Element {
   const statusPills = useMemo(
     () => [
       { label: 'Total', value: statusSummary.total },
       { label: 'Needs review', value: statusSummary.needsReview },
       { label: 'Ready', value: statusSummary.ready },
-      { label: 'Commit failed', value: statusSummary.commitFailed },
+      { label: 'Failed', value: statusSummary.commitFailed },
       { label: 'Committed', value: statusSummary.committed },
     ],
     [statusSummary],
   );
 
   return (
-    <div className="f-card f-p-5 f-space-y-4">
-      <div className="f-flex f-flex-col lg:f-flex-row f-items-start f-justify-between f-gap-4">
-        <div>
-          <h3 className="f-text-lg f-font-semibold f-text-ink f-m-0">Staging queue</h3>
-          <p className="f-text-sm f-text-slate-500 f-mt-1 f-mb-0">
-            Latest staged gifts sorted by most recently updated. Use refresh after new submissions.
-          </p>
+    <div className="f-card f-p-4 f-space-y-3">
+      <div className="f-flex f-flex-col gap-3 lg:f-flex-row lg:f-items-center lg:f-justify-between">
+        <div className="f-flex f-flex-wrap f-gap-2">
+          {statusPills.map((pill) => (
+            <span key={pill.label} className={pillClasses}>
+              {pill.label}: <strong>{pill.value}</strong>
+            </span>
+          ))}
         </div>
-        <div className="f-flex f-flex-wrap f-gap-3 f-items-center">
+        <div className="f-flex f-flex-wrap f-gap-2">
           {hasActiveFilters ? (
             <button
               type="button"
-              className="f-btn--secondary"
+              className="f-btn--ghost"
               onClick={onClearFilters}
               disabled={loading}
             >
@@ -106,20 +118,11 @@ export function StagingQueueSummary({
         </div>
       ) : null}
 
-      <div className="f-grid f-gap-4 lg:f-grid-cols-3">
-        <div className="f-space-y-3">
-          <h3 className="f-text-base f-font-semibold f-text-ink f-m-0">Status overview</h3>
-          <div className="f-flex f-flex-wrap f-gap-2">
-            {statusPills.map((pill) => (
-              <span key={pill.label} className={pillClasses}>
-                {pill.label}: <strong>{pill.value}</strong>
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="f-space-y-3">
-          <h3 className="f-text-base f-font-semibold f-text-ink f-m-0">Intake sources</h3>
+      <div className="f-flex f-flex-col gap-3 lg:f-flex-row lg:f-gap-6">
+        <div className="f-flex-1">
+          <p className="f-text-xs f-uppercase f-tracking-[0.08em] f-text-slate-500 f-mb-1 f-mt-0">
+            Intake sources
+          </p>
           {intakeSummary.length === 0 ? (
             <span className="f-text-sm f-text-slate-500">No intake sources</span>
           ) : (
@@ -143,8 +146,10 @@ export function StagingQueueSummary({
         </div>
 
         {batchSummary.length > 0 ? (
-          <div className="f-space-y-3">
-            <h3 className="f-text-base f-font-semibold f-text-ink f-m-0">Gift batches</h3>
+          <div className="f-flex-1">
+            <p className="f-text-xs f-uppercase f-tracking-[0.08em] f-text-slate-500 f-mb-1 f-mt-0">
+              Gift batches
+            </p>
             <div className="f-flex f-flex-wrap f-gap-2">
               {batchSummary.map(({ label, count }) => {
                 const isActive = activeBatchId === label;
@@ -163,6 +168,23 @@ export function StagingQueueSummary({
             </div>
           </div>
         ) : null}
+      </div>
+
+      <div className="f-flex f-flex-wrap f-gap-2">
+        <button
+          type="button"
+          className={`${toggleChipBase} ${showDuplicatesOnly ? toggleChipActive : ''}`}
+          onClick={onToggleDuplicates}
+        >
+          Duplicates
+        </button>
+        <button
+          type="button"
+          className={`${toggleChipBase} ${highValueOnly ? toggleChipActive : ''}`}
+          onClick={onToggleHighValue}
+        >
+          High value (≥ £1k)
+        </button>
       </div>
     </div>
   );

@@ -8,12 +8,10 @@ import { GiftStagingListFetchOptions, useGiftStagingList } from '../../hooks/use
 import { GiftStagingDrawer } from './GiftStagingDrawer';
 import { GiftDrawerFocus } from './types';
 import { StagingQueueSummary } from './StagingQueueSummary';
-import { StagingQueueFilters } from './StagingQueueFilters';
 import { StagingQueueTable } from './StagingQueueTable';
 import { mapQueueRows, HIGH_VALUE_THRESHOLD } from './stagingQueueUtils';
 
 export function StagingQueue(): JSX.Element {
-  const [recurringFilterInput, setRecurringFilterInput] = useState('');
   const [activeFilters, setActiveFilters] = useState<GiftStagingListFetchOptions>({});
   const { items, loading, isRefreshing, error, refresh } = useGiftStagingList(activeFilters);
   const [selectedStagingId, setSelectedStagingId] = useState<string | null>(null);
@@ -56,14 +54,6 @@ export function StagingQueue(): JSX.Element {
     [],
   );
 
-  const handleApplyRecurringFilter = useCallback(() => {
-    const trimmed = recurringFilterInput.trim();
-    if (trimmed.length > 0) {
-      applyFilter({ recurringAgreementId: trimmed });
-    } else {
-      clearFilterKey('recurringAgreementId');
-    }
-  }, [recurringFilterInput, applyFilter, clearFilterKey]);
 
   const toggleDuplicatesFilter = useCallback(() => {
     setShowDuplicatesOnly((prev) => {
@@ -99,7 +89,6 @@ export function StagingQueue(): JSX.Element {
     activeIntakeSources.length > 0 ||
     showDuplicatesOnly ||
     highValueOnly ||
-    Boolean(activeFilters.recurringAgreementId) ||
     Boolean(activeFilters.search);
 
   const handleSelectIntakeSource = (source: string) => {
@@ -125,9 +114,6 @@ export function StagingQueue(): JSX.Element {
   const handleClearFilters = () => {
     if (activeFilters.intakeSources) {
       clearFilterKey('intakeSources');
-    }
-    if (activeFilters.recurringAgreementId) {
-      clearFilterKey('recurringAgreementId');
     }
     if (activeFilters.search) {
       clearFilterKey('search');
@@ -301,23 +287,11 @@ export function StagingQueue(): JSX.Element {
           onClearFilters={handleClearFilters}
           onToggleIntakeSource={handleSelectIntakeSource}
           onSelectBatch={handleSelectBatch}
+          showDuplicatesOnly={showDuplicatesOnly}
+          highValueOnly={highValueOnly}
+          onToggleDuplicates={toggleDuplicatesFilter}
+          onToggleHighValue={toggleHighValueFilter}
         />
-
-      <StagingQueueFilters
-        showDuplicatesOnly={showDuplicatesOnly}
-        highValueOnly={highValueOnly}
-        onToggleDuplicates={toggleDuplicatesFilter}
-        onToggleHighValue={toggleHighValueFilter}
-        recurringFilterInput={recurringFilterInput}
-        onRecurringInputChange={setRecurringFilterInput}
-        onApplyRecurring={handleApplyRecurringFilter}
-        canClearRecurring={Boolean(activeFilters.recurringAgreementId)}
-        onClearRecurring={() => {
-          clearFilterKey('recurringAgreementId');
-          setRecurringFilterInput('');
-        }}
-        applyDisabled={loading || recurringFilterInput.trim().length === 0}
-      />
 
       <StagingQueueTable
         rows={filteredRows}
