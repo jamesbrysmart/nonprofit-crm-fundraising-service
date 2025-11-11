@@ -2,6 +2,7 @@ import { PersonDuplicate } from '../../api';
 import {
   classifyDuplicate,
   describeDuplicate,
+  duplicateTierBadgeClass,
   duplicateTierLabel,
   formatMatchDate,
 } from './duplicateHelpers';
@@ -40,34 +41,38 @@ export function DonorSearchModal({
   }
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className="modal">
-        <div className="modal-header">
-          <h3>Search donors</h3>
-          <button type="button" className="secondary-button" onClick={onClose}>
+    <div className="f-modal" role="dialog" aria-modal="true">
+      <div className="f-modal-panel">
+        <div className="f-flex f-justify-between f-items-center f-gap-4">
+          <div>
+            <h3 className="f-text-xl f-font-semibold f-text-ink f-m-0">Search donors</h3>
+            <p className="f-help-text">Match by name or email before creating a new record.</p>
+          </div>
+          <button type="button" className="f-btn--ghost" onClick={onClose}>
             Close
           </button>
         </div>
-        <form className="modal-search" onSubmit={onSearchSubmit}>
+        <form className="f-flex f-flex-col sm:f-flex-row f-gap-3" onSubmit={onSearchSubmit}>
           <input
             type="text"
             value={searchTerm}
             onChange={(event) => onSearchTermChange(event.target.value)}
             placeholder="Name or email"
+            className="f-input"
           />
-          <button type="submit" className="secondary-button" disabled={searchLoading}>
+          <button type="submit" className="f-btn--secondary" disabled={searchLoading}>
             {searchLoading ? 'Searching…' : 'Search'}
           </button>
         </form>
         {searchError ? (
-          <div className="form-alert form-alert-error" role="alert">
+          <div className="f-alert f-alert--error" role="alert">
             {searchError}
           </div>
         ) : null}
         {searchLoading ? (
-          <div className="queue-state">Searching donors…</div>
+          <div className="f-state-block">Searching donors…</div>
         ) : searchResults.length > 0 ? (
-          <table className="modal-table">
+          <table className="f-table">
             <thead>
               <tr>
                 <th scope="col">Match</th>
@@ -86,15 +91,17 @@ export function DonorSearchModal({
                 return (
                   <tr key={match.id}>
                     <td>
-                      <span className={`duplicate-tier-badge duplicate-tier-badge--${tier}`}>
-                        {duplicateTierLabel(tier)}
-                      </span>
+                      <span className={duplicateTierBadgeClass(tier)}>{duplicateTierLabel(tier)}</span>
                     </td>
                     <td>{describeDuplicate(match)}</td>
                     <td>{match.emails?.primaryEmail ?? '—'}</td>
                     <td>{formatMatchDate(match.updatedAt ?? match.createdAt)}</td>
                     <td>
-                      <button type="button" className="secondary-button" onClick={() => onSelectDonor(match.id)}>
+                      <button
+                        type="button"
+                        className="f-btn--ghost"
+                        onClick={() => onSelectDonor(match.id)}
+                      >
                         Use donor
                       </button>
                     </td>
@@ -104,7 +111,7 @@ export function DonorSearchModal({
             </tbody>
           </table>
         ) : (
-          !searchError && <p className="small-text">Enter a name or email to search.</p>
+          !searchError && <p className="f-help-text">Enter a name or email to search.</p>
         )}
       </div>
     </div>

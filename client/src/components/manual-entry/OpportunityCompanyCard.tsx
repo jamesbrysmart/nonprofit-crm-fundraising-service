@@ -26,7 +26,7 @@ interface OpportunityCompanyCardProps {
     inKindDescription: string;
     estimatedValue: string;
   };
-  onToggleInKind(): void;
+  onToggleInKind(event: React.ChangeEvent<HTMLInputElement>): void;
   onFieldChange(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void;
 }
 
@@ -58,57 +58,73 @@ export function OpportunityCompanyCard({
   return (
     <>
       {giftIntent === 'grant' ? (
-        <div className="form-row">
-          <label>Organisation</label>
+        <div className="f-field">
+          <label className="f-field-label">Organisation</label>
           {companyId ? (
-            <div className="selected-company">
-              <p className="small-text">
+            <div className="f-flex f-flex-col sm:f-flex-row sm:f-items-center f-gap-3 f-rounded-lg f-border f-border-slate-200 f-bg-slate-50 f-px-3 f-py-2">
+              <p className="f-text-sm f-text-slate-600 f-m-0">
                 Linked to <strong>{companyName || companyId}</strong>
               </p>
-              <button type="button" className="secondary-button" onClick={onClearCompany} disabled={disabled}>
+              <button
+                type="button"
+                className="f-btn--ghost"
+                onClick={onClearCompany}
+                disabled={disabled}
+              >
                 Clear organisation
               </button>
             </div>
           ) : (
             <>
-              <div className="form-row-inline">
+              <div className="f-flex f-flex-col sm:f-flex-row f-gap-3">
                 <input
                   type="text"
                   value={companySearchTerm}
                   onChange={(event) => onCompanySearchTermChange(event.target.value)}
                   placeholder="Search companies by name"
                   disabled={disabled}
+                  className="f-input"
                 />
-                <button type="button" className="secondary-button" onClick={onCompanyLookup} disabled={companyLookupBusy}>
+                <button
+                  type="button"
+                  className="f-btn--secondary"
+                  onClick={onCompanyLookup}
+                  disabled={companyLookupBusy || disabled}
+                >
                   {companyLookupBusy ? 'Searching…' : 'Search'}
                 </button>
               </div>
-              <p className="small-text">
+              <p className="f-help-text">
                 Link the organisation first, then choose the grant opportunity.
               </p>
             </>
           )}
           {companyLookupError ? (
-            <div className="form-alert form-alert-warning" role="alert">
+            <div className="f-alert f-alert--warning" role="alert">
               {companyLookupError}
             </div>
           ) : null}
           {companyResults.length > 0 ? (
-            <ul className="option-list">
+            <div className="f-flex f-flex-col f-gap-2">
               {companyResults.slice(0, 5).map((company) => (
-                <li key={company.id}>
-                  <button type="button" className="secondary-button" onClick={() => onSelectCompany(company)}>
-                    {company.name ?? company.id}
-                  </button>
-                </li>
+                <button
+                  key={company.id}
+                  type="button"
+                  className="f-btn--ghost f-justify-between"
+                  onClick={() => onSelectCompany(company)}
+                >
+                  {company.name ?? company.id}
+                </button>
               ))}
-            </ul>
+            </div>
           ) : null}
         </div>
       ) : null}
 
-      <div className="form-row">
-        <label htmlFor="opportunitySearch">Related opportunity</label>
+      <div className="f-field">
+        <label htmlFor="opportunitySearch" className="f-field-label">
+          Related opportunity
+        </label>
         <input
           id="opportunitySearch"
           type="text"
@@ -116,77 +132,91 @@ export function OpportunityCompanyCard({
           onChange={(event) => onOpportunitySearchTermChange(event.target.value)}
           placeholder="Search open opportunities"
           disabled={disabled}
+          className="f-input"
         />
         {selectedOpportunity ? (
-          <p className="small-text">
+          <p className="f-help-text f-flex f-flex-wrap f-items-center f-gap-2">
             Linked to{' '}
             <strong>{selectedOpportunity.name ?? selectedOpportunity.id}</strong>
-            {selectedOpportunity.stage ? ` · ${selectedOpportunity.stage}` : ''}{' '}
-            <button type="button" className="secondary-button" onClick={onClearOpportunity} disabled={disabled}>
+            {selectedOpportunity.stage ? ` · ${selectedOpportunity.stage}` : ''}
+            <button
+              type="button"
+              className="f-btn--ghost"
+              onClick={onClearOpportunity}
+              disabled={disabled}
+            >
               Remove
             </button>
           </p>
         ) : (
-          <p className="small-text">
+          <p className="f-help-text">
             Linking keeps pledges, grants, and stewardship plans in sync.
           </p>
         )}
       </div>
 
-      <div className="opportunity-suggestions">
+      <div className="f-space-y-2">
         {opportunityLoading ? (
-          <p className="small-text">Loading opportunity suggestions…</p>
+          <p className="f-help-text">Loading opportunity suggestions…</p>
         ) : opportunityLookupError ? (
-          <div className="form-alert form-alert-warning" role="alert">
+          <div className="f-alert f-alert--warning" role="alert">
             {opportunityLookupError}
           </div>
         ) : opportunityOptions.length === 0 ? (
-          <p className="small-text">No matching opportunities yet.</p>
+          <p className="f-help-text">No matching opportunities yet.</p>
         ) : (
-          <ul className="option-list">
+          <div className="f-flex f-flex-col f-gap-2">
             {opportunityOptions.slice(0, 6).map((record) => (
-              <li key={record.id}>
-                <div className="option-list-row">
-                  <div>
-                    <strong>{record.name ?? record.id}</strong>
-                    <div className="small-text">
-                      {record.stage ?? 'Stage unknown'}
-                      {record.companyName ? ` · ${record.companyName}` : ''}
-                    </div>
+              <div
+                key={record.id}
+                className="f-flex f-flex-col sm:f-flex-row sm:f-items-center f-justify-between f-gap-2 f-rounded-lg f-border f-border-slate-200 f-px-3 f-py-2"
+              >
+                <div>
+                  <strong>{record.name ?? record.id}</strong>
+                  <div className="f-help-text">
+                    {record.stage ?? 'Stage unknown'}
+                    {record.companyName ? ` · ${record.companyName}` : ''}
                   </div>
-                  <button type="button" className="secondary-button" onClick={() => onSelectOpportunity(record)}>
-                    {selectedOpportunity?.id === record.id ? 'Linked' : 'Link'}
-                  </button>
                 </div>
-              </li>
+                <button
+                  type="button"
+                  className={selectedOpportunity?.id === record.id ? 'f-btn--secondary' : 'f-btn--ghost'}
+                  onClick={() => onSelectOpportunity(record)}
+                >
+                  {selectedOpportunity?.id === record.id ? 'Linked' : 'Link'}
+                </button>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
 
       {(formState.isInKind || giftIntent === 'corporateInKind') ? (
-        <>
-          <div className="form-row">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <input type="checkbox" checked={formState.isInKind} onChange={onToggleInKind} />
-              Includes in-kind component
-            </label>
-            <p className="small-text">Add a description and estimated fair value.</p>
-          </div>
+        <div className="f-space-y-4">
+          <label className="f-inline-flex f-items-center f-gap-2 f-text-sm f-font-medium f-text-slate-700">
+            <input type="checkbox" checked={formState.isInKind} onChange={onToggleInKind} />
+            Includes in-kind component
+          </label>
+          <p className="f-help-text">Add a description and estimated fair value.</p>
           {formState.isInKind ? (
-            <>
-              <div className="form-row">
-                <label htmlFor="inKindDescription">In-kind description</label>
+            <div className="f-space-y-4">
+              <div className="f-field">
+                <label htmlFor="inKindDescription" className="f-field-label">
+                  In-kind description
+                </label>
                 <textarea
                   id="inKindDescription"
                   name="inKindDescription"
                   rows={3}
                   value={formState.inKindDescription}
                   onChange={onFieldChange}
+                  className="f-textarea"
                 />
               </div>
-              <div className="form-row">
-                <label htmlFor="estimatedValue">Estimated value</label>
+              <div className="f-field">
+                <label htmlFor="estimatedValue" className="f-field-label">
+                  Estimated value
+                </label>
                 <input
                   id="estimatedValue"
                   name="estimatedValue"
@@ -195,11 +225,12 @@ export function OpportunityCompanyCard({
                   min="0"
                   value={formState.estimatedValue}
                   onChange={onFieldChange}
+                  className="f-input"
                 />
               </div>
-            </>
+            </div>
           ) : null}
-        </>
+        </div>
       ) : null}
     </>
   );

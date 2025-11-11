@@ -61,14 +61,14 @@ export function StagingQueueFilters({
           <div className="f-inline-flex f-gap-2">
             <button
               type="button"
-              className="secondary-button"
+              className="f-btn--secondary"
               onClick={onApplyRecurring}
               disabled={applyDisabled}
             >
               Apply
             </button>
             {canClearRecurring ? (
-              <button type="button" className="secondary-button" onClick={onClearRecurring}>
+              <button type="button" className="f-btn--ghost" onClick={onClearRecurring}>
                 Clear
               </button>
             ) : null}

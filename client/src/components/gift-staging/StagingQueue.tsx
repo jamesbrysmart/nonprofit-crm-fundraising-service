@@ -6,7 +6,7 @@ import {
 } from '../../api';
 import { GiftStagingListFetchOptions, useGiftStagingList } from '../../hooks/useGiftStagingList';
 import { GiftStagingDrawer } from './GiftStagingDrawer';
-import { GiftDrawerFocus } from './GiftStagingDrawer';
+import { GiftDrawerFocus } from './types';
 import { StagingQueueSummary } from './StagingQueueSummary';
 import { StagingQueueFilters } from './StagingQueueFilters';
 import { StagingQueueTable } from './StagingQueueTable';
@@ -68,22 +68,30 @@ export function StagingQueue(): JSX.Element {
   const toggleDuplicatesFilter = useCallback(() => {
     setShowDuplicatesOnly((prev) => {
       const next = !prev;
-      applyFilter({
-        statuses: next ? ['dedupe_review', 'pending'] : undefined,
-      });
+      if (next) {
+        applyFilter({
+          statuses: ['dedupe_review', 'pending'],
+        });
+      } else {
+        clearFilterKey('statuses');
+      }
       return next;
     });
-  }, [applyFilter]);
+  }, [applyFilter, clearFilterKey]);
 
   const toggleHighValueFilter = useCallback(() => {
     setHighValueOnly((prev) => {
       const next = !prev;
-      applyFilter({
-        minAmountMinor: next ? HIGH_VALUE_THRESHOLD : undefined,
-      });
+      if (next) {
+        applyFilter({
+          minAmountMinor: HIGH_VALUE_THRESHOLD,
+        });
+      } else {
+        clearFilterKey('minAmountMinor');
+      }
       return next;
     });
-  }, [applyFilter]);
+  }, [applyFilter, clearFilterKey]);
 
   const activeIntakeSources = activeFilters.intakeSources ?? [];
   const hasActiveFilters =
@@ -103,7 +111,15 @@ export function StagingQueue(): JSX.Element {
   };
 
   const handleSelectBatch = (batchId: string) => {
-    setActiveBatchId((current) => (current === batchId ? null : batchId));
+    setActiveBatchId((current) => {
+      const next = current === batchId ? null : batchId;
+      if (next) {
+        applyFilter({ giftBatchId: next });
+      } else {
+        clearFilterKey('giftBatchId');
+      }
+      return next;
+    });
   };
 
   const handleClearFilters = () => {
@@ -115,6 +131,15 @@ export function StagingQueue(): JSX.Element {
     }
     if (activeFilters.search) {
       clearFilterKey('search');
+    }
+    if (typeof activeFilters.giftBatchId === 'string') {
+      clearFilterKey('giftBatchId');
+    }
+    if (activeFilters.statuses) {
+      clearFilterKey('statuses');
+    }
+    if (typeof activeFilters.minAmountMinor === 'number') {
+      clearFilterKey('minAmountMinor');
     }
     setActiveBatchId(null);
     setShowDuplicatesOnly(false);

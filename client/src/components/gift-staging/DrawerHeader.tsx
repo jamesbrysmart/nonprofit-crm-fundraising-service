@@ -1,4 +1,4 @@
-import { GiftDrawerFocus } from './GiftStagingDrawer';
+import { GiftDrawerFocus } from './types';
 
 interface DrawerHeaderProps {
   stagingId: string | null;
@@ -28,7 +28,7 @@ export function DrawerHeader({
       <div className="drawer-header-actions">
         <button
           type="button"
-          className="secondary-button"
+          className="f-btn--ghost"
           onClick={onMarkReady}
           disabled={actionBusy === 'mark-ready' || loading}
         >
@@ -36,13 +36,13 @@ export function DrawerHeader({
         </button>
         <button
           type="button"
-          className="secondary-button"
+          className="f-btn--ghost"
           onClick={onProcess}
           disabled={actionBusy === 'process' || loading}
         >
           {actionBusy === 'process' ? 'Processing…' : 'Process now'}
         </button>
-        <button type="button" className="secondary-button" onClick={onClose}>
+        <button type="button" className="f-btn--ghost" onClick={onClose}>
           Close
         </button>
       </div>

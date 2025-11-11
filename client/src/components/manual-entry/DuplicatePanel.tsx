@@ -1,6 +1,7 @@
 import { PersonDuplicate } from '../../api';
 import {
   describeDuplicate,
+  duplicateTierBadgeClass,
   duplicateTierLabel,
   formatMatchDate,
   DuplicateTier,
@@ -26,12 +27,18 @@ export function DuplicatePanel({
   disableActions,
 }: DuplicatePanelProps): JSX.Element {
   return (
-    <div className="duplicate-panel" role="status" aria-live="polite">
-      <h2>Possible existing donors</h2>
-      <p className="small-text">
-        We found donors that match the details you entered. Select one to reuse their record or continue to create a new contact.
-      </p>
-      <table className="duplicate-table">
+    <div
+      className="f-rounded-2xl f-border f-border-slate-200 f-bg-white f-shadow-card f-p-5 f-space-y-4"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="f-flex f-flex-col f-gap-1">
+        <h2 className="f-text-xl f-font-semibold f-text-ink f-m-0">Possible existing donors</h2>
+        <p className="f-help-text">
+          We found donors that match the details you entered. Select one to reuse their record or continue to create a new contact.
+        </p>
+      </div>
+      <table className="f-table">
         <thead>
           <tr>
             <th scope="col">Match</th>
@@ -47,12 +54,11 @@ export function DuplicatePanel({
               return null;
             }
             const isSelected = selectedDuplicateId === match.id;
+            const rowClass = isSelected ? 'f-bg-primary/5' : 'f-bg-white';
             return (
-              <tr key={match.id} className={isSelected ? 'duplicate-row--selected' : undefined}>
+              <tr key={match.id} className={`${rowClass} f-transition-colors`}>
                 <td>
-                  <span className={`duplicate-tier-badge duplicate-tier-badge--${tier}`}>
-                    {duplicateTierLabel(tier)}
-                  </span>
+                  <span className={duplicateTierBadgeClass(tier)}>{duplicateTierLabel(tier)}</span>
                 </td>
                 <td>{describeDuplicate(match)}</td>
                 <td>{match.emails?.primaryEmail ?? '—'}</td>
@@ -60,7 +66,7 @@ export function DuplicatePanel({
                 <td>
                   <button
                     type="button"
-                    className="secondary-button"
+                    className={isSelected ? 'f-btn--secondary' : 'f-btn--ghost'}
                     onClick={() => onSelectDuplicate(match.id)}
                     disabled={disableActions}
                   >
@@ -72,10 +78,10 @@ export function DuplicatePanel({
           })}
         </tbody>
       </table>
-      <div className="duplicate-actions">
+      <div className="f-flex f-flex-wrap f-gap-3 f-justify-end">
         <button
           type="button"
-          className="secondary-button"
+          className="f-btn--ghost"
           onClick={onCreateWithNewContact}
           disabled={disableActions}
         >
@@ -83,15 +89,23 @@ export function DuplicatePanel({
         </button>
         <button
           type="button"
+          className="f-btn--primary"
           onClick={onUseExistingContact}
           disabled={!selectedDuplicateId || disableActions}
         >
           Use selected donor
         </button>
       </div>
-      <button type="button" className="secondary-button" onClick={onOpenSearch} disabled={disableActions}>
-        Search donors…
-      </button>
+      <div className="f-flex f-justify-end">
+        <button
+          type="button"
+          className="f-btn--secondary"
+          onClick={onOpenSearch}
+          disabled={disableActions}
+        >
+          Search donors…
+        </button>
+      </div>
     </div>
   );
 }

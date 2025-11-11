@@ -378,6 +378,9 @@ export async function fetchGiftStagingList(
     statuses?: string[];
     intakeSources?: string[];
     search?: string;
+    minAmountMinor?: number;
+    maxAmountMinor?: number;
+    giftBatchId?: string;
   } = {},
 ): Promise<GiftStagingListResponse> {
   const query = new URLSearchParams();
@@ -398,6 +401,15 @@ export async function fetchGiftStagingList(
   }
   if (typeof params.search === 'string' && params.search.trim().length > 0) {
     query.set('search', params.search.trim());
+  }
+  if (typeof params.minAmountMinor === 'number') {
+    query.set('minAmountMinor', params.minAmountMinor.toString());
+  }
+  if (typeof params.maxAmountMinor === 'number') {
+    query.set('maxAmountMinor', params.maxAmountMinor.toString());
+  }
+  if (typeof params.giftBatchId === 'string' && params.giftBatchId.trim().length > 0) {
+    query.set('giftBatchId', params.giftBatchId.trim());
   }
 
   const url =

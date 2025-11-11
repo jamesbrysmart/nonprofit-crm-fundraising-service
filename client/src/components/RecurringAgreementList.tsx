@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchRecurringAgreements, RecurringAgreementListItem } from '../api';
+import { statusToneClass } from './gift-staging/queueStatusTone';
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   year: 'numeric',
@@ -162,144 +163,182 @@ export function RecurringAgreementList(): JSX.Element {
   };
 
   return (
-    <section>
-      <div className="queue-header">
-        <div>
-          <h2>Recurring agreements</h2>
-          <p className="small-text">
-            Snapshot of active agreements pulled from Twenty metadata. Use this list to confirm
-            Stripe or GoCardless webhooks are attaching to the right plan.
-          </p>
-        </div>
-        <div className="queue-header-actions">
-          <a
-            href="/objects/recurringAgreements"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="secondary-link"
-          >
-            Open in Twenty
-          </a>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => {
-              void load('refresh');
-            }}
-            disabled={isRefreshing || loading}
-          >
-            {isRefreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-      </div>
-
-      <div className="queue-summary">
-        <div className="queue-summary-section">
-          <h3>Agreements overview</h3>
-          <div className="summary-pill-group">
-            <span className="summary-pill">
-              Total: <strong>{summary.total}</strong>
-            </span>
-            <span className="summary-pill">
-              Active: <strong>{summary.active}</strong>
-            </span>
-            <span className="summary-pill">
-              Overdue: <strong>{summary.overdue}</strong>
-            </span>
-            <span className="summary-pill">
-              Paused/Canceled: <strong>{summary.paused}</strong>
-            </span>
-            <span className="summary-pill">
-              Delinquent: <strong>{summary.delinquent}</strong>
-            </span>
+    <section className="section-unstyled f-space-y-6">
+      <div className="f-card f-p-6 f-space-y-6">
+        <div className="f-flex f-flex-col lg:f-flex-row f-gap-4 f-justify-between">
+          <div className="f-space-y-1">
+            <p className="f-text-xs f-uppercase f-tracking-[0.08em] f-text-slate-500 f-m-0">
+              Recurring agreements
+            </p>
+            <h2 className="f-text-2xl f-font-semibold f-text-ink f-m-0">Agreement monitor</h2>
+            <p className="small-text">
+              Snapshot of active agreements pulled from Twenty metadata. Use this list to confirm
+              Stripe or GoCardless webhooks are attaching to the right plan.
+            </p>
+          </div>
+          <div className="f-flex f-flex-wrap f-gap-3 f-items-start">
+            <a
+              href="/objects/recurringAgreements"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="f-btn--ghost"
+            >
+              Open in Twenty
+            </a>
+            <button
+              type="button"
+              className="f-btn--secondary"
+              onClick={() => {
+                void load('refresh');
+              }}
+              disabled={isRefreshing || loading}
+            >
+              {isRefreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
           </div>
         </div>
-        <div className="queue-summary-section">
-          <h3>Filter focus</h3>
-          <div className="summary-chip-group">
-            <button
-              type="button"
-              className={`summary-chip ${activeFilter === 'overdue' ? 'summary-chip--active' : ''}`}
-              onClick={() => handleSelectFilter('overdue')}
-            >
-              Overdue <span className="summary-chip-count">{summary.overdue}</span>
-            </button>
-            <button
-              type="button"
-              className={`summary-chip ${activeFilter === 'paused' ? 'summary-chip--active' : ''}`}
-              onClick={() => handleSelectFilter('paused')}
-            >
-              Paused/Canceled <span className="summary-chip-count">{summary.paused}</span>
-            </button>
-            <button
-              type="button"
-              className={`summary-chip ${activeFilter === 'delinquent' ? 'summary-chip--active' : ''}`}
-              onClick={() => handleSelectFilter('delinquent')}
-            >
-              Delinquent <span className="summary-chip-count">{summary.delinquent}</span>
-            </button>
-            {activeFilter !== 'all' ? (
+
+        <div className="f-grid f-gap-4 lg:f-grid-cols-2">
+          <div className="f-space-y-3">
+            <h3 className="f-text-base f-font-semibold f-text-ink f-m-0">Agreements overview</h3>
+            <div className="f-flex f-flex-wrap f-gap-2">
+              <span className="f-inline-flex f-items-center f-gap-1.5 f-rounded-full f-bg-slate-100 f-text-slate-700 f-text-sm f-font-medium f-px-3 f-py-1">
+                Total: <strong>{summary.total}</strong>
+              </span>
+              <span className="f-inline-flex f-items-center f-gap-1.5 f-rounded-full f-bg-slate-100 f-text-slate-700 f-text-sm f-font-medium f-px-3 f-py-1">
+                Active: <strong>{summary.active}</strong>
+              </span>
+              <span className="f-inline-flex f-items-center f-gap-1.5 f-rounded-full f-bg-slate-100 f-text-slate-700 f-text-sm f-font-medium f-px-3 f-py-1">
+                Overdue: <strong>{summary.overdue}</strong>
+              </span>
+              <span className="f-inline-flex f-items-center f-gap-1.5 f-rounded-full f-bg-slate-100 f-text-slate-700 f-text-sm f-font-medium f-px-3 f-py-1">
+                Paused/Canceled: <strong>{summary.paused}</strong>
+              </span>
+              <span className="f-inline-flex f-items-center f-gap-1.5 f-rounded-full f-bg-slate-100 f-text-slate-700 f-text-sm f-font-medium f-px-3 f-py-1">
+                Delinquent: <strong>{summary.delinquent}</strong>
+              </span>
+            </div>
+          </div>
+          <div className="f-space-y-3">
+            <h3 className="f-text-base f-font-semibold f-text-ink f-m-0">Filter focus</h3>
+            <div className="f-flex f-flex-wrap f-gap-2">
               <button
                 type="button"
-                className="secondary-button"
-                onClick={() => setActiveFilter('all')}
+                className={`f-chip ${activeFilter === 'overdue' ? 'f-border-primary f-bg-primary/10 f-text-primary' : ''}`}
+                onClick={() => handleSelectFilter('overdue')}
               >
-                Show all
+                Overdue{' '}
+                <span className="f-inline-flex f-items-center f-justify-center f-rounded-full f-bg-slate-200 f-text-ink f-text-xs f-font-semibold f-px-2 f-py-0.5">
+                  {summary.overdue}
+                </span>
               </button>
-            ) : null}
+              <button
+                type="button"
+                className={`f-chip ${activeFilter === 'paused' ? 'f-border-primary f-bg-primary/10 f-text-primary' : ''}`}
+                onClick={() => handleSelectFilter('paused')}
+              >
+                Paused/Canceled{' '}
+                <span className="f-inline-flex f-items-center f-justify-center f-rounded-full f-bg-slate-200 f-text-ink f-text-xs f-font-semibold f-px-2 f-py-0.5">
+                  {summary.paused}
+                </span>
+              </button>
+              <button
+                type="button"
+                className={`f-chip ${activeFilter === 'delinquent' ? 'f-border-primary f-bg-primary/10 f-text-primary' : ''}`}
+                onClick={() => handleSelectFilter('delinquent')}
+              >
+                Delinquent{' '}
+                <span className="f-inline-flex f-items-center f-justify-center f-rounded-full f-bg-slate-200 f-text-ink f-text-xs f-font-semibold f-px-2 f-py-0.5">
+                  {summary.delinquent}
+                </span>
+              </button>
+              {activeFilter !== 'all' ? (
+                <button
+                  type="button"
+                  className="f-btn--ghost f-text-sm"
+                  onClick={() => setActiveFilter('all')}
+                >
+                  Show all
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
-      </div>
 
-      {loading ? (
-        <div className="queue-state">Loading recurring agreements…</div>
-      ) : error ? (
-        <div className="queue-state queue-state-error" role="alert">
-          {error}
-        </div>
-      ) : filteredRows.length === 0 ? (
-        <div className="queue-state">No recurring agreements found.</div>
-      ) : (
-        <div className="queue-table-wrapper">
-          <table className="queue-table">
-            <thead>
-              <tr>
-                <th scope="col">Agreement ID</th>
-                <th scope="col">Donor ID</th>
-                <th scope="col">Amount</th>
-                <th scope="col">Cadence</th>
-                <th scope="col">Next expected</th>
-                <th scope="col">Status</th>
-                <th scope="col">Provider</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRows.map((agreement) => (
-                <tr key={agreement.id}>
-                  <td className="queue-cell-id">
-                    <code>{agreement.id}</code>
-                  </td>
-                  <td>{agreement.contactId ?? '—'}</td>
-                  <td>{formatAmount(agreement)}</td>
-                  <td>
-                    {agreement.cadence ?? '—'}
-                    {agreement.intervalCount && agreement.intervalCount > 1
-                      ? ` · every ${agreement.intervalCount}`
-                      : ''}
-                  </td>
-                  <td>{formatDate(agreement.nextExpectedAt)}</td>
-                  <td>
-                    <span className={`status-pill status-pill--${agreementStatusTone(agreement)}`}>
-                      {agreement.status ?? '—'}
-                    </span>
-                  </td>
-                  <td>{agreement.provider ?? '—'}</td>
+        {loading ? (
+          <div className="f-state-block">Loading recurring agreements…</div>
+        ) : error ? (
+          <div className="f-alert f-alert--error" role="alert">
+            {error}
+          </div>
+        ) : filteredRows.length === 0 ? (
+          <div className="f-state-block">No recurring agreements found.</div>
+        ) : (
+          <div className="f-overflow-x-auto f-rounded-xl f-border f-border-slate-200 f-bg-white">
+            <table className="f-min-w-full f-text-sm f-text-slate-800">
+              <thead>
+                <tr>
+                  <th className="f-text-left f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3">
+                    Agreement ID
+                  </th>
+                  <th className="f-text-left f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3">
+                    Donor ID
+                  </th>
+                  <th className="f-text-left f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3">
+                    Amount
+                  </th>
+                  <th className="f-text-left f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3">
+                    Cadence
+                  </th>
+                  <th className="f-text-left f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3">
+                    Next expected
+                  </th>
+                  <th className="f-text-left f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3">
+                    Status
+                  </th>
+                  <th className="f-text-left f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3">
+                    Provider
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {filteredRows.map((agreement) => (
+                  <tr key={agreement.id} className="f-border-b f-border-slate-100">
+                    <td className="f-border-b f-border-slate-100 f-px-3 f-py-4">
+                      <code className="f-inline-flex f-font-mono f-text-xs f-bg-slate-100 f-text-slate-700 f-rounded f-px-2 f-py-0.5">
+                        {agreement.id}
+                      </code>
+                    </td>
+                    <td className="f-border-b f-border-slate-100 f-px-3 f-py-4">
+                      {agreement.contactId ?? '—'}
+                    </td>
+                    <td className="f-border-b f-border-slate-100 f-px-3 f-py-4">
+                      {formatAmount(agreement)}
+                    </td>
+                    <td className="f-border-b f-border-slate-100 f-px-3 f-py-4">
+                      {agreement.cadence ?? '—'}
+                      {agreement.intervalCount && agreement.intervalCount > 1
+                        ? ` · every ${agreement.intervalCount}`
+                        : ''}
+                    </td>
+                    <td className="f-border-b f-border-slate-100 f-px-3 f-py-4">
+                      {formatDate(agreement.nextExpectedAt)}
+                    </td>
+                    <td className="f-border-b f-border-slate-100 f-px-3 f-py-4">
+                      <span className={statusToneClass(agreementStatusTone(agreement))}>
+                        {agreement.status ?? '—'}
+                      </span>
+                    </td>
+                    <td className="f-border-b f-border-slate-100 f-px-3 f-py-4">
+                      {agreement.provider ?? '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

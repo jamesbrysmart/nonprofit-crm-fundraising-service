@@ -140,14 +140,14 @@ export function StagingQueueTable({
                 <div className="f-flex f-flex-wrap f-justify-end f-gap-2">
                   <button
                     type="button"
-                    className="secondary-button"
+                    className="f-btn--ghost"
                     onClick={() => onReview(row.id)}
                   >
                   Review
                   </button>
                   <button
                     type="button"
-                    className="secondary-button"
+                    className="f-btn--ghost"
                     onClick={() => onMarkReady(row.id)}
                     disabled={processingIds[row.id] === 'mark-ready'}
                   >
@@ -156,7 +156,7 @@ export function StagingQueueTable({
                   {row.statusMeta.label === 'Ready to process' ? (
                     <button
                       type="button"
-                      className="secondary-button"
+                      className="f-btn--ghost"
                       onClick={() => onProcess(row.id)}
                       disabled={processingIds[row.id] === 'process'}
                     >
@@ -166,7 +166,7 @@ export function StagingQueueTable({
                   {row.statusMeta.label === 'Commit failed' ? (
                     <button
                       type="button"
-                      className="secondary-button"
+                      className="f-btn--ghost"
                       onClick={() => onRetry(row.id)}
                       disabled={processingIds[row.id] !== undefined}
                     >

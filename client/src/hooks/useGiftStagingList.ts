@@ -14,6 +14,9 @@ export interface GiftStagingListFetchOptions {
   statuses?: string[];
   intakeSources?: string[];
   search?: string;
+  minAmountMinor?: number;
+  maxAmountMinor?: number;
+  giftBatchId?: string;
 }
 
 export function useGiftStagingList(filters: GiftStagingListFetchOptions = {}): UseGiftStagingListResult {
@@ -26,6 +29,11 @@ export function useGiftStagingList(filters: GiftStagingListFetchOptions = {}): U
   const statusesKey = Array.isArray(filters.statuses) ? filters.statuses.join('|') : '';
   const intakeSourcesKey = Array.isArray(filters.intakeSources) ? filters.intakeSources.join('|') : '';
   const searchKey = typeof filters.search === 'string' ? filters.search.trim() : '';
+  const minAmountKey =
+    typeof filters.minAmountMinor === 'number' ? filters.minAmountMinor.toString() : 'none';
+  const maxAmountKey =
+    typeof filters.maxAmountMinor === 'number' ? filters.maxAmountMinor.toString() : 'none';
+  const batchKey = typeof filters.giftBatchId === 'string' ? filters.giftBatchId.trim() : '';
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh' = 'initial') => {
@@ -44,6 +52,9 @@ export function useGiftStagingList(filters: GiftStagingListFetchOptions = {}): U
           statuses: filters.statuses,
           intakeSources: filters.intakeSources,
           search: filters.search,
+          minAmountMinor: filters.minAmountMinor,
+          maxAmountMinor: filters.maxAmountMinor,
+          giftBatchId: filters.giftBatchId,
         });
         setItems(response.data ?? []);
       } catch (err) {
@@ -59,7 +70,7 @@ export function useGiftStagingList(filters: GiftStagingListFetchOptions = {}): U
         }
       }
     },
-    [activeRecurringAgreementId, statusesKey, intakeSourcesKey, searchKey],
+    [activeRecurringAgreementId, statusesKey, intakeSourcesKey, searchKey, minAmountKey, maxAmountKey, batchKey],
   );
 
   useEffect(() => {

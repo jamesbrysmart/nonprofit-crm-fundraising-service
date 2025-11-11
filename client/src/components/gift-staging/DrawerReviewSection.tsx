@@ -6,12 +6,9 @@ import type {
 } from 'react';
 import { GiftStagingDetailResponse } from '../../api';
 import { formatDate } from './stagingQueueUtils';
-import {
-  EditFormState,
-  GiftDrawerFocus,
-  ParsedDedupeDiagnostics,
-  GiftIntentOption,
-} from './GiftStagingDrawer';
+import { EditFormState, ParsedDedupeDiagnostics } from '../../hooks/useGiftStagingDrawerController';
+import { GiftDrawerFocus } from './types';
+import { GiftIntentOption } from '../../types/giftIntent';
 
 type GiftStagingRecord = NonNullable<GiftStagingDetailResponse['data']['giftStaging']>;
 
@@ -205,23 +202,23 @@ export function DrawerReviewSection({
               </>
             ) : null}
           </div>
-          <div className="drawer-edit-actions">
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={onSaveEdits}
-              disabled={actionBusy === 'update' || loading}
-            >
-              {actionBusy === 'update' ? 'Saving…' : 'Save changes'}
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={onResetEdits}
-              disabled={actionBusy === 'update' || loading}
-            >
-              Reset
-            </button>
+        <div className="drawer-edit-actions">
+          <button
+            type="button"
+            className="f-btn--secondary"
+            onClick={onSaveEdits}
+            disabled={actionBusy === 'update' || loading}
+          >
+            {actionBusy === 'update' ? 'Saving…' : 'Save changes'}
+          </button>
+          <button
+            type="button"
+            className="f-btn--ghost"
+            onClick={onResetEdits}
+            disabled={actionBusy === 'update' || loading}
+          >
+            Reset
+          </button>
           </div>
         </>
       ) : null}
@@ -267,14 +264,14 @@ export function DrawerReviewSection({
             </div>
             {dedupeDiagnostics.matchedDonorId ? (
               <div className="duplicate-actions">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => onAssignDonor(dedupeDiagnostics.matchedDonorId!)}
-                  disabled={actionBusy === 'update' || loading}
-                >
-                  Assign matched donor
-                </button>
+              <button
+                type="button"
+                className="f-btn--secondary"
+                onClick={() => onAssignDonor(dedupeDiagnostics.matchedDonorId!)}
+                disabled={actionBusy === 'update' || loading}
+              >
+                Assign matched donor
+              </button>
               </div>
             ) : null}
             {dedupeDiagnostics.candidateDonorIds &&
@@ -296,7 +293,7 @@ export function DrawerReviewSection({
                         <span>Donor {candidateId}</span>
                         <button
                           type="button"
-                          className="secondary-button"
+                          className="f-btn--ghost"
                           onClick={() => onAssignDonor(candidateId)}
                           disabled={actionBusy === 'update' || loading}
                         >
@@ -345,7 +342,7 @@ function DrawerTab({
   return (
     <button
       type="button"
-      className={`secondary-button ${isActive ? 'secondary-button--active' : ''}`}
+      className={isActive ? 'f-btn--secondary' : 'f-btn--ghost'}
       onClick={onClick}
     >
       {label}

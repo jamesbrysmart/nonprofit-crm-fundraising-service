@@ -69,4 +69,84 @@
   .f-drawer {
     @apply f-bg-white f-shadow-drawer f-rounded-2xl;
   }
+
+  .f-btn {
+    @apply f-inline-flex f-items-center f-justify-center f-gap-2 f-rounded-lg f-border f-text-sm f-font-semibold f-transition-colors focus-visible:f-ring-2 focus-visible:f-ring-primary/30 disabled:f-opacity-60 disabled:f-cursor-not-allowed;
+  }
+
+  .f-btn--primary {
+    @apply f-btn f-border-primary f-bg-primary f-text-white hover:f-border-primary-dark hover:f-bg-primary-dark;
+  }
+
+  .f-btn--secondary {
+    @apply f-btn f-border-slate-200 f-bg-white f-text-ink hover:f-border-slate-400 hover:f-bg-slate-50;
+  }
+
+  .f-btn--ghost {
+    @apply f-btn f-border-transparent f-bg-transparent f-text-slate-600 hover:f-border-slate-200 hover:f-bg-slate-100;
+  }
+
+  .f-alert {
+    @apply f-rounded-lg f-border f-px-3 f-py-2 f-text-sm;
+  }
+
+  .f-alert--error {
+    @apply f-alert f-border-danger/20 f-bg-danger/10 f-text-danger;
+  }
+
+  .f-alert--info {
+    @apply f-alert f-border-slate-200 f-bg-slate-50 f-text-slate-700;
+  }
+
+  .f-alert--warning {
+    @apply f-alert f-border-amber-200 f-bg-amber-50 f-text-amber-700;
+  }
+
+  .f-alert--success {
+    @apply f-alert f-border-green-200 f-bg-green-50 f-text-success;
+  }
+
+  .f-state-block {
+    @apply f-rounded-lg f-border f-border-slate-200 f-bg-slate-50 f-text-sm f-text-slate-700 f-p-4;
+  }
+
+  .f-field {
+    @apply f-flex f-flex-col f-gap-2;
+  }
+
+  .f-field-label {
+    @apply f-text-sm f-font-medium f-text-slate-700;
+  }
+
+  .f-input {
+    @apply f-w-full f-rounded-lg f-border f-border-slate-300 f-bg-white f-px-3 f-py-2 f-text-sm f-text-ink placeholder:f-text-slate-400 focus:f-border-primary focus:f-ring-2 focus:f-ring-primary/20;
+  }
+
+  .f-textarea {
+    @apply f-input f-min-h-[6rem] f-resize-y;
+  }
+
+  .f-help-text {
+    @apply f-text-xs f-text-slate-500;
+  }
+
+  .f-modal {
+    @apply f-fixed f-inset-0 f-bg-black/50 f-flex f-items-center f-justify-center f-z-[3000];
+  }
+
+  .f-modal-panel {
+    @apply f-w-full f-max-w-2xl f-max-h-[85vh] f-bg-white f-rounded-2xl f-shadow-drawer f-p-6 f-overflow-y-auto f-space-y-4;
+  }
+
+  .f-table {
+    @apply f-min-w-full f-text-sm f-text-slate-800;
+  }
+
+  .f-table thead th {
+    @apply f-text-left f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3;
+  }
+
+  .f-table tbody td {
+    @apply f-border-b f-border-slate-100 f-px-3 f-py-4;
+  }
 }

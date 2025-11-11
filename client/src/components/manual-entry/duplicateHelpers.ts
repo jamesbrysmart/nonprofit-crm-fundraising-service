@@ -69,6 +69,17 @@ export function duplicateTierLabel(tier: DuplicateTier): string {
   }
 }
 
+export function duplicateTierBadgeClass(tier: DuplicateTier): string {
+  switch (tier) {
+    case 'exact':
+      return 'f-inline-flex f-items-center f-rounded-full f-bg-green-100 f-text-green-700 f-text-xs f-font-semibold f-px-2.5 f-py-0.5';
+    case 'review':
+      return 'f-inline-flex f-items-center f-rounded-full f-bg-amber-100 f-text-amber-800 f-text-xs f-font-semibold f-px-2.5 f-py-0.5';
+    default:
+      return 'f-inline-flex f-items-center f-rounded-full f-bg-red-100 f-text-danger f-text-xs f-font-semibold f-px-2.5 f-py-0.5';
+  }
+}
+
 export function formatMatchDate(value?: string): string {
   if (!value) {
     return '—';

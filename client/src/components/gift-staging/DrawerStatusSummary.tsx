@@ -16,19 +16,25 @@ export function DrawerStatusSummary({
   return (
     <section className="drawer-section status-summary">
       {actionError ? (
-        <div className="queue-state queue-state-error" role="alert">
+        <div className="f-alert f-alert--error" role="alert">
           {actionError}
         </div>
       ) : null}
       {actionNotice ? (
-        <div className="queue-state" role="status">
+        <div className="f-alert f-alert--info" role="status">
           {actionNotice}
         </div>
       ) : null}
-      <div className="status-pill-row">
-        <span className="status-pill">Processing: {detail.promotionStatus ?? 'unknown'}</span>
-        <span className="status-pill">Validation: {detail.validationStatus ?? 'unknown'}</span>
-        <span className="status-pill">Dedupe: {detail.dedupeStatus ?? 'unknown'}</span>
+      <div className="f-flex f-flex-wrap f-gap-2">
+        <span className="f-badge f-bg-slate-200 f-text-ink">
+          Processing: {detail.promotionStatus ?? 'unknown'}
+        </span>
+        <span className="f-badge f-bg-slate-200 f-text-ink">
+          Validation: {detail.validationStatus ?? 'unknown'}
+        </span>
+        <span className="f-badge f-bg-slate-200 f-text-ink">
+          Dedupe: {detail.dedupeStatus ?? 'unknown'}
+        </span>
       </div>
       <dl className="drawer-meta compact">
         <div>

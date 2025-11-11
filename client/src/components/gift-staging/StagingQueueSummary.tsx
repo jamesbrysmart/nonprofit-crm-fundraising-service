@@ -69,7 +69,7 @@ export function StagingQueueSummary({
           {hasActiveFilters ? (
             <button
               type="button"
-              className="secondary-button"
+              className="f-btn--secondary"
               onClick={onClearFilters}
               disabled={loading}
             >
@@ -80,13 +80,13 @@ export function StagingQueueSummary({
             href="/objects/giftStagings"
             target="_blank"
             rel="noopener noreferrer"
-            className="secondary-link"
+            className="f-btn--ghost"
           >
             Open in Twenty
           </a>
           <button
             type="button"
-            className="secondary-button"
+            className="f-btn--secondary"
             onClick={() => {
               void refresh();
             }}
