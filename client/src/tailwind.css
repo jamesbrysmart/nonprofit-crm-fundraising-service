@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color: #0f172a;
+    background-color: #f8fafc;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  body {
+    @apply f-font-sans f-text-base f-text-ink;
+    margin: 0;
+    min-height: 100vh;
+    background-color: #f8fafc;
+  }
+}
+
+@layer components {
+  .f-page {
+    @apply f-bg-white f-rounded-xl f-shadow-card f-border f-border-slate-200;
+  }
+
+  .f-card {
+    @apply f-bg-white f-border f-border-slate-200 f-rounded-xl f-shadow-card;
+  }
+
+  .f-heading-lg {
+    @apply f-text-2xl f-font-semibold f-text-ink;
+  }
+
+  .f-heading-md {
+    @apply f-text-xl f-font-semibold f-text-ink;
+  }
+
+  .f-heading-sm {
+    @apply f-text-sm f-font-semibold f-uppercase f-tracking-wide f-text-slate-600;
+  }
+
+  .f-text-muted {
+    @apply f-text-slate-500;
+  }
+
+  .f-badge {
+    @apply f-inline-flex f-items-center f-rounded-full f-bg-slate-100 f-text-slate-700 f-text-xs f-font-semibold f-uppercase f-tracking-wide f-px-2.5 f-py-0.5;
+  }
+
+  .f-pill-status--info {
+    @apply f-badge f-bg-slate-200 f-text-ink;
+  }
+
+  .f-pill-status--success {
+    @apply f-badge f-bg-green-100 f-text-success;
+  }
+
+  .f-pill-status--warning {
+    @apply f-badge f-bg-amber-100 f-text-amber-700;
+  }
+
+  .f-pill-status--danger {
+    @apply f-badge f-bg-red-100 f-text-danger;
+  }
+
+  .f-chip {
+    @apply f-inline-flex f-items-center f-gap-1 f-rounded-full f-border f-border-slate-200 f-bg-white f-px-3 f-py-1 f-text-sm f-font-medium;
+  }
+
+  .f-drawer {
+    @apply f-bg-white f-shadow-drawer f-rounded-2xl;
+  }
+}

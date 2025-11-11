@@ -17,6 +17,24 @@ import type {
   RecurringAgreementListItem,
 } from '../api';
 import { useAppealOptions } from '../hooks/useAppealOptions';
+import { GiftBasicsCard } from './manual-entry/GiftBasicsCard';
+import { DonorContactCard } from './manual-entry/DonorContactCard';
+import { DonorSearchModal } from './manual-entry/DonorSearchModal';
+import { DonorSelectionPanel } from './manual-entry/DonorSelectionPanel';
+import { OpportunityCompanyCard } from './manual-entry/OpportunityCompanyCard';
+import { RecurringAssociationsCard } from './manual-entry/RecurringAssociationsCard';
+import { ManualGiftStatus } from './manual-entry/ManualGiftStatus';
+import { RecurringAgreementSelector } from './manual-entry/RecurringAgreementSelector';
+import {
+  classifyDuplicate,
+  describeDuplicate,
+  duplicateTierLabel,
+  formatMatchDate,
+  DuplicateTier,
+  buildDuplicateLookupPayload,
+} from './manual-entry/duplicateHelpers';
+import { DuplicatePanel } from './manual-entry/DuplicatePanel';
+import { buildGiftPayload } from './manual-entry/giftPayload';
 
 interface GiftFormState {
   amountValue: string;
@@ -498,18 +516,6 @@ export function ManualGiftEntry(): JSX.Element {
     }));
   };
 
-  const buildDuplicateLookupPayload = () => {
-    const firstName = formState.contactFirstName.trim();
-    const lastName = formState.contactLastName.trim();
-    const email = formState.contactEmail.trim();
-
-    return {
-      firstName,
-      lastName,
-      email: email.length > 0 ? email : undefined,
-      depth: 1,
-    };
-  };
 
   const handleSuccess = (giftId: string) => {
     setStatus({
@@ -572,7 +578,7 @@ export function ManualGiftEntry(): JSX.Element {
     setStatus({ state: 'submitting' });
 
     try {
-      const matches = await findPersonDuplicates(buildDuplicateLookupPayload());
+      const matches = await findPersonDuplicates(buildDuplicateLookupPayload(formState));
       const filtered = matches.filter(
         (match): match is PersonDuplicate & { id: string } =>
           typeof match?.id === 'string',
@@ -757,864 +763,261 @@ export function ManualGiftEntry(): JSX.Element {
   }, [formState.opportunityId, opportunityOptions, pinnedOpportunity]);
 
   return (
-    <section>
-      <form onSubmit={handleSubmit}>
-        <fieldset disabled={status.state === 'submitting'} style={{ border: 0, padding: 0 }}>
-          <legend style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem' }}>
-            Gift details
-          </legend>
-          <div className="form-row">
-            <label htmlFor="amountValue">Amount</label>
-            <div className="form-row-inline">
+    <div className="f-space-y-6">
+      <form onSubmit={handleSubmit} className="f-space-y-6">
+        <fieldset
+          disabled={status.state === 'submitting'}
+          className="f-space-y-6 f-border-0 f-p-0 f-m-0"
+        >
+          <GiftBasicsCard>
+            <div className="form-row">
+              <label htmlFor="amountValue">Amount</label>
+              <div className="form-row-inline">
+                <input
+                  id="amountValue"
+                  name="amountValue"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  required
+                  value={formState.amountValue}
+                  onChange={handleChange}
+                />
+                <select
+                  id="currencyCode"
+                  name="currencyCode"
+                  value={formState.currencyCode}
+                  onChange={handleChange}
+                >
+                  <option value="GBP">GBP</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <label htmlFor="giftDate">Gift date</label>
               <input
-                id="amountValue"
-                name="amountValue"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
+                id="giftDate"
+                name="giftDate"
+                type="date"
                 required
-                value={formState.amountValue}
+                value={formState.giftDate}
                 onChange={handleChange}
               />
+            </div>
+
+            <div className="form-row">
+              <label htmlFor="appealId">Appeal (optional)</label>
               <select
-                id="currencyCode"
-                name="currencyCode"
-                value={formState.currencyCode}
+                id="appealId"
+                name="appealId"
+                value={formState.appealId}
+                onChange={handleChange}
+                disabled={appealsLoading && appealOptions.length === 0}
+              >
+                <option value="">No appeal</option>
+                {appealOptions.map((appeal) => (
+                  <option key={appeal.id} value={appeal.id}>
+                    {appeal.name ?? 'Untitled appeal'}
+                  </option>
+                ))}
+              </select>
+              {appealsLoading ? (
+                <span className="small-text" style={{ color: '#64748b' }}>
+                  Loading appeals…
+                </span>
+              ) : appealLoadError ? (
+                <span className="small-text" style={{ color: '#991b1b' }}>
+                  {appealLoadError}
+                </span>
+              ) : null}
+            </div>
+
+            <p className="f-text-sm f-font-semibold f-text-ink f-mt-4 f-mb-0">Gift context</p>
+
+            <div className="form-row">
+              <label htmlFor="giftIntent">Gift intent</label>
+              <select
+                id="giftIntent"
+                name="giftIntent"
+                value={formState.giftIntent}
                 onChange={handleChange}
               >
-                <option value="GBP">GBP</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <label htmlFor="giftDate">Gift date</label>
-            <input
-              id="giftDate"
-              name="giftDate"
-              type="date"
-              required
-              value={formState.giftDate}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="form-row">
-            <label htmlFor="appealId">Appeal (optional)</label>
-            <select
-              id="appealId"
-              name="appealId"
-              value={formState.appealId}
-              onChange={handleChange}
-              disabled={appealsLoading && appealOptions.length === 0}
-            >
-              <option value="">No appeal</option>
-              {appealOptions.map((appeal) => (
-                <option key={appeal.id} value={appeal.id}>
-                  {appeal.name ?? 'Untitled appeal'}
-                </option>
-              ))}
-            </select>
-            {appealsLoading ? (
-              <span className="small-text" style={{ color: '#64748b' }}>
-                Loading appeals…
-              </span>
-            ) : appealLoadError ? (
-              <span className="small-text" style={{ color: '#991b1b' }}>
-                {appealLoadError}
-              </span>
-            ) : null}
-          </div>
-
-          <legend style={{ fontSize: '1.125rem', fontWeight: 600, margin: '2rem 0 1rem' }}>
-            Gift context
-          </legend>
-
-          <div className="form-row">
-            <label htmlFor="giftIntent">Gift intent</label>
-            <select
-              id="giftIntent"
-              name="giftIntent"
-              value={formState.giftIntent}
-              onChange={handleChange}
-            >
-              {GIFT_INTENT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <p className="small-text">
-              Intent tags help surface the right workflows and keep reporting tidy.
-            </p>
-          </div>
-
-          {formState.giftIntent === 'grant' ? (
-            <div className="form-row">
-              <label>Organisation</label>
-              {formState.companyId ? (
-                <div className="selected-company">
-                  <p className="small-text">
-                    Linked to <strong>{formState.companyName || formState.companyId}</strong>
-                  </p>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={handleClearCompany}
-                    disabled={status.state === 'submitting'}
-                  >
-                    Clear organisation
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="form-row-inline">
-                    <input
-                      type="text"
-                      value={companySearchTerm}
-                      onChange={(event) => setCompanySearchTerm(event.target.value)}
-                      placeholder="Search companies by name"
-                      disabled={status.state === 'submitting'}
-                    />
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={handleCompanyLookup}
-                      disabled={companyLookupBusy}
-                    >
-                      {companyLookupBusy ? 'Searching…' : 'Search'}
-                    </button>
-                  </div>
-                  <p className="small-text">
-                    Link the organisation first, then choose the grant opportunity.
-                  </p>
-                </>
-              )}
-              {companyLookupError ? (
-                <div className="form-alert form-alert-warning" role="alert">
-                  {companyLookupError}
-                </div>
-              ) : null}
-              {companyResults.length > 0 ? (
-                <ul className="option-list">
-                  {companyResults.slice(0, 5).map((company) => (
-                    <li key={company.id}>
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        onClick={() => handleSelectCompany(company)}
-                      >
-                        {company.name ?? company.id}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
-
-          <div className="form-row">
-            <label htmlFor="opportunitySearch">Related opportunity</label>
-            <input
-              id="opportunitySearch"
-              type="text"
-              value={opportunitySearchTerm}
-              onChange={(event) => setOpportunitySearchTerm(event.target.value)}
-              placeholder="Search open opportunities"
-              disabled={status.state === 'submitting'}
-            />
-            {selectedOpportunity ? (
-              <p className="small-text">
-                Linked to{' '}
-                <strong>{selectedOpportunity.name ?? selectedOpportunity.id}</strong>
-                {selectedOpportunity.stage ? ` · ${selectedOpportunity.stage}` : ''}{' '}
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={handleClearOpportunity}
-                  disabled={status.state === 'submitting'}
-                >
-                  Remove
-                </button>
-              </p>
-            ) : (
-              <p className="small-text">
-                Linking keeps pledges, grants, and stewardship plans in sync.
-              </p>
-            )}
-          </div>
-
-          <div className="opportunity-suggestions">
-            {opportunityLoading ? (
-              <p className="small-text">Loading opportunity suggestions…</p>
-            ) : opportunityLookupError ? (
-              <div className="form-alert form-alert-warning" role="alert">
-                {opportunityLookupError}
-              </div>
-            ) : opportunityOptions.length === 0 ? (
-              <p className="small-text">No matching opportunities yet.</p>
-            ) : (
-              <ul className="option-list">
-                {opportunityOptions.slice(0, 6).map((record) => (
-                  <li key={record.id}>
-                    <div className="option-list-row">
-                      <div>
-                        <strong>{record.name ?? record.id}</strong>
-                        <div className="small-text">
-                          {record.stage ?? 'Stage unknown'}
-                          {record.companyName ? ` · ${record.companyName}` : ''}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        onClick={() => handleSelectOpportunity(record)}
-                      >
-                        {formState.opportunityId === record.id ? 'Linked' : 'Link'}
-                      </button>
-                    </div>
-                  </li>
+                {GIFT_INTENT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
                 ))}
-              </ul>
-            )}
-          </div>
-
-          {(formState.giftIntent === 'corporateInKind' || formState.isInKind) ? (
-            <>
-              <div className="form-row">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={formState.isInKind}
-                    onChange={handleInKindToggle}
-                  />
-                  Includes in-kind component
-                </label>
-                <p className="small-text">Add a description and estimated fair value.</p>
-              </div>
-              {formState.isInKind ? (
-                <>
-                  <div className="form-row">
-                    <label htmlFor="inKindDescription">In-kind description</label>
-                    <textarea
-                      id="inKindDescription"
-                      name="inKindDescription"
-                      rows={3}
-                      value={formState.inKindDescription}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label htmlFor="estimatedValue">Estimated value</label>
-                    <input
-                      id="estimatedValue"
-                      name="estimatedValue"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formState.estimatedValue}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </>
-              ) : null}
-            </>
-          ) : null}
-
-          <div className="form-row">
-            <label htmlFor="giftName">Gift name (optional)</label>
-            <input
-              id="giftName"
-              name="giftName"
-              type="text"
-              placeholder="Spring Appeal Donation"
-              value={formState.giftName}
-              onChange={handleChange}
-            />
-          </div>
-
-          <legend style={{ fontSize: '1.125rem', fontWeight: 600, margin: '2rem 0 1rem' }}>
-            Contact details
-          </legend>
-
-          <div className="form-row">
-            <label htmlFor="contactFirstName">First name</label>
-            <input
-              id="contactFirstName"
-              name="contactFirstName"
-              type="text"
-              autoComplete="given-name"
-              required
-              value={formState.contactFirstName}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="form-row">
-            <label htmlFor="contactLastName">Last name</label>
-            <input
-              id="contactLastName"
-              name="contactLastName"
-              type="text"
-              autoComplete="family-name"
-              required
-              value={formState.contactLastName}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="form-row">
-            <label htmlFor="contactEmail">Email (optional)</label>
-            <input
-              id="contactEmail"
-              name="contactEmail"
-              type="email"
-              autoComplete="email"
-              value={formState.contactEmail}
-              onChange={handleChange}
-            />
-          </div>
-
-          {selectedDonor ? (
-            <div className="supporter-summary" role="status" aria-live="polite">
-              <div className="supporter-summary-header">
-                <h4>Selected donor</h4>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => {
-                    handleClearSelectedDonor();
-                    openSearchModal();
-                  }}
-                  disabled={status.state === 'submitting'}
-                >
-                  Change donor
-                </button>
-              </div>
-              <dl className="supporter-summary-meta">
-                <div>
-                  <dt>Name</dt>
-                  <dd>{describeDuplicate(selectedDonor)}</dd>
-                </div>
-                <div>
-                  <dt>Email</dt>
-                  <dd>{selectedDonor.emails?.primaryEmail ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt>Donor ID</dt>
-                  <dd>{selectedDonor.id}</dd>
-                </div>
-                <div>
-                  <dt>Updated</dt>
-                  <dd>{formatMatchDate(selectedDonor.updatedAt ?? selectedDonor.createdAt)}</dd>
-                </div>
-              </dl>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={handleClearSelectedDonor}
-                disabled={status.state === 'submitting'}
-              >
-                Clear selection
-              </button>
-            </div>
-          ) : (
-            <div className="supporter-summary supporter-summary--empty">
-              <div className="supporter-summary-header">
-                <h4>Donor selection</h4>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={openSearchModal}
-                  disabled={status.state === 'submitting'}
-                >
-                  Search donors…
-                </button>
-              </div>
+              </select>
               <p className="small-text">
-                No donor selected. A new donor record will be created when you submit this gift.
+                Intent tags help surface the right workflows and keep reporting tidy.
               </p>
             </div>
-          )}
 
-          {duplicateLookupError ? (
-            <div className="form-alert form-alert-error" role="alert">
-              {duplicateLookupError}
-            </div>
-          ) : null}
+            <OpportunityCompanyCard
+              giftIntent={formState.giftIntent}
+              companyId={formState.companyId}
+              companyName={formState.companyName}
+              companySearchTerm={companySearchTerm}
+              companyLookupBusy={companyLookupBusy}
+              companyLookupError={companyLookupError}
+              companyResults={companyResults}
+              onCompanySearchTermChange={setCompanySearchTerm}
+              onCompanyLookup={handleCompanyLookup}
+              onSelectCompany={handleSelectCompany}
+              onClearCompany={handleClearCompany}
+              opportunitySearchTerm={opportunitySearchTerm}
+              onOpportunitySearchTermChange={setOpportunitySearchTerm}
+              opportunityLoading={opportunityLoading}
+              opportunityLookupError={opportunityLookupError}
+              opportunityOptions={opportunityOptions}
+              onSelectOpportunity={handleSelectOpportunity}
+              onClearOpportunity={handleClearOpportunity}
+              selectedOpportunity={selectedOpportunity}
+              disabled={status.state === 'submitting'}
+              formState={{
+                isInKind: formState.isInKind,
+                giftIntent: formState.giftIntent,
+                inKindDescription: formState.inKindDescription,
+                estimatedValue: formState.estimatedValue,
+              }}
+              onToggleInKind={handleInKindToggle}
+              onFieldChange={handleChange}
+            />
 
-          {!showDuplicates && classifiedDuplicates.length > 0 ? (
-            <div className="duplicate-hint">
-              <div className="duplicate-hint-header">
-                <p className="small-text">Possible existing donors:</p>
-                <button type="button" className="secondary-button" onClick={openSearchModal}>
-                  Search donors…
-                </button>
-              </div>
-              <table className="duplicate-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Match</th>
-                    <th scope="col">Donor</th>
-                    <th scope="col">Email</th>
-                    <th scope="col">Updated</th>
-                    <th scope="col" aria-label="Actions" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {classifiedDuplicates.map(({ match, tier }) => {
-                    if (!match?.id) {
-                      return null;
-                    }
-                    const isSelected = selectedDuplicateId === match.id;
-                    const fullName = describeDuplicate(match);
-                    const email = match.emails?.primaryEmail ?? '—';
-                    return (
-                      <tr
-                        key={match.id}
-                        className={isSelected ? 'duplicate-row--selected' : undefined}
-                      >
-                        <td>
-                          <span className={`duplicate-tier-badge duplicate-tier-badge--${tier}`}>
-                            {duplicateTierLabel(tier)}
-                          </span>
-                        </td>
-                        <td>{fullName}</td>
-                        <td>{email}</td>
-                        <td>{formatMatchDate(match.updatedAt ?? match.createdAt)}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            onClick={() => handleSelectDonor(match.id, { closeModal: false })}
-                          >
-                            {isSelected ? 'Selected' : 'Use donor'}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {selectedDuplicateId ? (
-                <p className="small-text">
-                  Selected donor:&nbsp;
-                  <code>{selectedDuplicateId}</code>
-                </p>
-              ) : (
-                <p className="small-text">Select a donor or search the directory.</p>
-              )}
-            </div>
-          ) : (
-            <div className="duplicate-hint-actions">
-              <button type="button" className="secondary-button" onClick={openSearchModal}>
-                Search donors…
-              </button>
-            </div>
-          )}
-
-          {potentialDuplicateMessage ? (
-            <div className="form-alert form-alert-warning" role="alert">
-              {potentialDuplicateMessage}
-            </div>
-          ) : null}
-
-          <div className="form-row">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <input
-                type="checkbox"
-                checked={isRecurring}
-                onChange={(event) => {
-                  const checked = event.target.checked;
-                  setIsRecurring(checked);
-                  if (!checked) {
-                    setSelectedRecurringId(null);
-                    setRecurringSearch('');
-                  }
-                }}
-              />
-              Part of a recurring agreement
-            </label>
-          </div>
-
-          {isRecurring ? (
             <div className="form-row">
-              <label htmlFor="recurringSearch">Find recurring agreement</label>
+              <label htmlFor="giftName">Gift name (optional)</label>
               <input
-                id="recurringSearch"
+                id="giftName"
+                name="giftName"
                 type="text"
-                value={recurringSearch}
-                onChange={(event) => setRecurringSearch(event.target.value)}
-                placeholder="Search by agreement ID or donor"
+                placeholder="Spring Appeal Donation"
+                value={formState.giftName}
+                onChange={handleChange}
               />
-              <div className="recurring-options">
-                {recurringOptions.length === 0 ? (
-                  <p className="small-text">No agreements available yet.</p>
-                ) : filteredRecurringOptions.length === 0 ? (
-                  <p className="small-text">No agreement matches your search.</p>
-                ) : (
-                  filteredRecurringOptions.slice(0, 8).map((agreement) => (
-                    <button
-                      key={agreement.id}
-                      type="button"
-                      className={`secondary-button recurring-option ${
-                        selectedRecurringId === agreement.id ? 'secondary-button--active' : ''
-                      }`}
-                      onClick={() => setSelectedRecurringId(agreement.id)}
-                    >
-                      {agreement.id}
-                      {agreement.contactId ? ` · ${agreement.contactId}` : ''}
-                      {agreement.status ? ` (${agreement.status})` : ''}
-                    </button>
-                  ))
-                )}
-                {selectedRecurringId ? (
-                  <p className="small-text">
-                    Selected agreement:&nbsp;
-                    <code>{selectedRecurringId}</code>
-                  </p>
-                ) : (
-                  <p className="small-text">Select an agreement before continuing.</p>
-                )}
-              </div>
             </div>
-          ) : null}
+          </GiftBasicsCard>
+
+          <DonorContactCard>
+            <div className="form-row">
+              <label htmlFor="contactFirstName">First name</label>
+              <input
+                id="contactFirstName"
+                name="contactFirstName"
+                type="text"
+                autoComplete="given-name"
+                required
+                value={formState.contactFirstName}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-row">
+              <label htmlFor="contactLastName">Last name</label>
+              <input
+                id="contactLastName"
+                name="contactLastName"
+                type="text"
+                autoComplete="family-name"
+                required
+                value={formState.contactLastName}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-row">
+              <label htmlFor="contactEmail">Email (optional)</label>
+              <input
+                id="contactEmail"
+                name="contactEmail"
+                type="email"
+                autoComplete="email"
+                value={formState.contactEmail}
+                onChange={handleChange}
+              />
+            </div>
+
+            <DonorSelectionPanel
+              selectedDonor={selectedDonor}
+              onChangeDonor={() => {
+                handleClearSelectedDonor();
+                openSearchModal();
+              }}
+              onClearSelectedDonor={handleClearSelectedDonor}
+              duplicateLookupError={duplicateLookupError}
+              showDuplicates={showDuplicates}
+              classifiedDuplicates={classifiedDuplicates}
+              selectedDuplicateId={selectedDuplicateId}
+              onSelectDuplicate={(id) => handleSelectDonor(id, { closeModal: false })}
+              onOpenSearch={openSearchModal}
+              potentialDuplicateMessage={potentialDuplicateMessage}
+              disableActions={status.state === 'submitting'}
+            />
+          </DonorContactCard>
+          <RecurringAssociationsCard>
+            <RecurringAgreementSelector
+              isRecurring={isRecurring}
+              onToggleRecurring={(checked) => {
+                setIsRecurring(checked);
+                if (!checked) {
+                  setSelectedRecurringId(null);
+                  setRecurringSearch('');
+                }
+              }}
+              recurringSearch={recurringSearch}
+              onRecurringSearchChange={setRecurringSearch}
+              filteredRecurringOptions={filteredRecurringOptions}
+              hasAnyAgreements={recurringOptions.length > 0}
+              selectedRecurringId={selectedRecurringId}
+              onSelectRecurring={setSelectedRecurringId}
+            />
+          </RecurringAssociationsCard>
         </fieldset>
 
-        {status.state === 'error' && (
-          <div className="form-alert form-alert-error" role="alert">
-            {status.message}
-          </div>
-        )}
-
-        {status.state === 'success' && (
-          <div className="form-alert form-alert-success" role="status">
-            Gift committed in Twenty (gift id {status.giftId}).
-            {giftLink ? (
-              <a href={giftLink} className="form-alert-link">
-                Open gifts list
-              </a>
-            ) : null}
-          </div>
-        )}
-
-        <div className="form-actions">
-          <button
-            type="submit"
-            disabled={
-              isSubmitDisabled ||
-              status.state === 'submitting' ||
-              showDuplicates
-            }
-          >
-            {status.state === 'submitting' ? 'Saving…' : 'Create gift'}
-          </button>
-        </div>
+        <ManualGiftStatus
+          status={
+            status.state === 'success'
+              ? { state: 'success', message: `Gift committed in Twenty (gift id ${status.giftId}).`, link: giftLink }
+              : status.state === 'error'
+              ? { state: 'error', message: status.message }
+              : { state: status.state }
+          }
+          isSubmitDisabled={isSubmitDisabled}
+          showDuplicates={showDuplicates}
+        />
       </form>
 
       {showDuplicates && classifiedDuplicates.length > 0 ? (
-        <div className="duplicate-panel" role="status" aria-live="polite">
-          <h2>Possible existing donors</h2>
-          <p className="small-text">
-            We found donors that match the details you entered. Select one to reuse their
-            record or continue to create a new contact.
-          </p>
-          <table className="duplicate-table">
-            <thead>
-              <tr>
-                <th scope="col">Match</th>
-                <th scope="col">Donor</th>
-                <th scope="col">Email</th>
-                <th scope="col">Updated</th>
-                <th scope="col" aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {classifiedDuplicates.map(({ match, tier }) => {
-                if (!match?.id) {
-                  return null;
-                }
-                const isSelected = selectedDuplicateId === match.id;
-                const fullName = describeDuplicate(match);
-                const email = match.emails?.primaryEmail ?? '—';
-                return (
-                  <tr
-                    key={match.id}
-                    className={isSelected ? 'duplicate-row--selected' : undefined}
-                  >
-                    <td>
-                      <span className={`duplicate-tier-badge duplicate-tier-badge--${tier}`}>
-                        {duplicateTierLabel(tier)}
-                      </span>
-                    </td>
-                    <td>{fullName}</td>
-                    <td>{email}</td>
-                    <td>{formatMatchDate(match.updatedAt ?? match.createdAt)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        onClick={() => handleSelectDonor(match.id, { closeModal: false })}
-                        disabled={status.state === 'submitting'}
-                      >
-                        {isSelected ? 'Selected' : 'Use donor'}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <div className="duplicate-actions">
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={handleCreateWithNewContact}
-              disabled={status.state === 'submitting'}
-            >
-              Create new contact
-            </button>
-            <button
-              type="button"
-              onClick={handleUseExistingContact}
-              disabled={!selectedDuplicateId || status.state === 'submitting'}
-            >
-              Use selected donor
-            </button>
-          </div>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={openSearchModal}
-            disabled={status.state === 'submitting'}
-          >
-            Search donors…
-          </button>
-        </div>
+        <DuplicatePanel
+          classifiedDuplicates={classifiedDuplicates}
+          selectedDuplicateId={selectedDuplicateId}
+          onSelectDuplicate={(id) => handleSelectDonor(id, { closeModal: false })}
+          onCreateWithNewContact={handleCreateWithNewContact}
+          onUseExistingContact={handleUseExistingContact}
+          onOpenSearch={openSearchModal}
+          disableActions={status.state === 'submitting'}
+        />
       ) : null}
 
-      {isSearchModalOpen ? (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>Search donors</h3>
-              <button type="button" className="secondary-button" onClick={closeSearchModal}>
-                Close
-              </button>
-            </div>
-            <form className="modal-search" onSubmit={handleSearchSubmit}>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Name or email"
-              />
-              <button type="submit" className="secondary-button" disabled={searchLoading}>
-                {searchLoading ? 'Searching…' : 'Search'}
-              </button>
-            </form>
-            {searchError ? (
-              <div className="form-alert form-alert-error" role="alert">
-                {searchError}
-              </div>
-            ) : null}
-            {searchLoading ? (
-              <div className="queue-state">Searching donors…</div>
-            ) : searchResults.length > 0 ? (
-              <table className="modal-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Match</th>
-                    <th scope="col">Supporter</th>
-                    <th scope="col">Email</th>
-                    <th scope="col">Updated</th>
-                    <th scope="col" aria-label="Actions" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {searchResults.map((match) => {
-                    if (!match?.id) {
-                      return null;
-                    }
-                    const tier = classifyDuplicate(match, formState);
-                    const fullName = describeDuplicate(match);
-                    const email = match.emails?.primaryEmail ?? '—';
-                    return (
-                      <tr key={match.id}>
-                        <td>
-                          <span className={`duplicate-tier-badge duplicate-tier-badge--${tier}`}>
-                            {duplicateTierLabel(tier)}
-                          </span>
-                        </td>
-                        <td>{fullName}</td>
-                        <td>{email}</td>
-                        <td>{formatMatchDate(match.updatedAt ?? match.createdAt)}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            onClick={() => handleSelectDonor(match.id)}
-                          >
-                            Use donor
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            ) : (
-              !searchError && <p className="small-text">Enter a name or email to search.</p>
-            )}
-          </div>
-        </div>
-      ) : null}
-    </section>
+      <DonorSearchModal
+        isOpen={isSearchModalOpen}
+        onClose={closeSearchModal}
+        searchTerm={searchTerm}
+        onSearchTermChange={setSearchTerm}
+        onSearchSubmit={handleSearchSubmit}
+        searchLoading={searchLoading}
+        searchError={searchError}
+        searchResults={searchResults}
+        onSelectDonor={handleSelectDonor}
+        formState={{
+          contactFirstName: formState.contactFirstName,
+          contactLastName: formState.contactLastName,
+          contactEmail: formState.contactEmail,
+        }}
+      />
+    </div>
   );
-}
-
-function buildGiftPayload(state: GiftFormState, existingContactId?: string): GiftCreatePayload {
-  const amountValue = Number.parseFloat(state.amountValue);
-  if (Number.isNaN(amountValue)) {
-    throw new Error('Amount must be numeric');
-  }
-
-  const contactFirstName = state.contactFirstName.trim();
-  const contactLastName = state.contactLastName.trim();
-  const contactEmail = state.contactEmail.trim();
-
-  const payload: GiftCreatePayload = {
-    amount: {
-      currencyCode: state.currencyCode,
-      value: amountValue,
-    },
-    giftDate: state.giftDate,
-    name: state.giftName.trim() || undefined,
-  };
-
-  const appealId = state.appealId.trim();
-  if (appealId.length > 0) {
-    payload.appealId = appealId;
-  }
-
-  const intent = state.giftIntent;
-  if (intent && intent !== 'standard') {
-    payload.giftIntent = intent;
-  }
-
-  const trimmedOpportunityId = state.opportunityId.trim();
-  if (trimmedOpportunityId.length > 0) {
-    payload.opportunityId = trimmedOpportunityId;
-  }
-
-  if (state.isInKind || intent === 'corporateInKind') {
-    payload.isInKind = state.isInKind || intent === 'corporateInKind';
-    const description = state.inKindDescription.trim();
-    if (description.length > 0) {
-      payload.inKindDescription = description;
-    }
-    const estimatedValueInput = state.estimatedValue.trim();
-    if (estimatedValueInput.length > 0) {
-      const estimatedNumber = Number.parseFloat(estimatedValueInput);
-      if (Number.isNaN(estimatedNumber)) {
-        throw new Error('Estimated value must be numeric');
-      }
-      payload.estimatedValue = estimatedNumber;
-    }
-  }
-
-  if (existingContactId) {
-    return {
-      ...payload,
-      contactId: existingContactId,
-    };
-  }
-
-  return {
-    ...payload,
-    contact: {
-      firstName: contactFirstName,
-      lastName: contactLastName,
-      ...(contactEmail.length > 0 ? { email: contactEmail } : {}),
-    },
-  };
-}
-
-function describeDuplicate(match: PersonDuplicate): string {
-  const parts: string[] = [];
-  const firstName = match.name?.firstName?.trim() ?? '';
-  const lastName = match.name?.lastName?.trim() ?? '';
-  const fullName = match.name?.fullName?.trim() ?? '';
-  const email = match.emails?.primaryEmail?.trim() ?? '';
-
-  if (fullName.length > 0) {
-    parts.push(fullName);
-  } else if (firstName || lastName) {
-    parts.push(`${firstName} ${lastName}`.trim());
-  }
-
-  if (email.length > 0) {
-    parts.push(`<${email}>`);
-  }
-
-  return parts.length > 0 ? parts.join(' ') : 'Existing donor';
-}
-
-type DuplicateTier = 'exact' | 'review' | 'partial';
-
-function classifyDuplicate(match: PersonDuplicate, state: GiftFormState): DuplicateTier {
-  const contactEmail = state.contactEmail.trim().toLowerCase();
-  const matchEmail = match.emails?.primaryEmail?.trim().toLowerCase() ?? '';
-  if (contactEmail && matchEmail && contactEmail === matchEmail) {
-    return 'exact';
-  }
-
-  const contactFull = `${state.contactFirstName} ${state.contactLastName}`
-    .trim()
-    .toLowerCase();
-  const matchFull = (
-    match.name?.fullName ??
-    `${match.name?.firstName ?? ''} ${match.name?.lastName ?? ''}`
-  )
-    .trim()
-    .toLowerCase();
-
-  if (contactFull && matchFull && contactFull === matchFull) {
-    return 'review';
-  }
-
-  if (matchFull) {
-    const first = state.contactFirstName.trim().toLowerCase();
-    const last = state.contactLastName.trim().toLowerCase();
-    if ((last && matchFull.includes(last)) || (first && matchFull.includes(first))) {
-      return 'review';
-    }
-  }
-
-  return 'partial';
-}
-
-function duplicateTierLabel(tier: DuplicateTier): string {
-  switch (tier) {
-    case 'exact':
-      return 'Exact email';
-    case 'review':
-      return 'Likely match';
-    default:
-      return 'Partial match';
-  }
-}
-
-function formatMatchDate(value?: string): string {
-  if (!value) {
-    return '—';
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toISOString().slice(0, 10);
 }
