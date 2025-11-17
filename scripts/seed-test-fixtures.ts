@@ -24,6 +24,14 @@ type SeededStagingSummary = {
   provider?: string;
   giftIntent?: string;
   opportunityId?: string;
+  giftPayoutId?: string;
+};
+
+type SeededPayoutSummary = {
+  id: string;
+  payoutReference?: string;
+  status?: string;
+  sourceSystem?: string;
 };
 
 async function main(): Promise<void> {
@@ -50,6 +58,7 @@ async function main(): Promise<void> {
     const runId = randomUUID().slice(0, 8);
     const today = new Date().toISOString().slice(0, 10);
     const stagingSummaries: SeededStagingSummary[] = [];
+    const payoutSummaries: SeededPayoutSummary[] = [];
     const { companyId, companyName, opportunityId } = await ensureTestOpportunity(
       twentyApiService,
       runId,
@@ -148,7 +157,7 @@ async function main(): Promise<void> {
       amountMinor: 250000,
       giftDate: today,
       runId,
-      giftIntent: 'grant',
+      giftIntent: companyId ? 'grant' : 'standard',
       opportunityId,
       notes: `High-value grant staged gift (${companyName ?? 'company'})`,
       statuses: {
@@ -156,6 +165,7 @@ async function main(): Promise<void> {
         validationStatus: 'passed',
         dedupeStatus: 'passed',
       },
+      companyId,
     });
     stagingSummaries.push({
       id: grantHighValue.entity.id,
@@ -174,11 +184,12 @@ async function main(): Promise<void> {
       amountMinor: 7800,
       giftDate: today,
       runId,
-      giftIntent: 'corporateInKind',
+      giftIntent: companyId ? 'corporateInKind' : 'standard',
       inKindDescription: 'Seeded equipment donation',
       estimatedValue: 4800,
       isInKind: true,
       notes: 'Corporate in-kind test fixture',
+      companyId,
       statuses: {
         promotionStatus: 'pending',
         validationStatus: 'pending',
@@ -243,6 +254,62 @@ async function main(): Promise<void> {
     notes: 'Seeded committed gift for manual verification',
   });
 
+    const payoutInfo = await seedGiftPayout({
+      twentyApiService,
+      runId,
+      today,
+    });
+
+    if (payoutInfo) {
+      payoutSummaries.push(payoutInfo);
+
+      await giftService.createGift({
+        amount: {
+          currencyCode: 'GBP',
+          value: 72.5,
+        },
+        feeAmount: {
+          currencyCode: 'GBP',
+          value: 2.5,
+        },
+        giftDate: today,
+        name: `Seeded payout gift ${runId}`,
+        autoPromote: true,
+        giftPayoutId: payoutInfo.id,
+        contact: {
+          firstName: `PayoutDonor${runId}`,
+          lastName: 'Linked',
+          email: `payout.linked+${runId}@example.org`,
+        },
+        notes: 'Seeded payout-linked committed gift',
+      });
+
+      const payoutStaging = await seedManualStaging({
+        label: 'payout-staging',
+        giftService,
+        giftStagingService,
+        amountMinor: 6350,
+        feeAmountMinor: 150,
+        giftDate: today,
+        runId,
+        giftPayoutId: payoutInfo.id,
+        statuses: {
+          promotionStatus: 'pending',
+          validationStatus: 'pending',
+          dedupeStatus: 'needs_review',
+        },
+        notes: 'Seeded staging tied to payout for reconciliation checks',
+      });
+      stagingSummaries.push({
+        id: payoutStaging.entity.id,
+        donorId: payoutStaging.preparedPayload.donorId,
+        scenario: 'Payout-linked staging',
+        status: payoutStaging.entity.promotionStatus,
+        intakeSource: payoutStaging.entity.intakeSource,
+        giftPayoutId: payoutInfo.id,
+      });
+    }
+
     console.log('\nSeed fixtures complete ✅');
     console.log('Staging rows created:');
     for (const summary of stagingSummaries) {
@@ -264,6 +331,15 @@ async function main(): Promise<void> {
     console.log('\nCommitted gift response snippet:');
     console.dir(committedGift, { depth: 2 });
 
+    if (payoutSummaries.length > 0) {
+      console.log('\nPayouts seeded:');
+      for (const summary of payoutSummaries) {
+        console.log(
+          `  • ${summary.payoutReference ?? summary.id} (id=${summary.id}, status=${summary.status ?? 'pending'}, source=${summary.sourceSystem ?? '—'})`,
+        );
+      }
+    }
+
     if (!recurringAgreementId) {
       console.warn(
         '\n⚠️ Recurring agreement creation failed or is unsupported. Recurring staging row remains unlinked.',
@@ -279,6 +355,7 @@ async function seedManualStaging(options: {
   giftService: GiftService;
   giftStagingService: GiftStagingService;
   amountMinor: number;
+  feeAmountMinor?: number;
   giftDate: string;
   runId: string;
   statuses?: GiftStagingStatusUpdate;
@@ -295,6 +372,8 @@ async function seedManualStaging(options: {
   inKindDescription?: string;
   isInKind?: boolean;
   estimatedValue?: number;
+  giftPayoutId?: string;
+  companyId?: string;
 }): Promise<{
   entity: GiftStagingEntity;
   preparedPayload: NormalizedGiftCreatePayload;
@@ -304,17 +383,20 @@ async function seedManualStaging(options: {
     giftService,
     giftStagingService,
     amountMinor,
+    feeAmountMinor,
     giftDate,
     runId,
-  statuses,
-  notes,
-  recurringAgreementId,
-  providerMetadata = {},
-  giftIntent,
-  opportunityId,
-  inKindDescription,
-  isInKind,
-  estimatedValue,
+    statuses,
+    notes,
+    recurringAgreementId,
+    providerMetadata = {},
+    giftIntent,
+    opportunityId,
+    inKindDescription,
+    isInKind,
+    estimatedValue,
+    giftPayoutId,
+    companyId,
   } =
     options;
 
@@ -342,6 +424,8 @@ async function seedManualStaging(options: {
     expectedAt: providerMetadata.expectedAt,
     giftIntent,
     opportunityId,
+    giftPayoutId,
+    companyId,
   } as Record<string, unknown>;
 
   if (typeof inKindDescription === 'string' && inKindDescription.trim().length > 0) {
@@ -354,6 +438,14 @@ async function seedManualStaging(options: {
 
   if (typeof estimatedValue === 'number') {
     payload.estimatedValue = estimatedValue;
+  }
+
+  if (typeof feeAmountMinor === 'number' && Number.isFinite(feeAmountMinor)) {
+    payload.feeAmountMinor = feeAmountMinor;
+    payload.feeAmount = {
+      currencyCode: 'GBP',
+      value: Number((feeAmountMinor / 100).toFixed(2)),
+    };
   }
 
   const prepared = await giftService.normalizeCreateGiftPayload(payload);
@@ -430,6 +522,65 @@ async function seedRecurringAgreement(args: {
     console.warn(
       `Unable to create recurring agreement via Twenty API (${message}). Continuing without linkage.`,
     );
+    return undefined;
+  }
+}
+
+async function seedGiftPayout(args: {
+  twentyApiService: TwentyApiService;
+  runId: string;
+  today: string;
+}): Promise<SeededPayoutSummary | undefined> {
+  const { twentyApiService, runId, today } = args;
+  const payload = {
+    sourceSystem: 'manual_seed',
+    payoutReference: `SEED-POUT-${runId}`,
+    depositDate: today,
+    depositGrossAmount: {
+      value: 150,
+      currencyCode: 'GBP',
+    },
+    depositFeeAmount: {
+      value: 5,
+      currencyCode: 'GBP',
+    },
+    depositNetAmount: {
+      value: 145,
+      currencyCode: 'GBP',
+    },
+    expectedItemCount: 2,
+    status: 'pending',
+    note: 'Seeded payout for reconciliation testing',
+  };
+
+  try {
+    const response = (await twentyApiService.request(
+      'POST',
+      '/giftPayouts',
+      payload,
+      'SeedGiftPayout',
+    )) as Record<string, unknown>;
+
+    const data = (response?.data as Record<string, unknown>) ?? response;
+    const created =
+      (data?.createGiftPayout as Record<string, unknown>) ??
+      (data?.giftPayout as Record<string, unknown>) ??
+      data;
+    const id = typeof created?.id === 'string' ? created.id : undefined;
+    if (!id) {
+      console.warn('⚠️ Failed to extract payout id from response:', response);
+      return undefined;
+    }
+
+    return {
+      id,
+      payoutReference:
+        typeof created?.payoutReference === 'string' ? created.payoutReference : undefined,
+      status: typeof created?.status === 'string' ? created.status : undefined,
+      sourceSystem: typeof created?.sourceSystem === 'string' ? created.sourceSystem : undefined,
+    };
+  } catch (error) {
+    console.warn('⚠️ Failed to seed gift payout:', error);
     return undefined;
   }
 }

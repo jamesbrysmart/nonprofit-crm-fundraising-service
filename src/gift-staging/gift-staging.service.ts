@@ -21,6 +21,8 @@ export interface GiftStagingEntity {
   amount?: number;
   amountMinor?: number;
   currency?: string;
+  feeAmount?: number;
+  feeAmountMinor?: number;
   intakeSource?: string;
   sourceFingerprint?: string;
   externalId?: string;
@@ -31,6 +33,7 @@ export interface GiftStagingEntity {
   providerPaymentId?: string;
   providerContext?: Record<string, unknown>;
   giftAidEligible?: boolean;
+  giftPayoutId?: string;
   donorId?: string;
   companyId?: string;
   donorFirstName?: string;
@@ -68,6 +71,9 @@ export interface GiftStagingUpdateInput {
   amountMinor?: number;
   amountMajor?: number;
   currency?: string | null;
+  feeAmountMinor?: number;
+  feeAmountMajor?: number;
+  feeCurrency?: string | null;
   dateReceived?: string | null;
   expectedAt?: string | null;
   fundId?: string | null;
@@ -86,6 +92,7 @@ export interface GiftStagingUpdateInput {
   dedupeStatus?: string;
   errorDetail?: string | null;
   giftBatchId?: string | null;
+  giftPayoutId?: string | null;
 }
 
 export interface GiftStagingListQuery {
@@ -114,6 +121,8 @@ export interface GiftStagingListItem {
   amountMinor?: number;
   amount?: number;
   currency?: string;
+  feeAmount?: number;
+  feeAmountMinor?: number;
   dateReceived?: string;
   expectedAt?: string;
   paymentMethod?: string;
@@ -136,6 +145,7 @@ export interface GiftStagingListItem {
   providerPaymentId?: string;
   providerContext?: Record<string, unknown>;
   recurringAgreementId?: string;
+  giftPayoutId?: string;
   rawPayloadAvailable: boolean;
   notes?: string;
 }
@@ -754,7 +764,7 @@ export class GiftStagingService {
       giftIntent: payload.giftIntent,
       isInKind:
         updates.isInKind !== undefined
-          ? updates.isInKind ?? undefined
+          ? (updates.isInKind ?? undefined)
           : payload.isInKind,
       inKindDescription: payload.inKindDescription,
       estimatedValue: payload.estimatedValue,
@@ -927,6 +937,14 @@ export class GiftStagingService {
         currencyCode: payload.currency,
       },
       amountMinor: payload.amountMinor,
+      feeAmount:
+        typeof payload.feeAmountMajor === 'number'
+          ? {
+              value: payload.feeAmountMajor,
+              currencyCode: payload.feeCurrency ?? payload.currency,
+            }
+          : undefined,
+      feeAmountMinor: payload.feeAmountMinor,
       paymentMethod: payload.paymentMethod,
       dateReceived: payload.dateReceived ?? payload.giftDate,
       expectedAt: payload.expectedAt,
@@ -944,6 +962,7 @@ export class GiftStagingService {
       providerPaymentId: payload.providerPaymentId,
       providerContext: this.normalizeProviderContext(payload.providerContext),
       recurringAgreementId: payload.recurringAgreementId,
+      giftPayoutId: payload.giftPayoutId,
       notes: payload.notes,
       opportunityId: payload.opportunityId,
       giftIntent: payload.giftIntent,
@@ -1065,6 +1084,16 @@ export class GiftStagingService {
           : undefined,
       currency:
         typeof recordObj.currency === 'string' ? recordObj.currency : undefined,
+      feeAmount:
+        typeof recordObj.feeAmount === 'number' &&
+        Number.isFinite(recordObj.feeAmount)
+          ? recordObj.feeAmount
+          : undefined,
+      feeAmountMinor:
+        typeof recordObj.feeAmountMinor === 'number' &&
+        Number.isFinite(recordObj.feeAmountMinor)
+          ? recordObj.feeAmountMinor
+          : undefined,
       intakeSource:
         typeof recordObj.intakeSource === 'string'
           ? recordObj.intakeSource
@@ -1095,9 +1124,16 @@ export class GiftStagingService {
         typeof recordObj.providerPaymentId === 'string'
           ? recordObj.providerPaymentId
           : undefined,
+      providerContext: this.isPlainObject(recordObj.providerContext)
+        ? recordObj.providerContext
+        : undefined,
       giftAidEligible:
         typeof recordObj.giftAidEligible === 'boolean'
           ? recordObj.giftAidEligible
+          : undefined,
+      giftPayoutId:
+        typeof recordObj.giftPayoutId === 'string'
+          ? recordObj.giftPayoutId
           : undefined,
       donorId:
         typeof recordObj.donorId === 'string' ? recordObj.donorId : undefined,
@@ -1383,6 +1419,8 @@ export class GiftStagingService {
       amount: entity.amount,
       amountMinor: entity.amountMinor,
       currency: entity.currency,
+      feeAmount: entity.feeAmount,
+      feeAmountMinor: entity.feeAmountMinor,
       dateReceived: entity.dateReceived,
       expectedAt: entity.expectedAt,
       paymentMethod: entity.paymentMethod,
@@ -1404,6 +1442,7 @@ export class GiftStagingService {
       providerPaymentId: entity.providerPaymentId,
       providerContext: entity.providerContext,
       recurringAgreementId: entity.recurringAgreementId,
+      giftPayoutId: entity.giftPayoutId,
       rawPayloadAvailable: Boolean(
         entity.rawPayload && entity.rawPayload.length > 0,
       ),

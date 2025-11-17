@@ -186,6 +186,30 @@ export class GiftService {
             : undefined,
     };
 
+    if (payload.feeAmount && typeof payload.feeAmount === 'object') {
+      const feeValue = payload.feeAmount.value;
+      if (typeof feeValue === 'number' && Number.isFinite(feeValue)) {
+        prepared.feeAmountMajor = feeValue;
+        prepared.feeAmountMinor =
+          typeof payload.feeAmountMinor === 'number'
+            ? payload.feeAmountMinor
+            : Math.round(feeValue * 100);
+        prepared.feeCurrency =
+          typeof payload.feeAmount.currencyCode === 'string'
+            ? payload.feeAmount.currencyCode
+            : prepared.currency;
+      }
+    } else if (
+      typeof payload.feeAmountMinor === 'number' &&
+      Number.isFinite(payload.feeAmountMinor)
+    ) {
+      prepared.feeAmountMinor = payload.feeAmountMinor;
+      prepared.feeAmountMajor = Number(
+        (payload.feeAmountMinor / 100).toFixed(2),
+      );
+      prepared.feeCurrency = prepared.currency;
+    }
+
     if (
       typeof payload.companyId === 'string' &&
       payload.companyId.trim().length > 0
@@ -266,6 +290,15 @@ export class GiftService {
       if (prepared.recurringAgreementId.length === 0) {
         delete prepared.recurringAgreementId;
       }
+    }
+
+    if (
+      typeof prepared.giftPayoutId === 'string' &&
+      prepared.giftPayoutId.trim().length > 0
+    ) {
+      prepared.giftPayoutId = prepared.giftPayoutId.trim();
+    } else {
+      delete prepared.giftPayoutId;
     }
 
     if (typeof prepared.provider === 'string') {

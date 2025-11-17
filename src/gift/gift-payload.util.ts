@@ -51,12 +51,34 @@ export const buildTwentyGiftPayload = (
     };
   }
 
+  if (
+    typeof payload.feeAmountMajor === 'number' &&
+    (typeof payload.feeCurrency === 'string' ||
+      typeof payload.currency === 'string')
+  ) {
+    body.feeAmount = {
+      value: payload.feeAmountMajor,
+      currencyCode: payload.feeCurrency ?? payload.currency,
+    };
+  } else if (
+    typeof payload.feeAmountMinor === 'number' &&
+    typeof payload.currency === 'string'
+  ) {
+    body.feeAmount = {
+      value: Number((payload.feeAmountMinor / 100).toFixed(2)),
+      currencyCode: payload.currency,
+    };
+  }
+
   const providerContext = normalizeProviderContext(payload.providerContext);
   if (providerContext && !body.recurringMetadata) {
     body.recurringMetadata = providerContext;
   }
 
   delete body.providerContext;
+  delete body.feeAmountMajor;
+  delete body.feeAmountMinor;
+  delete body.feeCurrency;
   delete body.dedupeDiagnostics;
   delete body.appealSegmentId;
   delete body.trackingCodeId;

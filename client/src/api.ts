@@ -357,6 +357,42 @@ export interface GiftStagingListResponse {
   };
 }
 
+export interface CurrencyAmount {
+  value?: number;
+  currencyCode?: string;
+}
+
+export interface GiftPayoutRecord {
+  id: string;
+  sourceSystem?: string;
+  payoutReference?: string;
+  depositDate?: string;
+  depositGrossAmount?: CurrencyAmount;
+  depositFeeAmount?: CurrencyAmount;
+  depositNetAmount?: CurrencyAmount;
+  expectedItemCount?: number;
+  status?: string;
+  varianceAmount?: CurrencyAmount;
+  varianceReason?: string;
+  note?: string;
+  confirmedAt?: string;
+  matchedGrossAmount?: CurrencyAmount;
+  matchedFeeAmount?: CurrencyAmount;
+  matchedGiftCount?: number;
+  pendingStagingCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface GiftPayoutListResponse {
+  data: GiftPayoutRecord[];
+  meta?: {
+    nextCursor?: string;
+    hasMore?: boolean;
+    totalCount?: number;
+  };
+}
+
 export interface RecurringAgreementListItem {
   id: string;
   contactId?: string;
@@ -432,6 +468,265 @@ export async function fetchGiftStagingList(
   }
 
   return (await response.json()) as GiftStagingListResponse;
+}
+
+const normalizeCurrencyField = (entry: unknown): CurrencyAmount | undefined => {
+  if (!entry || typeof entry !== 'object') {
+    return undefined;
+  }
+
+  const record = entry as Record<string, unknown>;
+  const value =
+    typeof record.value === 'number' && Number.isFinite(record.value)
+      ? record.value
+      : typeof record.amountMinor === 'number' && Number.isFinite(record.amountMinor)
+        ? Number((record.amountMinor / 100).toFixed(2))
+        : undefined;
+
+  const currencyCode =
+    typeof record.currencyCode === 'string'
+      ? record.currencyCode
+      : typeof record.currency === 'string'
+        ? record.currency
+        : undefined;
+
+  if (value === undefined && !currencyCode) {
+    return undefined;
+  }
+
+  return {
+    value,
+    currencyCode,
+  };
+};
+
+const normalizeGiftPayoutRecord = (entry: unknown): GiftPayoutRecord | null => {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  const record = entry as Record<string, unknown>;
+  const id = typeof record.id === 'string' ? record.id.trim() : '';
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    sourceSystem: typeof record.sourceSystem === 'string' ? record.sourceSystem : undefined,
+    payoutReference:
+      typeof record.payoutReference === 'string' ? record.payoutReference : undefined,
+    depositDate:
+      typeof record.depositDate === 'string' && record.depositDate.length > 0
+        ? record.depositDate
+        : undefined,
+    depositGrossAmount: normalizeCurrencyField(record.depositGrossAmount),
+    depositFeeAmount: normalizeCurrencyField(record.depositFeeAmount),
+    depositNetAmount: normalizeCurrencyField(record.depositNetAmount),
+    expectedItemCount:
+      typeof record.expectedItemCount === 'number' && Number.isFinite(record.expectedItemCount)
+        ? record.expectedItemCount
+        : undefined,
+    status: typeof record.status === 'string' ? record.status : undefined,
+    varianceAmount: normalizeCurrencyField(record.varianceAmount),
+    varianceReason:
+      typeof record.varianceReason === 'string' ? record.varianceReason : undefined,
+    note: typeof record.note === 'string' ? record.note : undefined,
+    confirmedAt:
+      typeof record.confirmedAt === 'string' && record.confirmedAt.length > 0
+        ? record.confirmedAt
+        : undefined,
+    matchedGrossAmount: normalizeCurrencyField(record.matchedGrossAmount),
+    matchedFeeAmount: normalizeCurrencyField(record.matchedFeeAmount),
+    matchedGiftCount:
+      typeof record.matchedGiftCount === 'number' && Number.isFinite(record.matchedGiftCount)
+        ? record.matchedGiftCount
+        : undefined,
+    pendingStagingCount:
+      typeof record.pendingStagingCount === 'number' &&
+      Number.isFinite(record.pendingStagingCount)
+        ? record.pendingStagingCount
+        : undefined,
+    createdAt:
+      typeof record.createdAt === 'string' && record.createdAt.length > 0
+        ? record.createdAt
+        : undefined,
+    updatedAt:
+      typeof record.updatedAt === 'string' && record.updatedAt.length > 0
+        ? record.updatedAt
+        : undefined,
+  };
+};
+
+export async function fetchGiftPayouts(
+  params: {
+    limit?: number;
+    cursor?: string;
+    statuses?: string[];
+    sourceSystems?: string[];
+    search?: string;
+    sort?: string;
+  } = {},
+): Promise<GiftPayoutListResponse> {
+  const query = new URLSearchParams();
+  if (typeof params.limit === 'number' && Number.isFinite(params.limit)) {
+    query.set('limit', Math.max(1, params.limit).toString());
+  }
+  if (typeof params.cursor === 'string' && params.cursor.trim().length > 0) {
+    query.set('cursor', params.cursor.trim());
+  }
+  if (Array.isArray(params.statuses) && params.statuses.length > 0) {
+    query.set('statuses', params.statuses.join(','));
+  }
+  if (Array.isArray(params.sourceSystems) && params.sourceSystems.length > 0) {
+    query.set('sourceSystems', params.sourceSystems.join(','));
+  }
+  if (typeof params.search === 'string' && params.search.trim().length > 0) {
+    query.set('search', params.search.trim());
+  }
+  if (typeof params.sort === 'string' && params.sort.trim().length > 0) {
+    query.set('sort', params.sort.trim());
+  }
+
+  const url =
+    query.size > 0
+      ? `/api/fundraising/gift-payouts?${query.toString()}`
+      : '/api/fundraising/gift-payouts';
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || response.statusText);
+  }
+
+  const payload = (await response.json()) as {
+    data?: { giftPayouts?: unknown[] } | GiftPayoutRecord[];
+    meta?: GiftPayoutListResponse['meta'];
+  };
+
+  const list =
+    Array.isArray((payload.data as { giftPayouts?: unknown[] })?.giftPayouts)
+      ? ((payload.data as { giftPayouts?: unknown[] })?.giftPayouts as unknown[])
+      : Array.isArray(payload.data)
+        ? (payload.data as unknown[])
+        : [];
+
+  const data = list
+    .map((entry) => normalizeGiftPayoutRecord(entry))
+    .filter((entry): entry is GiftPayoutRecord => Boolean(entry));
+
+  return {
+    data,
+    meta: payload.meta,
+  };
+}
+
+export async function createGiftPayout(payload: Record<string, unknown>): Promise<GiftPayoutRecord | null> {
+  const response = await fetch('/api/fundraising/gift-payouts', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload ?? {}),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || response.statusText);
+  }
+
+  const json = (await response.json()) as { data?: { giftPayout?: unknown } } | unknown;
+  const record = (json as { data?: { giftPayout?: unknown } })?.data?.giftPayout ?? json;
+  return normalizeGiftPayoutRecord(record ?? null);
+}
+
+export async function updateGiftPayout(
+  payoutId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const trimmedId = payoutId.trim();
+  if (!trimmedId) {
+    throw new Error('payoutId is required');
+  }
+
+  const response = await fetch(`/api/fundraising/gift-payouts/${encodeURIComponent(trimmedId)}`, {
+    method: 'PATCH',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload ?? {}),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || response.statusText);
+  }
+}
+
+export async function linkGiftsToPayout(
+  payoutId: string,
+  giftIds: string[],
+): Promise<{ linkedGiftIds: string[] }> {
+  const trimmedId = payoutId.trim();
+  if (!trimmedId) {
+    throw new Error('payoutId is required');
+  }
+
+  const response = await fetch(
+    `/api/fundraising/gift-payouts/${encodeURIComponent(trimmedId)}/gifts/link`,
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ giftIds }),
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || response.statusText);
+  }
+
+  return (await response.json()) as { linkedGiftIds: string[] };
+}
+
+export async function unlinkGiftsFromPayout(
+  payoutId: string,
+  giftIds: string[],
+): Promise<{ unlinkedGiftIds: string[] }> {
+  const trimmedId = payoutId.trim();
+  if (!trimmedId) {
+    throw new Error('payoutId is required');
+  }
+
+  const response = await fetch(
+    `/api/fundraising/gift-payouts/${encodeURIComponent(trimmedId)}/gifts/unlink`,
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ giftIds }),
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || response.statusText);
+  }
+
+  return (await response.json()) as { unlinkedGiftIds: string[] };
 }
 
 export async function fetchRecurringAgreements(

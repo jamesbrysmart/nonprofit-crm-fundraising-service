@@ -168,9 +168,12 @@ async function createField(fieldData) {
       : typeof messages === 'string'
         ? [messages]
         : [];
-    if (messageList.some(msg => msg.includes('Field already exists') || msg.includes('is not available'))) {
-  console.log(`Field ${fieldData.name} already exists. Skipping.`);
-  return null;
+        if (messageList.some(msg => msg.includes('Field already exists') || msg.includes('is not available'))) {
+          console.log(`Field ${fieldData.name} already exists. Skipping.`);
+          return null;
+        }
+        throw error;
+      }
 }
 
 async function graphQLCall(payload) {
@@ -246,10 +249,16 @@ async function ensureRelationField({ name, label, objectMetadataId, relationCrea
     },
   };
 
-  const result = await graphQLCall(payload);
-  console.log(`Created relation field ${name}:`, JSON.stringify(result.data.createOneField, null, 2));
-  return result.data.createOneField;
-}
+  try {
+    const result = await graphQLCall(payload);
+    console.log(`Created relation field ${name}:`, JSON.stringify(result.data.createOneField, null, 2));
+    return result.data.createOneField;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('not available') || message.includes('already exists')) {
+      console.log(`Relation field ${name} already exists or reserved. Skipping creation.`);
+      return undefined;
+    }
     throw error;
   }
 }
@@ -308,6 +317,7 @@ async function main() {
 
   const giftFields = [
     { name: "amount", label: "Amount", type: "CURRENCY" },
+    { name: "feeAmount", label: "Fee Amount", type: "CURRENCY" },
     { name: "date", label: "Gift Date", type: "DATE" },
     { name: "externalId", label: "External ID", type: "TEXT" },
     { name: "paymentMethod", label: "Payment Method", type: "TEXT" },
@@ -436,6 +446,8 @@ async function main() {
     { name: 'externalId', label: 'External ID', type: 'TEXT' },
     { name: 'amount', label: 'Amount', type: 'CURRENCY' },
     { name: 'amountMinor', label: 'Amount (minor units)', type: 'NUMBER' },
+    { name: 'feeAmount', label: 'Fee Amount', type: 'CURRENCY' },
+    { name: 'feeAmountMinor', label: 'Fee Amount (minor units)', type: 'NUMBER' },
     { name: 'paymentMethod', label: 'Payment Method', type: 'TEXT' },
     { name: 'dateReceived', label: 'Date Received', type: 'DATE' },
     { name: 'expectedAt', label: 'Expected At', type: 'DATE' },
@@ -463,6 +475,45 @@ async function main() {
   for (const field of giftStagingFields) {
     await createField({
       objectMetadataId: giftStagingObjectId,
+      name: field.name,
+      label: field.label,
+      type: field.type,
+    });
+  }
+
+  console.log('--- Setting up Gift Payout Object ---');
+  const giftPayoutObjectId = await ensureObject({
+    nameSingular: 'giftPayout',
+    namePlural: 'giftPayouts',
+    labelSingular: 'Gift Payout',
+    labelPlural: 'Gift Payouts',
+    icon: 'IconReceipt2',
+    description:
+      'Represents a processor payout or bank deposit that groups multiple gifts for reconciliation.',
+  });
+
+  const giftPayoutFields = [
+    { name: 'sourceSystem', label: 'Source System', type: 'TEXT' },
+    { name: 'payoutReference', label: 'Payout Reference', type: 'TEXT' },
+    { name: 'depositDate', label: 'Deposit Date', type: 'DATE' },
+    { name: 'depositGrossAmount', label: 'Deposit Gross Amount', type: 'CURRENCY' },
+    { name: 'depositFeeAmount', label: 'Deposit Fee Amount', type: 'CURRENCY' },
+    { name: 'depositNetAmount', label: 'Deposit Net Amount', type: 'CURRENCY' },
+    { name: 'expectedItemCount', label: 'Expected Item Count', type: 'NUMBER' },
+    { name: 'status', label: 'Status', type: 'TEXT' },
+    { name: 'varianceAmount', label: 'Variance Amount', type: 'CURRENCY' },
+    { name: 'varianceReason', label: 'Variance Reason', type: 'TEXT' },
+    { name: 'note', label: 'Note', type: 'TEXT' },
+    { name: 'confirmedAt', label: 'Confirmed At', type: 'DATE_TIME' },
+    { name: 'matchedGrossAmount', label: 'Matched Gross Amount', type: 'CURRENCY' },
+    { name: 'matchedFeeAmount', label: 'Matched Fee Amount', type: 'CURRENCY' },
+    { name: 'matchedGiftCount', label: 'Matched Gift Count', type: 'NUMBER' },
+    { name: 'pendingStagingCount', label: 'Pending Staging Count', type: 'NUMBER' },
+  ];
+
+  for (const field of giftPayoutFields) {
+    await createField({
+      objectMetadataId: giftPayoutObjectId,
       name: field.name,
       label: field.label,
       type: field.type,
@@ -545,14 +596,26 @@ async function main() {
     'NOTE: GraphQL helper is newly added; only the Gift→Person relation below has been exercised so far. Treat this as experimental until we wire more relations through it.',
   );
   await ensureRelationField({
-    name: 'donorLinkAuto',
-    label: 'Donor',
+    name: 'giftPayout',
+    label: 'Gift Payout',
     objectMetadataId: giftObjectId,
     relationCreationPayload: {
       type: 'MANY_TO_ONE',
-      targetObjectMetadataId: personObjectId,
+      targetObjectMetadataId: giftPayoutObjectId,
       targetFieldLabel: 'Gifts',
-      targetFieldIcon: 'IconGift',
+      targetFieldIcon: 'IconReceipt2',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'giftPayout',
+    label: 'Gift Payout',
+    objectMetadataId: giftStagingObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: giftPayoutObjectId,
+      targetFieldLabel: 'Gift Staging Rows',
+      targetFieldIcon: 'IconReceipt2',
     },
   });
 

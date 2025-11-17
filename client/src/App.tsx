@@ -5,8 +5,9 @@ import { RecurringAgreementList } from './components/RecurringAgreementList';
 import { AppealsView } from './components/AppealsView';
 import { HouseholdManager } from './components/HouseholdManager';
 import { ManualGiftEntryDrawer } from './components/manual-entry/ManualGiftEntryDrawer';
+import { ReconciliationView } from './components/reconciliation/ReconciliationView';
 
-type ViewMode = 'manual' | 'queue' | 'agreements' | 'appeals' | 'households';
+type ViewMode = 'manual' | 'queue' | 'agreements' | 'appeals' | 'households' | 'reconciliation';
 
 type ViewConfig = {
   label: string;
@@ -42,12 +43,18 @@ const VIEW_CONFIG: Record<ViewMode, ViewConfig> = {
     description: 'Pilot tooling to group supporters and manage shared mailing details.',
     group: 'Data hygiene & records',
   },
+  reconciliation: {
+    label: 'Reconciliation',
+    description: 'Review payouts, match gifts, and resolve variances before finance closes.',
+    group: 'Operations',
+    badge: 'New',
+  },
 };
 
 const NAV_GROUPS: Array<{ label: string; items: ViewMode[] }> = [
   {
     label: 'Operations',
-    items: ['queue', 'manual'],
+    items: ['queue', 'manual', 'reconciliation'],
   },
   {
     label: 'Data hygiene & records',
@@ -82,6 +89,10 @@ export function App(): JSX.Element {
 
     if (view === 'appeals') {
       return <AppealsView />;
+    }
+
+    if (view === 'reconciliation') {
+      return <ReconciliationView />;
     }
 
     return <HouseholdManager />;

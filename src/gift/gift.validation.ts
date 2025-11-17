@@ -26,12 +26,14 @@ const ALLOWED_STRING_FIELDS = new Set([
   'recurringStatus',
   'giftIntent',
   'inKindDescription',
+  'giftPayoutId',
 ]);
 
 const ALLOWED_NUMBER_FIELDS = new Set([
   'amountMicros',
   'amountMinor',
   'estimatedValue',
+  'feeAmountMinor',
 ]);
 
 const ALLOWED_BOOLEAN_FIELDS = new Set([
@@ -50,6 +52,7 @@ export type GiftAmount = {
 export type GiftCreatePayload = Writable<
   {
     amount: GiftAmount;
+    feeAmount?: GiftAmount;
   } & Record<string, unknown>
 > & {
   amountMinor?: number;
@@ -60,6 +63,8 @@ export type GiftCreatePayload = Writable<
   intakeSource?: string;
   sourceFingerprint?: string;
   autoPromote?: boolean;
+  feeAmountMinor?: number;
+  giftPayoutId?: string;
 };
 
 export type GiftUpdatePayload = Partial<GiftCreatePayload>;
@@ -167,6 +172,14 @@ const collectAllowedFields = (
       if (value !== undefined) {
         normalizeStringField(result, key, value);
       }
+      continue;
+    }
+
+    if (key === 'feeAmount') {
+      if (value === undefined || value === null) {
+        continue;
+      }
+      result.feeAmount = parseAmount(value, context);
       continue;
     }
 
@@ -284,6 +297,13 @@ export const validateCreateGiftPayload = (body: unknown): GiftCreatePayload => {
     sanitized.currency = parsedAmount.currencyCode;
   }
 
+  if (sanitized.feeAmount && typeof sanitized.feeAmount === 'object') {
+    const feeAmount = sanitized.feeAmount as GiftAmount;
+    if (typeof sanitized.feeAmountMinor !== 'number') {
+      sanitized.feeAmountMinor = Math.round(feeAmount.value * 100);
+    }
+  }
+
   const giftIntent =
     typeof sanitized.giftIntent === 'string' ? sanitized.giftIntent : undefined;
   const companyId =
@@ -337,6 +357,12 @@ export const validateUpdateGiftPayload = (body: unknown): GiftUpdatePayload => {
     sanitized.amount = parsedAmount;
     sanitized.amountMinor = Math.round(parsedAmount.value * 100);
     sanitized.currency = parsedAmount.currencyCode;
+  }
+
+  if (body.feeAmount !== undefined) {
+    const parsedFeeAmount = parseAmount(body.feeAmount, 'update');
+    sanitized.feeAmount = parsedFeeAmount;
+    sanitized.feeAmountMinor = Math.round(parsedFeeAmount.value * 100);
   }
 
   if (Object.keys(sanitized).length === 0) {

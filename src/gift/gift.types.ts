@@ -6,6 +6,9 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   amountMajor?: number;
   amountMinor: number;
   currency: string;
+  feeAmountMajor?: number;
+  feeAmountMinor?: number;
+  feeCurrency?: string;
   donorId?: string;
   companyId?: string;
   donorFirstName?: string;
@@ -38,6 +41,7 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   isInKind?: boolean;
   inKindDescription?: string;
   estimatedValue?: number;
+  giftPayoutId?: string;
 }
 
 export interface GiftStagingRecord {

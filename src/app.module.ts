@@ -13,6 +13,7 @@ import { AppealModule } from './appeal/appeal.module';
 import { HouseholdModule } from './household/household.module';
 import { OpportunityModule } from './opportunity/opportunity.module';
 import { CompanyModule } from './company/company.module';
+import { GiftPayoutModule } from './gift-payout/gift-payout.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { CompanyModule } from './company/company.module';
     HouseholdModule,
     OpportunityModule,
     CompanyModule,
+    GiftPayoutModule,
   ],
   controllers: [HealthController],
   providers: [],
