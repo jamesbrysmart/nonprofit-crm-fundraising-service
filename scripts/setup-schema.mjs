@@ -40,6 +40,9 @@ console.log(`TWENTY_API_KEY from process.env (after dotenv): ${process.env.TWENT
 const TWENTY_REST_METADATA_URL = process.env.TWENTY_METADATA_BASE_URL
   ? process.env.TWENTY_METADATA_BASE_URL.replace(/\/$/, '')
   : 'http://localhost:3000/rest/metadata';
+const TWENTY_GRAPHQL_METADATA_URL = process.env.TWENTY_METADATA_GRAPHQL_URL
+  ? process.env.TWENTY_METADATA_GRAPHQL_URL
+  : 'http://localhost:3000/metadata';
 const API_KEY = process.env.TWENTY_API_KEY;
 
 async function restCall(method, endpoint, payload) {
@@ -113,6 +116,31 @@ async function findObjectByNameSingular(nameSingular) {
   return null;
 }
 
+async function findFieldByNameAndObject(name, objectMetadataId) {
+  const url = `${TWENTY_REST_METADATA_URL}/fields`;
+  const headers = {
+    Authorization: `Bearer ${API_KEY}`,
+  };
+
+  console.log(`Fetching fields to find ${name} on ${objectMetadataId}`);
+
+  const response = await fetch(url, { method: 'GET', headers });
+  const result = await response.json();
+
+  if (!response.ok) {
+    console.error('Failed to fetch fields for lookup:');
+    console.error(JSON.stringify(result, null, 2));
+    const messages = result?.messages || result?.message;
+    throw new Error(`REST API Error: ${messages || response.statusText}`);
+  }
+
+  const fields = result?.data?.fields || result?.data || [];
+  return fields.find(
+    (field) =>
+      field.name === name && field.objectMetadataId === objectMetadataId,
+  );
+}
+
 async function ensureObject(objectData) {
   const existingId = await findObjectByNameSingular(objectData.nameSingular);
   if (existingId) {
@@ -141,9 +169,87 @@ async function createField(fieldData) {
         ? [messages]
         : [];
     if (messageList.some(msg => msg.includes('Field already exists') || msg.includes('is not available'))) {
-      console.log(`Field ${fieldData.name} already exists. Skipping.`);
-      return null;
-    }
+  console.log(`Field ${fieldData.name} already exists. Skipping.`);
+  return null;
+}
+
+async function graphQLCall(payload) {
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${API_KEY}`,
+  };
+
+  console.log(`GraphQL metadata call payload: ${JSON.stringify(payload)}`);
+
+  const response = await fetch(TWENTY_GRAPHQL_METADATA_URL, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  const resultText = await response.text();
+  let parsed;
+
+  try {
+    parsed = resultText ? JSON.parse(resultText) : {};
+  } catch (error) {
+    console.error('Failed to parse GraphQL response body:', resultText);
+    throw error;
+  }
+
+  if (!response.ok || parsed.errors) {
+    const errors = parsed.errors?.map((e) => e.message).join(', ');
+    throw new Error(errors || response.statusText);
+  }
+
+  return parsed;
+}
+
+async function ensureRelationField({ name, label, objectMetadataId, relationCreationPayload }) {
+  const existing = await findFieldByNameAndObject(name, objectMetadataId);
+  if (existing) {
+    console.log(`Relation field ${name} already exists on object ${objectMetadataId}. Skipping.`);
+    return existing;
+  }
+
+  const payload = {
+    query: `
+      mutation CreateRelationField($input: CreateOneFieldMetadataInput!) {
+        createOneField(input: $input) {
+          id
+          name
+          type
+          relation {
+            type
+            targetObjectMetadata {
+              id
+              nameSingular
+            }
+            targetFieldMetadata {
+              id
+              name
+              label
+            }
+          }
+        }
+      }
+    `,
+    variables: {
+      input: {
+        field: {
+          type: 'RELATION',
+          name,
+          label,
+          objectMetadataId,
+          relationCreationPayload,
+        },
+      },
+    },
+  };
+
+  const result = await graphQLCall(payload);
+  console.log(`Created relation field ${name}:`, JSON.stringify(result.data.createOneField, null, 2));
+  return result.data.createOneField;
+}
     throw error;
   }
 }
@@ -434,25 +540,27 @@ async function main() {
     });
   }
 
-  console.log('--- Linking Objects (Manual Step Required) ---');
-  console.log('NOTE: RELATION/LOOKUP fields cannot be created via API at this time.');
-  console.log('Please create the following LOOKUP fields manually in the Twenty UI:');
-  console.log('- For Gift object: "Appeal" (linking to Appeal object)');
-  console.log('- For Gift object: "Contact" (linking to Person object)');
-  console.log('- For Gift object: "Recurring Agreement" (linking to Recurring Agreement object)');
-  console.log('- For Gift Staging object: "Gift" (linking to Gift object)');
-  console.log('- For Gift Staging object: "Gift Batch" (linking to Gift Batch object, optional)');
-  console.log('- For Gift Staging object: "Recurring Agreement" (linking to Recurring Agreement object)');
-  console.log('- For Recurring Agreement object: "Contact" (linking to Person object)');
-  console.log('- For Appeal object: "Parent Appeal" (self-lookup to Appeal object)');
-  console.log('- For Appeal object: "Default Fund" (linking to Fund/Designation object, optional)');
-  console.log('- For Appeal object: "Default Tracking Code" (linking to Tracking Code object, optional)');
-  console.log('- For Solicitation Snapshot object: "Appeal" (linking to Appeal object)');
-  console.log('- For Solicitation Snapshot object: "Appeal Segment" (linking to Appeal Segment object, optional)');
-  console.log('- For Person object: "Primary Household" lookup pointing to Household');
-  console.log('- For Household object: "Primary Contact" lookup pointing to Person');
+  console.log('--- Linking Objects (GraphQL Metadata API) ---');
+  console.log(
+    'NOTE: GraphQL helper is newly added; only the Gift→Person relation below has been exercised so far. Treat this as experimental until we wire more relations through it.',
+  );
+  await ensureRelationField({
+    name: 'donorLinkAuto',
+    label: 'Donor',
+    objectMetadataId: giftObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: personObjectId,
+      targetFieldLabel: 'Gifts',
+      targetFieldIcon: 'IconGift',
+    },
+  });
 
-  console.log('✅ Twenty CRM custom objects and fields setup complete (manual steps for LOOKUP fields pending).');
+  console.log(
+    'TODO: Add additional ensureRelationField calls for Gift→Appeal, Gift→RecurringAgreement, GiftStaging links, etc. Until then, create the remaining lookups manually (see docs/METADATA_RUNBOOK.md).',
+  );
+
+  console.log('✅ Twenty CRM custom objects and fields setup complete (relations partially automated).');
 }
 
 main().catch(error => {
