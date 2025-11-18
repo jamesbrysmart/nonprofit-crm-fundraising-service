@@ -1,0 +1,77 @@
+import { fetchJson } from '../api-shared/http';
+
+export interface RecurringAgreementListItem {
+  id: string;
+  contactId?: string;
+  status?: string;
+  cadence?: string;
+  intervalCount?: number;
+  amountMinor?: number;
+  currency?: string;
+  nextExpectedAt?: string;
+  autoPromoteEnabled?: boolean;
+  provider?: string;
+  providerAgreementId?: string;
+  providerPaymentMethodId?: string;
+}
+
+export async function fetchRecurringAgreements(
+  params: { limit?: number } = {},
+): Promise<RecurringAgreementListItem[]> {
+  const queryParams: Record<string, unknown> = {};
+  if (typeof params.limit === 'number' && Number.isFinite(params.limit)) {
+    queryParams.limit = Math.max(1, params.limit);
+  }
+
+  const payload = await fetchJson<{
+    data?: { recurringAgreements?: unknown[] };
+  }>('/api/fundraising/recurring-agreements', { params: queryParams });
+
+  const items = Array.isArray(payload.data?.recurringAgreements)
+    ? payload.data?.recurringAgreements
+    : [];
+
+  return items
+    .map((entry) => normalizeRecurringAgreement(entry))
+    .filter((entry): entry is RecurringAgreementListItem => Boolean(entry));
+}
+
+function normalizeRecurringAgreement(entry: unknown): RecurringAgreementListItem | null {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  const record = entry as Record<string, unknown>;
+  const id = typeof record.id === 'string' && record.id.trim().length > 0 ? record.id.trim() : null;
+  if (!id) {
+    return null;
+  }
+
+  const amountMinor =
+    typeof record.amountMinor === 'number' && Number.isFinite(record.amountMinor)
+      ? record.amountMinor
+      : undefined;
+
+  return {
+    id,
+    contactId: typeof record.contactId === 'string' ? record.contactId : undefined,
+    status: typeof record.status === 'string' ? record.status : undefined,
+    cadence: typeof record.cadence === 'string' ? record.cadence : undefined,
+    intervalCount:
+      typeof record.intervalCount === 'number' && Number.isFinite(record.intervalCount)
+        ? record.intervalCount
+        : undefined,
+    amountMinor,
+    currency: typeof record.currency === 'string' ? record.currency : undefined,
+    nextExpectedAt: typeof record.nextExpectedAt === 'string' ? record.nextExpectedAt : undefined,
+    autoPromoteEnabled:
+      typeof record.autoPromoteEnabled === 'boolean' ? record.autoPromoteEnabled : undefined,
+    provider: typeof record.provider === 'string' ? record.provider : undefined,
+    providerAgreementId:
+      typeof record.providerAgreementId === 'string' ? record.providerAgreementId : undefined,
+    providerPaymentMethodId:
+      typeof record.providerPaymentMethodId === 'string'
+        ? record.providerPaymentMethodId
+        : undefined,
+  };
+}
