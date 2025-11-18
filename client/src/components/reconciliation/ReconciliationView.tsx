@@ -199,7 +199,6 @@ export function ReconciliationView(): JSX.Element {
         onClose={() => setSelectedPayout(null)}
         onUpdated={async () => {
           await refresh();
-          setSelectedPayout(null);
         }}
       />
 

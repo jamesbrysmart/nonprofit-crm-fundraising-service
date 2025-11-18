@@ -1410,6 +1410,120 @@ export interface MoneyInput {
   currencyCode?: string;
 }
 
+export interface GiftRecord {
+  id: string;
+  name?: string;
+  amount?: MoneyValue;
+  giftDate?: string;
+  contactId?: string;
+  contactName?: string;
+  externalId?: string;
+  status?: string;
+  giftPayoutId?: string;
+  intakeSource?: string;
+}
+
+export interface GiftListParams {
+  giftPayoutId?: string;
+  limit?: number;
+  search?: string;
+  sort?: string;
+}
+
+const toGiftRecord = (entry: unknown): GiftRecord | null => {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  const record = entry as Record<string, unknown>;
+  const id = typeof record.id === 'string' ? record.id.trim() : '';
+  if (!id) {
+    return null;
+  }
+
+  const contact = record.contact;
+  let contactName: string | undefined;
+  if (contact && typeof contact === 'object') {
+    const name = (contact as Record<string, unknown>).name;
+    if (name && typeof name === 'object') {
+      const nameRecord = name as Record<string, unknown>;
+      if (typeof nameRecord.fullName === 'string' && nameRecord.fullName.trim().length > 0) {
+        contactName = nameRecord.fullName.trim();
+      } else {
+        const first = typeof nameRecord.firstName === 'string' ? nameRecord.firstName.trim() : '';
+        const last = typeof nameRecord.lastName === 'string' ? nameRecord.lastName.trim() : '';
+        contactName = [first, last].filter(Boolean).join(' ').trim() || undefined;
+      }
+    }
+  }
+
+  const amount =
+    record.amount && typeof record.amount === 'object'
+      ? normalizeCurrencyField(record.amount)
+      : undefined;
+
+  return {
+    id,
+    name: typeof record.name === 'string' ? record.name : undefined,
+    amount,
+    giftDate: typeof record.giftDate === 'string' ? record.giftDate : undefined,
+    contactId: typeof record.contactId === 'string' ? record.contactId : undefined,
+    contactName,
+    externalId: typeof record.externalId === 'string' ? record.externalId : undefined,
+    status: typeof record.status === 'string' ? record.status : undefined,
+    giftPayoutId:
+      typeof record.giftPayoutId === 'string' && record.giftPayoutId.length > 0
+        ? record.giftPayoutId
+        : undefined,
+    intakeSource:
+      typeof record.intakeSource === 'string' && record.intakeSource.length > 0
+        ? record.intakeSource
+        : undefined,
+  };
+};
+
+export async function fetchGifts(params: GiftListParams = {}): Promise<GiftRecord[]> {
+  const query = new URLSearchParams();
+  if (typeof params.limit === 'number' && Number.isFinite(params.limit)) {
+    query.set('limit', Math.max(1, params.limit).toString());
+  }
+  if (typeof params.giftPayoutId === 'string' && params.giftPayoutId.trim().length > 0) {
+    query.set('giftPayoutId', params.giftPayoutId.trim());
+  }
+  if (typeof params.search === 'string' && params.search.trim().length > 0) {
+    query.set('search', params.search.trim());
+  }
+  if (typeof params.sort === 'string' && params.sort.trim().length > 0) {
+    query.set('sort', params.sort.trim());
+  }
+
+  const url =
+    query.size > 0 ? `/api/fundraising/gifts?${query.toString()}` : '/api/fundraising/gifts';
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || response.statusText);
+  }
+
+  const payload = (await response.json()) as { data?: { gifts?: unknown[] } } | unknown;
+  const data = Array.isArray((payload as { data?: { gifts?: unknown[] } }).data?.gifts)
+    ? ((payload as { data?: { gifts?: unknown[] } }).data?.gifts as unknown[])
+    : Array.isArray(payload)
+      ? (payload as unknown[])
+      : [];
+
+  return data
+    .map((entry) => toGiftRecord(entry))
+    .filter((record): record is GiftRecord => Boolean(record));
+}
+
 export interface AppealRecord {
   id: string;
   name?: string;
