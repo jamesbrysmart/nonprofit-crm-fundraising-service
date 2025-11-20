@@ -369,6 +369,30 @@ async function main() {
     });
   }
 
+  console.log('--- Ensuring Company Rollup Fields ---');
+  const companyObjectId = await findObjectByNameSingular('company');
+  if (!companyObjectId) {
+    throw new Error('Unable to locate core Company object via metadata API; cannot create company rollup fields.');
+  }
+
+  const companyRollupFields = [
+    { name: 'lifetimeGiftAmount', label: 'Lifetime Gift Amount', type: 'CURRENCY' },
+    { name: 'lifetimeGiftCount', label: 'Lifetime Gift Count', type: 'NUMBER' },
+    { name: 'firstGiftDate', label: 'First Gift Date', type: 'DATE' },
+    { name: 'lastGiftDate', label: 'Last Gift Date', type: 'DATE' },
+    { name: 'yearToDateGiftAmount', label: 'Year-To-Date Gift Amount', type: 'CURRENCY' },
+    { name: 'yearToDateGiftCount', label: 'Year-To-Date Gift Count', type: 'NUMBER' },
+  ];
+
+  for (const field of companyRollupFields) {
+    await createField({
+      objectMetadataId: companyObjectId,
+      name: field.name,
+      label: field.label,
+      type: field.type,
+    });
+  }
+
   console.log('--- Ensuring Opportunity Fields ---');
   const opportunityObjectId = await findObjectByNameSingular('opportunity');
   if (!opportunityObjectId) {
@@ -417,6 +441,13 @@ async function main() {
     { name: 'salutationFormal', label: 'Salutation (Formal)', type: 'TEXT' },
     { name: 'salutationInformal', label: 'Salutation (Informal)', type: 'TEXT' },
     { name: 'mailingAddress', label: 'Mailing Address', type: 'ADDRESS', isNullable: true },
+    { name: 'lifetimeGiftAmount', label: 'Lifetime Gift Amount', type: 'CURRENCY' },
+    { name: 'lifetimeGiftCount', label: 'Lifetime Gift Count', type: 'NUMBER' },
+    { name: 'firstGiftDate', label: 'First Gift Date', type: 'DATE' },
+    { name: 'lastGiftDate', label: 'Last Gift Date', type: 'DATE' },
+    { name: 'yearToDateGiftAmount', label: 'Year-To-Date Gift Amount', type: 'CURRENCY' },
+    { name: 'yearToDateGiftCount', label: 'Year-To-Date Gift Count', type: 'NUMBER' },
+    { name: 'lastGiftMemberName', label: 'Last Gift Member Name', type: 'TEXT' },
   ];
 
   for (const field of householdFields) {
@@ -553,6 +584,9 @@ async function main() {
     { name: 'canceledAt', label: 'Canceled At', type: 'DATE_TIME' },
     { name: 'completedAt', label: 'Completed At', type: 'DATE_TIME' },
     { name: 'statusUpdatedAt', label: 'Status Updated At', type: 'DATE_TIME' },
+    { name: 'totalReceivedAmount', label: 'Total Received Amount', type: 'CURRENCY' },
+    { name: 'paidInstallmentCount', label: 'Paid Installment Count', type: 'NUMBER' },
+    { name: 'lastPaidAt', label: 'Last Paid At', type: 'DATE' },
   ];
 
   for (const field of recurringAgreementFields) {
