@@ -7,8 +7,8 @@ export class GoCardlessWebhookController {
 
   @Post()
   @HttpCode(HttpStatus.ACCEPTED)
-  async handleWebhook(@Body() body: unknown): Promise<{ ok: true }> {
-    await this.webhookService.handleWebhook(body);
+  handleWebhook(@Body() body: unknown): { ok: true } {
+    this.webhookService.handleWebhook(body);
     return { ok: true };
   }
 }

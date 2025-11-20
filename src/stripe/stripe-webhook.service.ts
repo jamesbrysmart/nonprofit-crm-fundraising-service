@@ -155,7 +155,7 @@ export class StripeWebhookService {
     );
 
     try {
-      const result = await this.giftService.createGift(giftPayload);
+      await this.giftService.createGift(giftPayload);
       if (giftPayload.autoPromote === false) {
         this.logger.info('Stripe webhook staged gift for manual review', {
           event: 'stripe_checkout_session_staged',

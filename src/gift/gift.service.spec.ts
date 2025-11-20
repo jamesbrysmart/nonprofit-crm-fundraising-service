@@ -6,34 +6,43 @@ import * as giftValidation from './gift.validation';
 import type { GiftCreatePayload } from './gift.validation';
 import { NormalizedGiftCreatePayload } from './gift.types';
 
-jest.mock('@nestjs/common', () => ({
-  ...jest.requireActual('@nestjs/common'),
-  Logger: jest.fn().mockImplementation(() => ({
-    log: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  })),
-}));
-
 describe('GiftService - staging auto promote', () => {
   let giftService: GiftService;
   let twentyApiService: jest.Mocked<TwentyApiService>;
   let giftStagingService: jest.Mocked<GiftStagingService>;
+  let twentyRequestMock: jest.MockedFunction<TwentyApiService['request']>;
+  let stageGiftMock: jest.MockedFunction<GiftStagingService['stageGift']>;
+  let markCommittedMock: jest.MockedFunction<
+    GiftStagingService['markCommitted']
+  >;
+  let isStagingEnabledMock: jest.MockedFunction<
+    GiftStagingService['isEnabled']
+  >;
+  let updateStatusMock: jest.MockedFunction<
+    GiftStagingService['updateStatusById']
+  >;
 
   beforeEach(() => {
+    twentyRequestMock = jest.fn();
     twentyApiService = {
-      request: jest.fn(),
+      request: twentyRequestMock,
     } as unknown as jest.Mocked<TwentyApiService>;
 
+    stageGiftMock = jest.fn();
+    markCommittedMock = jest.fn();
+    isStagingEnabledMock = jest.fn();
+    updateStatusMock = jest.fn();
+
     giftStagingService = {
-      stageGift: jest.fn(),
-      markCommitted: jest.fn(),
-      isEnabled: jest.fn(),
-      updateStatusById: jest.fn(),
+      stageGift: stageGiftMock,
+      markCommitted: markCommittedMock,
+      isEnabled: isStagingEnabledMock,
+      updateStatusById: updateStatusMock,
     } as unknown as jest.Mocked<GiftStagingService>;
 
-    // Silence real logger instances instantiated inside GiftService.
-    (Logger as unknown as jest.Mock).mockClear();
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(jest.fn());
 
     giftService = new GiftService(twentyApiService, giftStagingService);
   });
@@ -68,8 +77,8 @@ describe('GiftService - staging auto promote', () => {
       )
       .mockResolvedValue(preparedPayload);
 
-    giftStagingService.isEnabled.mockReturnValue(true);
-    giftStagingService.stageGift.mockResolvedValue({
+    isStagingEnabledMock.mockReturnValue(true);
+    stageGiftMock.mockResolvedValue({
       id: 'stg-123',
       autoPromote: false,
       promotionStatus: 'pending',
@@ -91,9 +100,9 @@ describe('GiftService - staging auto promote', () => {
       },
     });
 
-    expect(twentyApiService.request).not.toHaveBeenCalled();
-    expect(giftStagingService.markCommitted).not.toHaveBeenCalled();
-    expect(giftStagingService.updateStatusById).not.toHaveBeenCalled();
+    expect(twentyRequestMock).not.toHaveBeenCalled();
+    expect(markCommittedMock).not.toHaveBeenCalled();
+    expect(updateStatusMock).not.toHaveBeenCalled();
   });
 
   it('commits gift immediately when autoPromote resolves true', async () => {
@@ -122,28 +131,28 @@ describe('GiftService - staging auto promote', () => {
       )
       .mockResolvedValue(preparedPayload);
 
-    giftStagingService.isEnabled.mockReturnValue(true);
-    giftStagingService.stageGift.mockResolvedValue({
+    isStagingEnabledMock.mockReturnValue(true);
+    stageGiftMock.mockResolvedValue({
       id: 'stg-456',
       autoPromote: true,
       promotionStatus: 'committing',
       payload: preparedPayload,
     });
 
-    twentyApiService.request.mockResolvedValue({
+    twentyRequestMock.mockResolvedValue({
       data: { createGift: { id: 'gift-789' } },
     });
 
     const response = await giftService.createGift({});
 
     expect(response).toEqual({ data: { createGift: { id: 'gift-789' } } });
-    expect(twentyApiService.request).toHaveBeenCalledWith(
+    expect(twentyRequestMock).toHaveBeenCalledWith(
       'POST',
       '/gifts',
       expect.any(Object),
       expect.any(String),
     );
-    expect(giftStagingService.markCommitted).toHaveBeenCalledWith(
+    expect(markCommittedMock).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'stg-456',
         autoPromote: true,
@@ -151,7 +160,7 @@ describe('GiftService - staging auto promote', () => {
       }),
       'gift-789',
     );
-    expect(giftStagingService.updateStatusById).not.toHaveBeenCalled();
+    expect(updateStatusMock).not.toHaveBeenCalled();
   });
 
   it('updates dedupe status when diagnostics present', async () => {
@@ -186,8 +195,8 @@ describe('GiftService - staging auto promote', () => {
       )
       .mockResolvedValue(preparedPayload);
 
-    giftStagingService.isEnabled.mockReturnValue(true);
-    giftStagingService.stageGift.mockResolvedValue({
+    isStagingEnabledMock.mockReturnValue(true);
+    stageGiftMock.mockResolvedValue({
       id: 'stg-900',
       autoPromote: false,
       promotionStatus: 'pending',
@@ -209,12 +218,9 @@ describe('GiftService - staging auto promote', () => {
       },
     });
 
-    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith(
-      'stg-900',
-      {
-        dedupeStatus: 'matched_existing',
-      },
-    );
+    expect(updateStatusMock).toHaveBeenCalledWith('stg-900', {
+      dedupeStatus: 'matched_existing',
+    });
   });
 
   it('passes appealId through to the Twenty API payload when present', async () => {
@@ -244,14 +250,14 @@ describe('GiftService - staging auto promote', () => {
       )
       .mockResolvedValue(preparedPayload);
 
-    giftStagingService.isEnabled.mockReturnValue(false);
-    twentyApiService.request.mockResolvedValue({
+    isStagingEnabledMock.mockReturnValue(false);
+    twentyRequestMock.mockResolvedValue({
       data: { createGift: { id: 'gift-appeal' } },
     });
 
     await giftService.createGift({});
 
-    expect(twentyApiService.request).toHaveBeenCalledWith(
+    expect(twentyRequestMock).toHaveBeenCalledWith(
       'POST',
       '/gifts',
       expect.objectContaining({ appealId: 'apl-123' }),

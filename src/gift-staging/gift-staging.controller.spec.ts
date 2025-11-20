@@ -20,22 +20,47 @@ describe('GiftStagingController', () => {
   let giftStagingService: jest.Mocked<GiftStagingService>;
   let giftStagingProcessingService: jest.Mocked<GiftStagingProcessingService>;
   let giftService: jest.Mocked<GiftService>;
+  let isEnabledMock: jest.MockedFunction<GiftStagingService['isEnabled']>;
+  let listGiftStagingMock: jest.MockedFunction<
+    GiftStagingService['listGiftStaging']
+  >;
+  let updateStatusByIdMock: jest.MockedFunction<
+    GiftStagingService['updateStatusById']
+  >;
+  let stageGiftMock: jest.MockedFunction<GiftStagingService['stageGift']>;
+  let getGiftStagingByIdMock: jest.MockedFunction<
+    GiftStagingService['getGiftStagingById']
+  >;
+  let processGiftMock: jest.MockedFunction<
+    GiftStagingProcessingService['processGift']
+  >;
+  let normalizeGiftPayloadMock: jest.MockedFunction<
+    GiftService['normalizeCreateGiftPayload']
+  >;
 
   beforeEach(() => {
+    isEnabledMock = jest.fn();
+    listGiftStagingMock = jest.fn();
+    updateStatusByIdMock = jest.fn();
+    stageGiftMock = jest.fn();
+    getGiftStagingByIdMock = jest.fn();
+    processGiftMock = jest.fn();
+    normalizeGiftPayloadMock = jest.fn();
+
     giftStagingService = {
-      isEnabled: jest.fn(),
-      listGiftStaging: jest.fn(),
-      updateStatusById: jest.fn(),
-      stageGift: jest.fn(),
-      getGiftStagingById: jest.fn(),
+      isEnabled: isEnabledMock,
+      listGiftStaging: listGiftStagingMock,
+      updateStatusById: updateStatusByIdMock,
+      stageGift: stageGiftMock,
+      getGiftStagingById: getGiftStagingByIdMock,
     } as unknown as jest.Mocked<GiftStagingService>;
 
     giftStagingProcessingService = {
-      processGift: jest.fn(),
+      processGift: processGiftMock,
     } as unknown as jest.Mocked<GiftStagingProcessingService>;
 
     giftService = {
-      normalizeCreateGiftPayload: jest.fn(),
+      normalizeCreateGiftPayload: normalizeGiftPayloadMock,
     } as unknown as jest.Mocked<GiftService>;
 
     controller = new GiftStagingController(
@@ -46,30 +71,30 @@ describe('GiftStagingController', () => {
   });
 
   it('throws ServiceUnavailableException when staging is disabled', async () => {
-    giftStagingService.isEnabled.mockReturnValue(false);
+    isEnabledMock.mockReturnValue(false);
 
     await expect(controller.processGift('stg-123')).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
-    expect(giftStagingProcessingService.processGift).not.toHaveBeenCalled();
+    expect(processGiftMock).not.toHaveBeenCalled();
   });
 
   it('throws when listing and staging is disabled', async () => {
-    giftStagingService.isEnabled.mockReturnValue(false);
+    isEnabledMock.mockReturnValue(false);
 
     await expect(controller.listGiftStaging({})).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
-    expect(giftStagingService.listGiftStaging).not.toHaveBeenCalled();
+    expect(listGiftStagingMock).not.toHaveBeenCalled();
   });
 
   it('delegates listing to service with normalized params', async () => {
-    giftStagingService.isEnabled.mockReturnValue(true);
+    isEnabledMock.mockReturnValue(true);
     const result: GiftStagingListResult = {
       data: [],
       meta: { hasMore: false },
     };
-    giftStagingService.listGiftStaging.mockResolvedValue(result);
+    listGiftStagingMock.mockResolvedValue(result);
 
     await expect(
       controller.listGiftStaging({
@@ -82,7 +107,7 @@ describe('GiftStagingController', () => {
       }),
     ).resolves.toEqual(result);
 
-    expect(giftStagingService.listGiftStaging).toHaveBeenCalledWith({
+    expect(listGiftStagingMock).toHaveBeenCalledWith({
       statuses: ['ready_for_commit', 'commit_failed'],
       intakeSources: ['manual_ui', 'stripe_webhook'],
       search: 'ABC',
@@ -93,8 +118,8 @@ describe('GiftStagingController', () => {
   });
 
   it('returns single staging record when available', async () => {
-    giftStagingService.isEnabled.mockReturnValue(true);
-    giftStagingService.getGiftStagingById.mockResolvedValue({
+    isEnabledMock.mockReturnValue(true);
+    getGiftStagingByIdMock.mockResolvedValue({
       id: 'stg-200',
       promotionStatus: 'pending',
     });
@@ -110,8 +135,8 @@ describe('GiftStagingController', () => {
   });
 
   it('throws NotFoundException when staging record missing', async () => {
-    giftStagingService.isEnabled.mockReturnValue(true);
-    giftStagingService.getGiftStagingById.mockResolvedValue(undefined);
+    isEnabledMock.mockReturnValue(true);
+    getGiftStagingByIdMock.mockResolvedValue(undefined);
 
     await expect(controller.getGiftStaging('missing')).rejects.toBeInstanceOf(
       NotFoundException,
@@ -119,31 +144,31 @@ describe('GiftStagingController', () => {
   });
 
   it('delegates to processing service when enabled', async () => {
-    giftStagingService.isEnabled.mockReturnValue(true);
+    isEnabledMock.mockReturnValue(true);
     const result: ProcessGiftResult = {
       status: 'committed',
       stagingId: 'stg-123',
       giftId: 'gift-456',
     };
-    giftStagingProcessingService.processGift.mockResolvedValue(result);
+    processGiftMock.mockResolvedValue(result);
 
     await expect(controller.processGift('stg-123')).resolves.toEqual(result);
 
-    expect(giftStagingProcessingService.processGift).toHaveBeenCalledWith({
+    expect(processGiftMock).toHaveBeenCalledWith({
       stagingId: 'stg-123',
     });
   });
 
   it('propagates errors from the processing service', async () => {
-    giftStagingService.isEnabled.mockReturnValue(true);
+    isEnabledMock.mockReturnValue(true);
     const error = new ServiceUnavailableException('failed');
-    giftStagingProcessingService.processGift.mockRejectedValue(error);
+    processGiftMock.mockRejectedValue(error);
 
     await expect(controller.processGift('stg-123')).rejects.toThrow('failed');
   });
 
   it('updates status when staging is enabled', async () => {
-    giftStagingService.isEnabled.mockReturnValue(true);
+    isEnabledMock.mockReturnValue(true);
 
     await expect(
       controller.updateStatus('stg-123', {
@@ -153,27 +178,24 @@ describe('GiftStagingController', () => {
       }),
     ).resolves.toEqual({ ok: true });
 
-    expect(giftStagingService.updateStatusById).toHaveBeenCalledWith(
-      'stg-123',
-      {
-        promotionStatus: 'ready_for_commit',
-        validationStatus: 'passed',
-        dedupeStatus: 'passed',
-      },
-    );
+    expect(updateStatusByIdMock).toHaveBeenCalledWith('stg-123', {
+      promotionStatus: 'ready_for_commit',
+      validationStatus: 'passed',
+      dedupeStatus: 'passed',
+    });
   });
 
   it('throws when staging disabled for status update', async () => {
-    giftStagingService.isEnabled.mockReturnValue(false);
+    isEnabledMock.mockReturnValue(false);
 
     await expect(controller.updateStatus('stg-123', {})).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
-    expect(giftStagingService.updateStatusById).not.toHaveBeenCalled();
+    expect(updateStatusByIdMock).not.toHaveBeenCalled();
   });
 
   it('creates a staging record when enabled', async () => {
-    giftStagingService.isEnabled.mockReturnValue(true);
+    isEnabledMock.mockReturnValue(true);
 
     const normalizedPayload: NormalizedGiftCreatePayload = {
       amount: { currencyCode: 'GBP', value: 25 },
@@ -185,18 +207,18 @@ describe('GiftStagingController', () => {
       donorId: 'person-1',
     };
 
-    giftService.normalizeCreateGiftPayload.mockResolvedValue({
+    normalizeGiftPayloadMock.mockResolvedValue({
       ...normalizedPayload,
     });
 
-    giftStagingService.stageGift.mockResolvedValue({
+    stageGiftMock.mockResolvedValue({
       id: 'stg-111',
       autoPromote: false,
       promotionStatus: 'pending',
       payload: { ...normalizedPayload, autoPromote: false },
     });
 
-    giftStagingService.getGiftStagingById.mockResolvedValue({
+    getGiftStagingByIdMock.mockResolvedValue({
       id: 'stg-111',
       promotionStatus: 'pending',
       validationStatus: 'pending',
@@ -225,17 +247,17 @@ describe('GiftStagingController', () => {
       },
     });
 
-    expect(giftService.normalizeCreateGiftPayload).toHaveBeenCalledWith({
+    expect(normalizeGiftPayloadMock).toHaveBeenCalledWith({
       amount: { currencyCode: 'GBP', value: 25 },
     });
-    expect(giftStagingService.stageGift).toHaveBeenCalledWith(
+    expect(stageGiftMock).toHaveBeenCalledWith(
       expect.objectContaining({ autoPromote: false }),
     );
   });
 
   it('throws when staging creation fails', async () => {
-    giftStagingService.isEnabled.mockReturnValue(true);
-    giftService.normalizeCreateGiftPayload.mockResolvedValue({
+    isEnabledMock.mockReturnValue(true);
+    normalizeGiftPayloadMock.mockResolvedValue({
       amount: { currencyCode: 'GBP', value: 10 },
       amountMinor: 1000,
       currency: 'GBP',
@@ -244,7 +266,7 @@ describe('GiftStagingController', () => {
       autoPromote: false,
       donorId: 'person-2',
     });
-    giftStagingService.stageGift.mockResolvedValue(undefined);
+    stageGiftMock.mockResolvedValue(undefined);
 
     await expect(controller.createGiftStaging({})).rejects.toBeInstanceOf(
       InternalServerErrorException,
@@ -252,11 +274,11 @@ describe('GiftStagingController', () => {
   });
 
   it('throws when staging is disabled for create', async () => {
-    giftStagingService.isEnabled.mockReturnValue(false);
+    isEnabledMock.mockReturnValue(false);
 
     await expect(controller.createGiftStaging({})).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
-    expect(giftService.normalizeCreateGiftPayload).not.toHaveBeenCalled();
+    expect(normalizeGiftPayloadMock).not.toHaveBeenCalled();
   });
 });

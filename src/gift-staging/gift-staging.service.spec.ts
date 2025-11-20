@@ -10,10 +10,13 @@ describe('GiftStagingService', () => {
   let configService: jest.Mocked<ConfigService>;
   let logger: jest.Mocked<StructuredLoggerService>;
   let twentyApiService: jest.Mocked<TwentyApiService>;
+  let configGetMock: jest.MockedFunction<ConfigService['get']>;
+  let requestMock: jest.MockedFunction<TwentyApiService['request']>;
 
   beforeEach(() => {
+    configGetMock = jest.fn();
     configService = {
-      get: jest.fn(),
+      get: configGetMock,
     } as unknown as jest.Mocked<ConfigService>;
 
     logger = {
@@ -23,13 +26,14 @@ describe('GiftStagingService', () => {
       error: jest.fn(),
     } as unknown as jest.Mocked<StructuredLoggerService>;
 
+    requestMock = jest.fn();
     twentyApiService = {
-      request: jest.fn(),
+      request: requestMock,
     } as unknown as jest.Mocked<TwentyApiService>;
   });
 
   const createService = (enabled: boolean) => {
-    configService.get.mockImplementation((key: string) => {
+    configGetMock.mockImplementation((key: string) => {
       if (key === 'FUNDRAISING_ENABLE_GIFT_STAGING') {
         return enabled ? 'true' : 'false';
       }
@@ -51,13 +55,13 @@ describe('GiftStagingService', () => {
       data: [],
       meta: { hasMore: false },
     });
-    expect(twentyApiService.request).not.toHaveBeenCalled();
+    expect(requestMock).not.toHaveBeenCalled();
   });
 
   it('maps records from API response', async () => {
     const service = createService(true);
 
-    twentyApiService.request.mockResolvedValue({
+    requestMock.mockResolvedValue({
       data: {
         giftStagings: [
           {
@@ -121,7 +125,7 @@ describe('GiftStagingService', () => {
   it('applies filters and sorting', async () => {
     const service = createService(true);
 
-    twentyApiService.request.mockResolvedValue({
+    requestMock.mockResolvedValue({
       data: {
         giftStagings: [
           {

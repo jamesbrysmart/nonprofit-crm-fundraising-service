@@ -95,8 +95,12 @@ const parseAmount = (
     throw new BadRequestException('amount.value cannot be null');
   }
 
+  if (typeof value !== 'number' && typeof value !== 'string') {
+    throw new BadRequestException('amount.value must be numeric');
+  }
+
   const numericValue =
-    typeof value === 'number' ? value : Number.parseFloat(String(value));
+    typeof value === 'number' ? value : Number.parseFloat(value);
 
   if (Number.isNaN(numericValue)) {
     throw new BadRequestException('amount.value must be numeric');

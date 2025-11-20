@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { TwentyApiService } from '../twenty/twenty-api.service';
+import { stringifyQueryValue } from '../common/query-string.utils';
 import {
   ensureAppealListResponse,
   ensureCreateAppealResponse,
@@ -135,13 +136,13 @@ export class AppealService {
       if (Array.isArray(value)) {
         for (const entry of value) {
           if (entry !== undefined && entry !== null) {
-            params.append(key, String(entry));
+            params.append(key, stringifyQueryValue(entry));
           }
         }
         continue;
       }
 
-      params.append(key, String(value));
+      params.append(key, stringifyQueryValue(value));
     }
 
     const serialized = params.toString();

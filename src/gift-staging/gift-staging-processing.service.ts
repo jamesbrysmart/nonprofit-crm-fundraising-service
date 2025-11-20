@@ -380,11 +380,11 @@ export class GiftStagingProcessingService {
     rawPayload: string,
   ): NormalizedGiftCreatePayload | undefined {
     try {
-      const parsed = JSON.parse(rawPayload);
+      const parsed: unknown = JSON.parse(rawPayload);
       if (this.isPlainObject(parsed)) {
         return parsed as NormalizedGiftCreatePayload;
       }
-    } catch (error) {
+    } catch {
       return undefined;
     }
 

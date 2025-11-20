@@ -17,7 +17,7 @@ export class GoCardlessWebhookService {
 
   constructor(private readonly logger: StructuredLoggerService) {}
 
-  async handleWebhook(payload: unknown): Promise<void> {
+  handleWebhook(payload: unknown): void {
     const summaries = this.extractEventSummaries(payload);
     this.logger.info(
       'Received GoCardless webhook (skeleton handler)',

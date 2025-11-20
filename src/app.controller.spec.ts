@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import type { Response as ExpressResponse } from 'express';
 import { AppController } from './app.controller';
 
 describe('AppController', () => {
@@ -13,8 +14,10 @@ describe('AppController', () => {
   });
 
   it('redirects /fundraising to the trailing slash path', () => {
-    const redirect = jest.fn();
-    controller.redirectToFundraisingRoot({ redirect } as any);
-    expect(redirect).toHaveBeenCalledWith('/fundraising/');
+    const response: Pick<ExpressResponse, 'redirect'> = {
+      redirect: jest.fn(),
+    };
+    controller.redirectToFundraisingRoot(response);
+    expect(response.redirect).toHaveBeenCalledWith('/fundraising/');
   });
 });

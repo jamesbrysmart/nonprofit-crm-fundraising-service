@@ -158,7 +158,7 @@ export class TwentyApiService {
       }
 
       try {
-        const parsed = JSON.parse(rawBody);
+        const parsed: unknown = JSON.parse(rawBody);
 
         if (attempt > 1) {
           this.structuredLogger.info(

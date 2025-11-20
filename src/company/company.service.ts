@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { stringifyQueryValue } from '../common/query-string.utils';
 import { TwentyApiService } from '../twenty/twenty-api.service';
 
 @Injectable()
@@ -54,13 +55,13 @@ export class CompanyService {
       if (Array.isArray(value)) {
         for (const entry of value) {
           if (entry !== undefined && entry !== null) {
-            params.append(key, String(entry));
+            params.append(key, stringifyQueryValue(entry));
           }
         }
         continue;
       }
 
-      params.append(key, String(value));
+      params.append(key, stringifyQueryValue(value));
     }
 
     const serialized = params.toString();

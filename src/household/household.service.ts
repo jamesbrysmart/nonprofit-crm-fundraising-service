@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { URLSearchParams } from 'url';
+import { stringifyQueryValue } from '../common/query-string.utils';
 import { TwentyApiService } from '../twenty/twenty-api.service';
 import {
   AssignHouseholdMemberPayload,
@@ -140,7 +141,7 @@ export class HouseholdService {
     householdId: string,
     contactId: string,
   ): Promise<HouseholdMemberRecord> {
-    const normalizedId = this.normalizeId(householdId, 'householdId');
+    this.normalizeId(householdId, 'householdId');
     const normalizedContactId = this.normalizeId(contactId, 'contactId');
 
     await this.twentyApiService.request(
@@ -218,12 +219,12 @@ export class HouseholdService {
           if (entry === undefined || entry === null) {
             continue;
           }
-          params.append(key, String(entry));
+          params.append(key, stringifyQueryValue(entry));
         }
         continue;
       }
 
-      params.append(key, String(value));
+      params.append(key, stringifyQueryValue(value));
     }
 
     const serialized = params.toString();

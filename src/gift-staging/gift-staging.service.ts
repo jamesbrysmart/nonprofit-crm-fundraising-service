@@ -549,11 +549,6 @@ export class GiftStagingService {
       return trimmed.length > 0 ? trimmed : undefined;
     };
 
-    const normalizeCurrency = (value?: string | null): string | undefined => {
-      const normalized = normalizeString(value);
-      return normalized ? normalized.toUpperCase() : undefined;
-    };
-
     if (updates.donorId !== undefined) {
       merged.donorId = normalizeString(updates.donorId);
     }
@@ -794,7 +789,7 @@ export class GiftStagingService {
       return undefined;
     }
     try {
-      const parsed = JSON.parse(rawPayload);
+      const parsed: unknown = JSON.parse(rawPayload);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         return parsed as NormalizedGiftCreatePayload;
       }
@@ -993,7 +988,7 @@ export class GiftStagingService {
     }
     if (typeof value === 'string') {
       try {
-        const parsed = JSON.parse(value);
+        const parsed: unknown = JSON.parse(value);
         if (this.isPlainObject(parsed)) {
           return parsed;
         }
@@ -1209,6 +1204,7 @@ export class GiftStagingService {
           {
             event: 'gift_staging_extract_raw_payload_failed',
             stagingId: id,
+            message: error instanceof Error ? error.message : String(error),
           },
           GiftStagingService.name,
         );
@@ -1220,7 +1216,7 @@ export class GiftStagingService {
       entity.providerContext = providerContextRaw;
     } else if (typeof providerContextRaw === 'string') {
       try {
-        const parsed = JSON.parse(providerContextRaw);
+        const parsed: unknown = JSON.parse(providerContextRaw);
         if (this.isPlainObject(parsed)) {
           entity.providerContext = parsed;
         }

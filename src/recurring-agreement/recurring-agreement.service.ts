@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { URLSearchParams } from 'url';
+import { stringifyQueryValue } from '../common/query-string.utils';
 import { TwentyApiService } from '../twenty/twenty-api.service';
 import { RecurringAgreementPayload } from './recurring-agreement.types';
 
@@ -92,9 +93,11 @@ export class RecurringAgreementService {
         continue;
       }
       if (Array.isArray(value)) {
-        value.forEach((item) => searchParams.append(key, String(item)));
+        value.forEach((item) =>
+          searchParams.append(key, stringifyQueryValue(item)),
+        );
       } else {
-        searchParams.append(key, String(value));
+        searchParams.append(key, stringifyQueryValue(value));
       }
     }
 

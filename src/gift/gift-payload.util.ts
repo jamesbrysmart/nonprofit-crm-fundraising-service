@@ -9,7 +9,7 @@ const normalizeProviderContext = (
 
   if (typeof input === 'string') {
     try {
-      const parsed = JSON.parse(input);
+      const parsed: unknown = JSON.parse(input);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         return parsed as Record<string, unknown>;
       }
