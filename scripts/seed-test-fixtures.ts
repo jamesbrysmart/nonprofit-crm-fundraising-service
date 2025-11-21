@@ -25,6 +25,8 @@ type SeededStagingSummary = {
   giftIntent?: string;
   opportunityId?: string;
   giftPayoutId?: string;
+  receiptStatus?: string;
+  receiptWarnings?: string[];
 };
 
 type SeededPayoutSummary = {
@@ -55,11 +57,11 @@ async function main(): Promise<void> {
       );
     }
 
-    const runId = randomUUID().slice(0, 8);
-    const today = new Date().toISOString().slice(0, 10);
-    const stagingSummaries: SeededStagingSummary[] = [];
-    const payoutSummaries: SeededPayoutSummary[] = [];
-    const { companyId, companyName, opportunityId } = await ensureTestOpportunity(
+  const runId = randomUUID().slice(0, 8);
+  const today = new Date().toISOString().slice(0, 10);
+  const stagingSummaries: SeededStagingSummary[] = [];
+  const payoutSummaries: SeededPayoutSummary[] = [];
+  const { companyId, companyName, opportunityId } = await ensureTestOpportunity(
       twentyApiService,
       runId,
     );
@@ -89,6 +91,8 @@ async function main(): Promise<void> {
       intakeSource: pendingReview.entity.intakeSource,
       giftIntent: pendingReview.preparedPayload.giftIntent,
       opportunityId,
+      receiptStatus: pendingReview.entity.receiptStatus,
+      receiptWarnings: pendingReview.entity.receiptWarnings,
     });
 
     const readyForCommit = await seedManualStaging({
@@ -115,6 +119,8 @@ async function main(): Promise<void> {
       intakeSource: readyForCommit.entity.intakeSource,
       giftIntent: readyForCommit.preparedPayload.giftIntent,
       opportunityId,
+      receiptStatus: readyForCommit.entity.receiptStatus,
+      receiptWarnings: readyForCommit.entity.receiptWarnings,
     });
 
     const commitFailed = await seedManualStaging({
@@ -139,6 +145,8 @@ async function main(): Promise<void> {
       status: commitFailed.entity.promotionStatus,
       intakeSource: commitFailed.entity.intakeSource,
       giftIntent: commitFailed.preparedPayload.giftIntent,
+      receiptStatus: commitFailed.entity.receiptStatus,
+      receiptWarnings: commitFailed.entity.receiptWarnings,
     });
 
     const recurringAgreementId = await seedRecurringAgreement({
@@ -175,6 +183,8 @@ async function main(): Promise<void> {
       intakeSource: grantHighValue.entity.intakeSource,
       giftIntent: 'grant',
       opportunityId,
+      receiptStatus: grantHighValue.entity.receiptStatus,
+      receiptWarnings: grantHighValue.entity.receiptWarnings,
     });
 
     const corporateInKind = await seedManualStaging({
@@ -203,6 +213,8 @@ async function main(): Promise<void> {
       status: corporateInKind.entity.promotionStatus,
       intakeSource: corporateInKind.entity.intakeSource,
       giftIntent: 'corporateInKind',
+      receiptStatus: corporateInKind.entity.receiptStatus,
+      receiptWarnings: corporateInKind.entity.receiptWarnings,
     });
 
     const recurringRow = await seedManualStaging({
@@ -236,6 +248,35 @@ async function main(): Promise<void> {
       recurringAgreementId: recurringRow.entity.recurringAgreementId,
       provider: recurringRow.entity.provider,
       giftIntent: recurringRow.preparedPayload.giftIntent,
+      receiptStatus: recurringRow.entity.receiptStatus,
+      receiptWarnings: recurringRow.entity.receiptWarnings,
+    });
+
+    const missingEmail = await seedManualStaging({
+      label: 'missing-email',
+      giftService,
+      giftStagingService,
+      amountMinor: 1950,
+      giftDate: today,
+      runId,
+      omitEmail: true,
+      notes: 'Seeded test fixture (missing email/name for receipt warning)',
+      giftIntent: 'standard',
+      statuses: {
+        promotionStatus: 'pending',
+        validationStatus: 'pending',
+        dedupeStatus: 'pending',
+      },
+    });
+    stagingSummaries.push({
+      id: missingEmail.entity.id,
+      donorId: missingEmail.preparedPayload.donorId,
+      scenario: 'Missing email/name',
+      status: missingEmail.entity.promotionStatus,
+      intakeSource: missingEmail.entity.intakeSource,
+      giftIntent: missingEmail.preparedPayload.giftIntent,
+      receiptStatus: missingEmail.entity.receiptStatus,
+      receiptWarnings: missingEmail.entity.receiptWarnings,
     });
 
   const committedGift = await giftService.createGift({
@@ -374,6 +415,7 @@ async function seedManualStaging(options: {
   estimatedValue?: number;
   giftPayoutId?: string;
   companyId?: string;
+  omitEmail?: boolean;
 }): Promise<{
   entity: GiftStagingEntity;
   preparedPayload: NormalizedGiftCreatePayload;
@@ -397,6 +439,7 @@ async function seedManualStaging(options: {
     estimatedValue,
     giftPayoutId,
     companyId,
+    omitEmail = false,
   } =
     options;
 
@@ -413,7 +456,9 @@ async function seedManualStaging(options: {
     contact: {
       firstName: `Seeded${label.replace(/[^a-z0-9]/gi, '') || 'Donor'}`,
       lastName: `Scenario${runId}`,
-      email: `seeded.${label.replace(/[^a-z0-9]/gi, '').toLowerCase()}+${runId}@example.org`,
+      email: omitEmail
+        ? undefined
+        : `seeded.${label.replace(/[^a-z0-9]/gi, '').toLowerCase()}+${runId}@example.org`,
     },
     autoPromote: false,
     notes,

@@ -13,6 +13,7 @@ import {
 import { ensureCreateGiftResponse } from '../gift/gift.validation';
 import type { NormalizedGiftCreatePayload } from '../gift/gift.types';
 import { RecurringAgreementService } from '../recurring-agreement/recurring-agreement.service';
+import { ReceiptPolicyService } from '../receipt/receipt-policy.service';
 
 export interface ProcessGiftArgs {
   stagingId: string;
@@ -42,6 +43,7 @@ export class GiftStagingProcessingService {
     private readonly twentyApiService: TwentyApiService,
     private readonly structuredLogger: StructuredLoggerService,
     private readonly recurringAgreementService: RecurringAgreementService,
+    private readonly receiptPolicyService: ReceiptPolicyService,
   ) {}
 
   async processGift(args: ProcessGiftArgs): Promise<ProcessGiftResult> {
@@ -178,7 +180,10 @@ export class GiftStagingProcessingService {
       promotionStatus: 'committing',
     });
 
-    const requestBody = buildTwentyGiftPayload(parsedPayload);
+    const enrichedPayload =
+      this.receiptPolicyService.applyReceiptMetadata(parsedPayload);
+
+    const requestBody = buildTwentyGiftPayload(enrichedPayload);
 
     let createGiftResponse: unknown;
     try {

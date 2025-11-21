@@ -32,6 +32,11 @@ export type QueueRow = GiftStagingListItem & {
   alertFlags: string[];
   isHighValue: boolean;
   intentLabel?: string;
+  receiptMeta?: {
+    label: string;
+    tone: 'info' | 'success' | 'warning' | 'danger';
+    policy?: string;
+  };
 };
 
 export function mapQueueRows(items: GiftStagingListItem[]): QueueRow[] {
@@ -51,6 +56,7 @@ export function mapQueueRows(items: GiftStagingListItem[]): QueueRow[] {
     alertFlags: getAlertFlags(item),
     isHighValue: typeof item.amountMinor === 'number' && item.amountMinor >= HIGH_VALUE_THRESHOLD,
     intentLabel: getIntentLabel(item.giftIntent),
+    receiptMeta: formatReceiptStatus(item),
   }));
 }
 
@@ -99,6 +105,14 @@ function getAlertFlags(item: GiftStagingListItem): string[] {
   }
   if (typeof item.amountMinor === 'number' && item.amountMinor >= HIGH_VALUE_THRESHOLD) {
     alerts.add('High value');
+  }
+  if (item.receiptWarnings && item.receiptWarnings.length > 0) {
+    for (const warning of item.receiptWarnings) {
+      alerts.add(warning);
+    }
+  }
+  if (item.receiptStatus === 'suppressed') {
+    alerts.add('Receipt suppressed');
   }
   return Array.from(alerts);
 }
@@ -185,5 +199,24 @@ export function formatDedupeStatus(status?: string): DuplicateStatusMeta {
       return { label: 'Needs review', tone: 'warning' };
     default:
       return { label: status ?? '—', tone: 'info' };
+  }
+}
+
+function formatReceiptStatus(
+  item: GiftStagingListItem,
+): { label: string; tone: 'info' | 'success' | 'warning' | 'danger'; policy?: string } | undefined {
+  const status = (item.receiptStatus ?? '').toLowerCase();
+
+  switch (status) {
+    case 'sent':
+      return { label: 'Receipt sent', tone: 'success', policy: item.receiptPolicyApplied };
+    case 'pending':
+      return { label: 'Receipt pending', tone: 'info', policy: item.receiptPolicyApplied };
+    case 'failed':
+      return { label: 'Receipt failed', tone: 'danger', policy: item.receiptPolicyApplied };
+    case 'suppressed':
+      return { label: 'Receipt suppressed', tone: 'warning', policy: item.receiptPolicyApplied };
+    default:
+      return undefined;
   }
 }

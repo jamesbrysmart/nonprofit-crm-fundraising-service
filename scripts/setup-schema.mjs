@@ -334,6 +334,13 @@ async function main() {
     { name: "isInKind", label: "Is In-Kind", type: "BOOLEAN" },
     { name: "inKindDescription", label: "In-Kind Description", type: "TEXT" },
     { name: "estimatedValue", label: "Estimated Value", type: "NUMBER" },
+    { name: "receiptStatus", label: "Receipt Status", type: "TEXT" },
+    { name: "receiptSentAt", label: "Receipt Sent At", type: "DATE_TIME" },
+    { name: "receiptPolicyApplied", label: "Receipt Policy Applied", type: "TEXT" },
+    { name: "receiptChannel", label: "Receipt Channel", type: "TEXT" },
+    { name: "receiptTemplateVersion", label: "Receipt Template Version", type: "TEXT" },
+    { name: "receiptError", label: "Receipt Error", type: "TEXT" },
+    { name: "receiptDedupeKey", label: "Receipt Dedupe Key", type: "TEXT" },
   ];
 
   for (const field of giftFields) {
@@ -587,6 +594,10 @@ async function main() {
     { name: 'totalReceivedAmount', label: 'Total Received Amount', type: 'CURRENCY' },
     { name: 'paidInstallmentCount', label: 'Paid Installment Count', type: 'NUMBER' },
     { name: 'lastPaidAt', label: 'Last Paid At', type: 'DATE' },
+    { name: 'annualReceiptStatus', label: 'Annual Receipt Status', type: 'TEXT' },
+    { name: 'annualReceiptSentAt', label: 'Annual Receipt Sent At', type: 'DATE_TIME' },
+    { name: 'annualReceiptPeriod', label: 'Annual Receipt Period', type: 'TEXT' },
+    { name: 'annualReceiptPolicy', label: 'Annual Receipt Policy', type: 'TEXT' },
   ];
 
   for (const field of recurringAgreementFields) {

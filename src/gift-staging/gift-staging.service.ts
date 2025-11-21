@@ -51,6 +51,14 @@ export interface GiftStagingEntity {
   recurringAgreementId?: string;
   notes?: string;
   errorDetail?: string;
+  receiptStatus?: string;
+  receiptPolicyApplied?: string;
+  receiptChannel?: string;
+  receiptTemplateVersion?: string;
+  receiptError?: string;
+  receiptDedupeKey?: string;
+  receiptSentAt?: string;
+  receiptWarnings?: string[];
 }
 
 export interface GiftStagingStatusUpdate {
@@ -148,6 +156,14 @@ export interface GiftStagingListItem {
   giftPayoutId?: string;
   rawPayloadAvailable: boolean;
   notes?: string;
+  receiptStatus?: string;
+  receiptPolicyApplied?: string;
+  receiptChannel?: string;
+  receiptTemplateVersion?: string;
+  receiptError?: string;
+  receiptDedupeKey?: string;
+  receiptSentAt?: string;
+  receiptWarnings?: string[];
 }
 
 export interface GiftStagingListResult {
@@ -289,7 +305,7 @@ export class GiftStagingService {
         GiftStagingService.name,
       );
 
-      const entity = this.extractGiftStagingFromResponse(response);
+      let entity = this.extractGiftStagingFromResponse(response);
       if (!entity) {
         this.structuredLogger.warn(
           'Gift staging get response missing giftStaging',
@@ -300,6 +316,11 @@ export class GiftStagingService {
           GiftStagingService.name,
         );
         return undefined;
+      }
+
+      const receiptMeta = this.extractReceiptMeta(entity);
+      if (receiptMeta) {
+        entity = { ...entity, ...receiptMeta };
       }
 
       return entity;
@@ -1273,7 +1294,90 @@ export class GiftStagingService {
           ? pageInfo.nextCursor
           : undefined;
 
-    return { records, hasMore, nextCursor };
+    const augmentedRecords = records.map((record) => {
+      const receiptMeta = this.extractReceiptMeta(record);
+      return receiptMeta ? { ...record, ...receiptMeta } : record;
+    });
+
+    return { records: augmentedRecords, hasMore, nextCursor };
+  }
+
+  private extractReceiptMeta(
+    entity: GiftStagingEntity,
+  ):
+    | {
+        receiptStatus?: string;
+        receiptPolicyApplied?: string;
+        receiptChannel?: string;
+        receiptTemplateVersion?: string;
+        receiptError?: string;
+        receiptDedupeKey?: string;
+        receiptSentAt?: string;
+        receiptWarnings?: string[];
+      }
+    | undefined {
+    const raw = entity.rawPayload;
+    if (!raw || raw.trim().length === 0) {
+      return undefined;
+    }
+
+    let parsed: Record<string, unknown> | undefined;
+    try {
+      const maybe = JSON.parse(raw);
+      parsed = maybe && typeof maybe === 'object' && !Array.isArray(maybe) ? maybe : undefined;
+    } catch {
+      return undefined;
+    }
+
+    if (!parsed) {
+      return undefined;
+    }
+
+    const normalize = (value: unknown): string | undefined => {
+      if (typeof value !== 'string') {
+        return undefined;
+      }
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : undefined;
+    };
+
+    const receiptStatus = normalize(parsed.receiptStatus);
+    const receiptPolicyApplied = normalize(parsed.receiptPolicyApplied);
+    const receiptChannel = normalize(parsed.receiptChannel);
+    const receiptTemplateVersion = normalize(parsed.receiptTemplateVersion);
+    const receiptError = normalize(parsed.receiptError);
+    const receiptDedupeKey = normalize(parsed.receiptDedupeKey);
+    const receiptSentAt = normalize(parsed.receiptSentAt);
+
+    const warnings: string[] = [];
+    if ((receiptChannel ?? 'email') === 'email') {
+      const donorEmail = normalize(entity.donorEmail) ?? normalize(parsed.donorEmail);
+      if (!donorEmail && receiptStatus !== 'suppressed') {
+        warnings.push('Missing email for receipt');
+      }
+      const donorFirst = normalize(entity.donorFirstName) ?? normalize(parsed.donorFirstName);
+      const donorLast = normalize(entity.donorLastName) ?? normalize(parsed.donorLastName);
+      if (!donorFirst || !donorLast) {
+        warnings.push('Missing donor name');
+      }
+    }
+    if (receiptStatus === 'suppressed') {
+      warnings.push('Receipt suppressed');
+    }
+    if (receiptStatus === 'failed') {
+      warnings.push('Receipt failed');
+    }
+
+    return {
+      receiptStatus,
+      receiptPolicyApplied,
+      receiptChannel,
+      receiptTemplateVersion,
+      receiptError,
+      receiptDedupeKey,
+      receiptSentAt,
+      receiptWarnings: warnings.length > 0 ? warnings : undefined,
+    };
   }
 
   private buildListQueryParams(query: {
@@ -1399,6 +1503,7 @@ export class GiftStagingService {
   }
 
   private toListItem(entity: GiftStagingEntity): GiftStagingListItem {
+    const receiptMeta = this.extractReceiptMeta(entity);
     return {
       id: entity.id,
       createdAt: entity.createdAt,
@@ -1443,6 +1548,14 @@ export class GiftStagingService {
         entity.rawPayload && entity.rawPayload.length > 0,
       ),
       notes: entity.notes,
+      receiptStatus: receiptMeta?.receiptStatus,
+      receiptPolicyApplied: receiptMeta?.receiptPolicyApplied,
+      receiptChannel: receiptMeta?.receiptChannel,
+      receiptTemplateVersion: receiptMeta?.receiptTemplateVersion,
+      receiptError: receiptMeta?.receiptError,
+      receiptDedupeKey: receiptMeta?.receiptDedupeKey,
+      receiptSentAt: receiptMeta?.receiptSentAt,
+      receiptWarnings: receiptMeta?.receiptWarnings,
     };
   }
 

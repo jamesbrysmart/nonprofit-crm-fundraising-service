@@ -5,6 +5,7 @@ import { GiftStagingService } from '../gift-staging/gift-staging.service';
 import * as giftValidation from './gift.validation';
 import type { GiftCreatePayload } from './gift.validation';
 import { NormalizedGiftCreatePayload } from './gift.types';
+import { ReceiptPolicyService } from '../receipt/receipt-policy.service';
 
 describe('GiftService - staging auto promote', () => {
   let giftService: GiftService;
@@ -40,11 +41,19 @@ describe('GiftService - staging auto promote', () => {
       updateStatusById: updateStatusMock,
     } as unknown as jest.Mocked<GiftStagingService>;
 
+    const receiptPolicyService = {
+      applyReceiptMetadata: jest.fn((value) => value),
+    } as unknown as jest.Mocked<ReceiptPolicyService>;
+
     jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
     jest.spyOn(Logger.prototype, 'error').mockImplementation(jest.fn());
 
-    giftService = new GiftService(twentyApiService, giftStagingService);
+    giftService = new GiftService(
+      twentyApiService,
+      giftStagingService,
+      receiptPolicyService,
+    );
   });
 
   afterEach(() => {

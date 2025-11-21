@@ -27,6 +27,7 @@ import {
   GiftStagingRecord,
   NormalizedGiftCreatePayload,
 } from './gift.types';
+import { ReceiptPolicyService } from '../receipt/receipt-policy.service';
 
 interface ExistingPersonMatch {
   personId: string;
@@ -44,6 +45,7 @@ export class GiftService {
   constructor(
     private readonly twentyApiService: TwentyApiService,
     private readonly giftStagingService: GiftStagingService,
+    private readonly receiptPolicyService: ReceiptPolicyService,
   ) {}
 
   async normalizeCreateGiftPayload(
@@ -364,7 +366,7 @@ export class GiftService {
       prepared.dedupeDiagnostics = dedupeDiagnostics;
     }
 
-    return prepared;
+    return this.receiptPolicyService.applyReceiptMetadata(prepared);
   }
 
   private async createPerson(

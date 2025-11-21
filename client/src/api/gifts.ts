@@ -60,6 +60,13 @@ export interface GiftRecord {
   status?: string;
   giftPayoutId?: string;
   intakeSource?: string;
+  receiptStatus?: string;
+  receiptPolicyApplied?: string;
+  receiptChannel?: string;
+  receiptTemplateVersion?: string;
+  receiptError?: string;
+  receiptDedupeKey?: string;
+  receiptSentAt?: string;
 }
 
 export interface GiftListParams {

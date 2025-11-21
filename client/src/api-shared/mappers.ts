@@ -137,5 +137,33 @@ export const toGiftRecord = (entry: unknown): GiftRecord | null => {
       typeof record.intakeSource === 'string' && record.intakeSource.length > 0
         ? record.intakeSource
         : undefined,
+    receiptStatus:
+      typeof record.receiptStatus === 'string' && record.receiptStatus.length > 0
+        ? record.receiptStatus
+        : undefined,
+    receiptPolicyApplied:
+      typeof record.receiptPolicyApplied === 'string' && record.receiptPolicyApplied.length > 0
+        ? record.receiptPolicyApplied
+        : undefined,
+    receiptChannel:
+      typeof record.receiptChannel === 'string' && record.receiptChannel.length > 0
+        ? record.receiptChannel
+        : undefined,
+    receiptTemplateVersion:
+      typeof record.receiptTemplateVersion === 'string' && record.receiptTemplateVersion.length > 0
+        ? record.receiptTemplateVersion
+        : undefined,
+    receiptError:
+      typeof record.receiptError === 'string' && record.receiptError.length > 0
+        ? record.receiptError
+        : undefined,
+    receiptDedupeKey:
+      typeof record.receiptDedupeKey === 'string' && record.receiptDedupeKey.length > 0
+        ? record.receiptDedupeKey
+        : undefined,
+    receiptSentAt:
+      typeof record.receiptSentAt === 'string' && record.receiptSentAt.length > 0
+        ? record.receiptSentAt
+        : undefined,
   };
 };

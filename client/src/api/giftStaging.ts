@@ -124,6 +124,14 @@ export interface GiftStagingListItem {
   rawPayloadAvailable?: boolean;
   errorDetail?: string;
   notes?: string;
+  receiptStatus?: string;
+  receiptPolicyApplied?: string;
+  receiptChannel?: string;
+  receiptTemplateVersion?: string;
+  receiptError?: string;
+  receiptDedupeKey?: string;
+  receiptSentAt?: string;
+  receiptWarnings?: string[];
 }
 
 export interface GiftStagingListResponse {
@@ -227,6 +235,14 @@ export interface GiftStagingDetailResponse {
       inKindDescription?: string;
       estimatedValue?: number;
       notes?: string;
+      receiptStatus?: string;
+      receiptPolicyApplied?: string;
+      receiptChannel?: string;
+      receiptTemplateVersion?: string;
+      receiptError?: string;
+      receiptDedupeKey?: string;
+      receiptSentAt?: string;
+      receiptWarnings?: string[];
     };
   };
 }

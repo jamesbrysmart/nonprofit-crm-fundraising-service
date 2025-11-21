@@ -108,9 +108,27 @@ export function StagingQueueTable({
               </td>
               <td className={dataCell}>{row.formattedDate}</td>
               <td className={dataCell}>
-                <span className={statusToneClass(row.statusMeta.tone)}>
-                  {row.statusMeta.label}
-                </span>
+                <div className="f-flex f-flex-col f-gap-1">
+                  <span className={statusToneClass(row.statusMeta.tone)}>
+                    {row.statusMeta.label}
+                  </span>
+                  {row.receiptMeta ? (
+                    <span
+                      className={statusToneClass(
+                        row.receiptMeta.tone === 'danger'
+                          ? 'danger'
+                          : row.receiptMeta.tone === 'warning'
+                            ? 'warning'
+                            : row.receiptMeta.tone === 'success'
+                              ? 'success'
+                              : 'info',
+                      )}
+                    >
+                      {row.receiptMeta.label}
+                      {row.receiptMeta.policy ? ` (${row.receiptMeta.policy})` : ''}
+                    </span>
+                  ) : null}
+                </div>
               </td>
               <td className={dataCell}>
                 <div className="f-flex f-items-center f-gap-2 f-flex-wrap">

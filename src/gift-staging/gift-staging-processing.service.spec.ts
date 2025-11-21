@@ -25,6 +25,11 @@ describe('GiftStagingProcessingService (manual processing)', () => {
   let updateRecurringAgreementMock: jest.MockedFunction<
     RecurringAgreementService['updateAgreement']
   >;
+  let receiptPolicyService: {
+    applyReceiptMetadata: jest.MockedFunction<
+      (payload: NormalizedGiftCreatePayload) => NormalizedGiftCreatePayload
+    >;
+  };
 
   const basePayload: NormalizedGiftCreatePayload = {
     amount: { currencyCode: 'GBP', value: 12.34 },
@@ -71,11 +76,16 @@ describe('GiftStagingProcessingService (manual processing)', () => {
       updateAgreement: updateRecurringAgreementMock,
     } as unknown as jest.Mocked<RecurringAgreementService>;
 
+    receiptPolicyService = {
+      applyReceiptMetadata: jest.fn((payload) => payload),
+    };
+
     service = new GiftStagingProcessingService(
       giftStagingService,
       twentyApiService,
       structuredLogger,
       recurringAgreementService,
+      receiptPolicyService as unknown as any,
     );
   });
 

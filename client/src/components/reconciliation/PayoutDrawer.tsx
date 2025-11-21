@@ -67,6 +67,22 @@ const formatGiftDate = (value?: string): string => {
   return date.toLocaleDateString();
 };
 
+const receiptTone = (status?: string): { label: string; className: string } => {
+  const normalized = (status ?? '').toLowerCase();
+  switch (normalized) {
+    case 'sent':
+      return { label: 'Receipt sent', className: 'f-badge f-bg-green-100 f-text-green-800' };
+    case 'failed':
+      return { label: 'Receipt failed', className: 'f-badge f-bg-danger/10 f-text-danger' };
+    case 'suppressed':
+      return { label: 'Receipt suppressed', className: 'f-badge f-bg-amber-100 f-text-amber-800' };
+    case 'pending':
+      return { label: 'Receipt pending', className: 'f-badge f-bg-slate-200 f-text-ink' };
+    default:
+      return { label: 'Receipt unknown', className: 'f-badge f-bg-slate-200 f-text-ink' };
+  }
+};
+
 export function PayoutDrawer({ payout, open, onClose, onUpdated }: PayoutDrawerProps): JSX.Element | null {
   const [status, setStatus] = useState(payout?.status ?? '');
   const [varianceReason, setVarianceReason] = useState(payout?.varianceReason ?? '');
@@ -492,6 +508,9 @@ export function PayoutDrawer({ payout, open, onClose, onUpdated }: PayoutDrawerP
                       <th className="f-text-left f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3">
                         Gift date
                       </th>
+                      <th className="f-text-left f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3">
+                        Receipt
+                      </th>
                       <th className="f-text-right f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3">
                         Actions
                       </th>
@@ -523,6 +542,18 @@ export function PayoutDrawer({ payout, open, onClose, onUpdated }: PayoutDrawerP
                         </td>
                         <td className="f-border-b f-border-slate-100 f-px-3 f-py-3">
                           {formatGiftDate(gift.giftDate)}
+                        </td>
+                        <td className="f-border-b f-border-slate-100 f-px-3 f-py-3">
+                          <div className="f-flex f-flex-col f-gap-1">
+                            <span className={receiptTone(gift.receiptStatus).className}>
+                              {receiptTone(gift.receiptStatus).label}
+                            </span>
+                            {gift.receiptPolicyApplied ? (
+                              <span className="small-text f-text-slate-500">
+                                Policy: {gift.receiptPolicyApplied}
+                              </span>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="f-border-b f-border-slate-100 f-px-3 f-py-3 f-text-right">
                           <button
@@ -616,6 +647,9 @@ export function PayoutDrawer({ payout, open, onClose, onUpdated }: PayoutDrawerP
                       <th className="f-text-left f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3">
                         Intake source
                       </th>
+                      <th className="f-text-left f-text-xs f-font-semibold f-uppercase f-tracking-[0.08em] f-text-slate-500 f-border-b f-border-slate-200 f-py-3 f-px-3">
+                        Receipt
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -648,6 +682,18 @@ export function PayoutDrawer({ payout, open, onClose, onUpdated }: PayoutDrawerP
                           </td>
                           <td className="f-border-b f-border-slate-100 f-px-3 f-py-3">
                             {gift.intakeSource ?? '—'}
+                          </td>
+                          <td className="f-border-b f-border-slate-100 f-px-3 f-py-3">
+                            <div className="f-flex f-flex-col f-gap-1">
+                              <span className={receiptTone(gift.receiptStatus).className}>
+                                {receiptTone(gift.receiptStatus).label}
+                              </span>
+                              {gift.receiptPolicyApplied ? (
+                                <span className="small-text f-text-slate-500">
+                                  Policy: {gift.receiptPolicyApplied}
+                                </span>
+                              ) : null}
+                            </div>
                           </td>
                         </tr>
                       );
