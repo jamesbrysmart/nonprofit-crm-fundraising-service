@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Inject,
@@ -12,9 +13,10 @@ import {
   ServiceUnavailableException,
   forwardRef,
 } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
 import {
   GiftStagingService,
-  GiftStagingEntity,
   GiftStagingListResult,
   GiftStagingListQuery,
   GiftStagingStatusUpdate,
@@ -26,6 +28,8 @@ import {
   ProcessGiftResult,
 } from './gift-staging-processing.service';
 import { GiftService } from '../gift/gift.service';
+import { GiftStagingListQueryDto } from './dtos/gift-staging-list.dto';
+import { GiftStagingRecordModel } from './gift-staging.service';
 
 interface GiftStagingCreateResponse {
   data: {
@@ -61,14 +65,34 @@ export class GiftStagingController {
   ): Promise<GiftStagingListResult> {
     this.ensureEnabled();
 
+    const mergedQuery = {
+      ...query,
+      statuses: query.statuses ?? query.status,
+      intakeSources: query.intakeSources ?? query.intakeSource,
+    };
+
+    const dto = plainToInstance(GiftStagingListQueryDto, mergedQuery, {
+      enableImplicitConversion: true,
+    });
+
+    const validationErrors = validateSync(dto, {
+      skipMissingProperties: true,
+      whitelist: true,
+      forbidUnknownValues: false,
+    });
+
+    if (validationErrors.length > 0) {
+      throw new BadRequestException('Invalid list query parameters');
+    }
+
     const normalizedQuery: GiftStagingListQuery = {
-      statuses: this.toArray(query.status ?? query.statuses),
-      intakeSources: this.toArray(query.intakeSource ?? query.intakeSources),
-      search: this.toOptionalString(query.search),
-      cursor: this.toOptionalString(query.cursor),
-      limit: this.toOptionalNumber(query.limit),
-      sort: this.toOptionalString(query.sort),
-      recurringAgreementId: this.toOptionalString(query.recurringAgreementId),
+      statuses: dto.statuses,
+      intakeSources: dto.intakeSources,
+      search: dto.search,
+      cursor: dto.cursor,
+      limit: dto.limit,
+      sort: dto.sort,
+      recurringAgreementId: dto.recurringAgreementId,
     };
 
     return this.giftStagingService.listGiftStaging(normalizedQuery);
@@ -77,7 +101,7 @@ export class GiftStagingController {
   @Get(':id')
   async getGiftStaging(
     @Param('id') stagingId: string,
-  ): Promise<{ data: { giftStaging: GiftStagingEntity } }> {
+  ): Promise<{ data: { giftStaging: GiftStagingRecordModel } }> {
     this.ensureEnabled();
 
     const entity = await this.giftStagingService.getGiftStagingById(stagingId);
@@ -160,7 +184,7 @@ export class GiftStagingController {
   async updateGiftStaging(
     @Param('id') stagingId: string,
     @Body() body: GiftStagingUpdateRequest,
-  ): Promise<{ data: { giftStaging: GiftStagingEntity } }> {
+  ): Promise<{ data: { giftStaging: GiftStagingRecordModel } }> {
     this.ensureEnabled();
 
     const entity = await this.giftStagingService.updateGiftStagingPayload(
@@ -193,45 +217,5 @@ export class GiftStagingController {
     if (!this.giftStagingService.isEnabled()) {
       throw new ServiceUnavailableException('Gift staging is disabled');
     }
-  }
-
-  private toOptionalNumber(
-    value: string | string[] | undefined,
-  ): number | undefined {
-    const parsed = this.toOptionalString(value);
-    if (!parsed) {
-      return undefined;
-    }
-
-    const num = Number.parseInt(parsed, 10);
-    return Number.isFinite(num) ? num : undefined;
-  }
-
-  private toOptionalString(
-    value: string | string[] | undefined,
-  ): string | undefined {
-    if (Array.isArray(value)) {
-      if (value.length === 0) {
-        return undefined;
-      }
-      return value[0]?.trim() || undefined;
-    }
-    if (typeof value !== 'string') {
-      return undefined;
-    }
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
-  }
-
-  private toArray(value: string | string[] | undefined): string[] | undefined {
-    if (!value) {
-      return undefined;
-    }
-    const source = Array.isArray(value) ? value : [value];
-    const normalized = source
-      .flatMap((entry) => entry.split(','))
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
-    return normalized.length > 0 ? normalized : undefined;
   }
 }

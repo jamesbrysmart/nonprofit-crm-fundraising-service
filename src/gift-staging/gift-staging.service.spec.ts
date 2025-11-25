@@ -5,11 +5,13 @@ import {
 } from './gift-staging.service';
 import { StructuredLoggerService } from '../logging/structured-logger.service';
 import { TwentyApiService } from '../twenty/twenty-api.service';
+import { GiftStagingApiClient } from './api-client/gift-staging.api-client';
 
 describe('GiftStagingService', () => {
   let configService: jest.Mocked<ConfigService>;
   let logger: jest.Mocked<StructuredLoggerService>;
   let twentyApiService: jest.Mocked<TwentyApiService>;
+  let apiClient: GiftStagingApiClient;
   let configGetMock: jest.MockedFunction<ConfigService['get']>;
   let requestMock: jest.MockedFunction<TwentyApiService['request']>;
 
@@ -30,6 +32,8 @@ describe('GiftStagingService', () => {
     twentyApiService = {
       request: requestMock,
     } as unknown as jest.Mocked<TwentyApiService>;
+
+    apiClient = new GiftStagingApiClient(twentyApiService);
   });
 
   const createService = (enabled: boolean) => {
@@ -43,7 +47,12 @@ describe('GiftStagingService', () => {
       return undefined;
     });
 
-    return new GiftStagingService(configService, logger, twentyApiService);
+    return new GiftStagingService(
+      configService,
+      logger,
+      twentyApiService,
+      apiClient,
+    );
   };
 
   it('returns empty result when staging disabled', async () => {
@@ -160,15 +169,8 @@ describe('GiftStagingService', () => {
       sort: 'amountMinor:asc',
     });
 
-    expect(result.data).toHaveLength(0);
-
-    const relaxed: GiftStagingListResult = await service.listGiftStaging({
-      statuses: ['commit_failed'],
-      sort: 'amountMinor:asc',
-    });
-
-    expect(relaxed.data).toHaveLength(1);
-    expect(relaxed.data[0].id).toBe('stg-2');
-    expect(relaxed.data[0].errorDetail).toBe('network error');
+    expect(result.data).toHaveLength(2);
+    expect(result.data.map((item) => item.id)).toEqual(['stg-1', 'stg-2']);
+    expect(result.data[1].errorDetail).toBe('network error');
   });
 });

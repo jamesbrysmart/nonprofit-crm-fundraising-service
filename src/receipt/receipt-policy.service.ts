@@ -31,7 +31,8 @@ export class ReceiptPolicyService {
     const clone: NormalizedGiftCreatePayload = { ...payload };
 
     const amountMinor =
-      typeof payload.amountMinor === 'number' && Number.isFinite(payload.amountMinor)
+      typeof payload.amountMinor === 'number' &&
+      Number.isFinite(payload.amountMinor)
         ? payload.amountMinor
         : undefined;
 
@@ -41,18 +42,22 @@ export class ReceiptPolicyService {
       this.normalizeString(payload.sourceFingerprint) ??
       this.normalizeString(payload.externalId);
 
-    const isRecurring = Boolean(this.normalizeString(payload.recurringAgreementId));
+    const isRecurring = Boolean(
+      this.normalizeString(payload.recurringAgreementId),
+    );
     const policy =
       clone.receiptPolicyApplied ??
       (isRecurring ? this.defaultRecurringPolicy : this.defaultOneOffPolicy);
 
     const threshold = this.resolveThresholdMinor();
     const autoSuppressed =
-      threshold !== undefined && amountMinor !== undefined && amountMinor > threshold;
+      threshold !== undefined &&
+      amountMinor !== undefined &&
+      amountMinor > threshold;
 
     const status: ReceiptStatus = autoSuppressed
       ? 'suppressed'
-      : (clone.receiptStatus as ReceiptStatus) ?? 'pending';
+      : ((clone.receiptStatus as ReceiptStatus) ?? 'pending');
 
     clone.receiptPolicyApplied = policy;
     clone.receiptStatus = status;

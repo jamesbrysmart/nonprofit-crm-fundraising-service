@@ -42,7 +42,10 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   inKindDescription?: string;
   estimatedValue?: number;
   giftPayoutId?: string;
-  receiptStatus?: 'pending' | 'sent' | 'failed' | 'suppressed' | string;
+  /**
+   * Known values: 'pending', 'sent', 'failed', 'suppressed'
+   */
+  receiptStatus?: string;
   receiptPolicyApplied?: string;
   receiptChannel?: string;
   receiptTemplateVersion?: string;

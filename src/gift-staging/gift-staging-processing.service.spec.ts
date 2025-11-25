@@ -1,10 +1,14 @@
 import { BadRequestException } from '@nestjs/common';
 import { GiftStagingProcessingService } from './gift-staging-processing.service';
-import { GiftStagingService, GiftStagingEntity } from './gift-staging.service';
+import {
+  GiftStagingService,
+  GiftStagingRecordModel,
+} from './gift-staging.service';
 import { TwentyApiService } from '../twenty/twenty-api.service';
 import { StructuredLoggerService } from '../logging/structured-logger.service';
 import { NormalizedGiftCreatePayload } from '../gift/gift.types';
 import { RecurringAgreementService } from '../recurring-agreement/recurring-agreement.service';
+import { ReceiptPolicyService } from '../receipt/receipt-policy.service';
 
 describe('GiftStagingProcessingService (manual processing)', () => {
   let service: GiftStagingProcessingService;
@@ -40,7 +44,7 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     sourceFingerprint: 'fp-123',
   };
 
-  const baseStaging: GiftStagingEntity = {
+  const baseStaging: GiftStagingRecordModel = {
     id: 'stg-123',
     promotionStatus: 'ready_for_commit',
     validationStatus: 'passed',
@@ -85,7 +89,7 @@ describe('GiftStagingProcessingService (manual processing)', () => {
       twentyApiService,
       structuredLogger,
       recurringAgreementService,
-      receiptPolicyService as unknown as any,
+      receiptPolicyService as unknown as ReceiptPolicyService,
     );
   });
 

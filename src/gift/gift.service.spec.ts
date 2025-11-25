@@ -42,7 +42,9 @@ describe('GiftService - staging auto promote', () => {
     } as unknown as jest.Mocked<GiftStagingService>;
 
     const receiptPolicyService = {
-      applyReceiptMetadata: jest.fn((value) => value),
+      applyReceiptMetadata: jest.fn(
+        (value: NormalizedGiftCreatePayload) => value,
+      ),
     } as unknown as jest.Mocked<ReceiptPolicyService>;
 
     jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());

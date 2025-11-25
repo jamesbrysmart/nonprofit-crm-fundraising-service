@@ -7,8 +7,8 @@ import { AppModule } from '../src/app.module';
 import { GiftService } from '../src/gift/gift.service';
 import {
   GiftStagingService,
-  GiftStagingEntity,
   GiftStagingStatusUpdate,
+  GiftStagingRecordModel,
 } from '../src/gift-staging/gift-staging.service';
 import { NormalizedGiftCreatePayload } from '../src/gift/gift.types';
 import { RecurringAgreementService } from '../src/recurring-agreement/recurring-agreement.service';
@@ -417,7 +417,7 @@ async function seedManualStaging(options: {
   companyId?: string;
   omitEmail?: boolean;
 }): Promise<{
-  entity: GiftStagingEntity;
+  entity: GiftStagingRecordModel;
   preparedPayload: NormalizedGiftCreatePayload;
 }> {
   const {

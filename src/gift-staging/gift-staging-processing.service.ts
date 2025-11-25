@@ -2,9 +2,9 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { StructuredLoggerService } from '../logging/structured-logger.service';
 import {
   GiftStagingService,
-  GiftStagingEntity,
   GiftStagingStatusUpdate,
 } from './gift-staging.service';
+import type { GiftStagingRecordModel } from './gift-staging.service';
 import { TwentyApiService } from '../twenty/twenty-api.service';
 import {
   buildTwentyGiftPayload,
@@ -303,7 +303,7 @@ export class GiftStagingProcessingService {
   }
 
   private handleAlreadyCommitted(
-    stagingRecord: GiftStagingEntity,
+    stagingRecord: GiftStagingRecordModel,
   ): { status: 'committed'; giftId: string } | undefined {
     if (stagingRecord.promotionStatus !== 'committed') {
       return undefined;
@@ -369,7 +369,7 @@ export class GiftStagingProcessingService {
     }
   }
 
-  private canProcess(stagingRecord: GiftStagingEntity): boolean {
+  private canProcess(stagingRecord: GiftStagingRecordModel): boolean {
     const promotionStatus = stagingRecord.promotionStatus ?? 'pending';
     const eligibleStatuses = new Set(['ready_for_commit', 'commit_failed']);
 
@@ -397,7 +397,7 @@ export class GiftStagingProcessingService {
   }
 
   private calculateNextExpectedAt(
-    stagingRecord: GiftStagingEntity,
+    stagingRecord: GiftStagingRecordModel,
   ): string | undefined {
     // If the staging record carries an explicit expectedAt (from provider schedule), honour it.
     if (
