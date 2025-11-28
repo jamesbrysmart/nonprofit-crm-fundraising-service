@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { DrawerHeader } from './DrawerHeader';
-import { DrawerStatusSummary } from './DrawerStatusSummary';
 import { DrawerStatusDetails } from './DrawerStatusDetails';
 import { DrawerReviewSection } from './DrawerReviewSection';
 import { GiftDrawerFocus } from './types';
 import { useGiftStagingDrawerController } from '../../hooks/useGiftStagingDrawerController';
+import { useStagingDonorHydration } from '../../hooks/useStagingDonorHydration';
+import { fallbackCompanyDisplay } from '../../utils/donorAdapters';
+import { DonorDisplay } from '../../types/donor';
+import { useDonorSearch } from '../../hooks/useDonorSearch';
+import { DonorSearchModal } from '../manual-entry/DonorSearchModal';
 
 interface GiftStagingDrawerProps {
   stagingId: string | null;
@@ -28,7 +32,6 @@ export function GiftStagingDrawer({
     appealOptions,
     appealsLoading,
     appealError,
-    appealListId,
     editForm,
     handleFieldChange,
     handleInKindEditToggle,
@@ -40,13 +43,31 @@ export function GiftStagingDrawer({
     actionBusy,
     actionError,
     actionNotice,
-    activeSection,
-    setActiveSection,
     dedupeStatusLabel,
     dedupeDiagnostics,
     intentLabel,
     intentOptions,
   } = useGiftStagingDrawerController(stagingId, focus, onRefreshList);
+
+  const candidateIds = dedupeDiagnostics?.candidateDonorIds ?? [];
+  const matchedId = dedupeDiagnostics?.matchedDonorId;
+  const uniqueIds = Array.from(new Set([...candidateIds, matchedId].filter(Boolean) as string[]));
+  const { candidates: hydratedCandidates } = useStagingDonorHydration(uniqueIds);
+  const donorSearch = useDonorSearch();
+
+  const classifiedDuplicates = hydratedCandidates.map((candidate) => ({
+    match: candidate,
+    tier: dedupeDiagnostics?.matchType === 'email' ? 'exact' : 'review',
+  }));
+
+  let selectedDonor: DonorDisplay | undefined;
+  if (detail?.donorId) {
+    selectedDonor = hydratedCandidates.find((c) => c.id === detail.donorId);
+    if (!selectedDonor) {
+      // Fallback display; best-effort.
+      selectedDonor = fallbackCompanyDisplay(detail.donorId);
+    }
+  }
 
   if (!stagingId) {
     return null;
@@ -54,11 +75,13 @@ export function GiftStagingDrawer({
 
   return (
     <div className="drawer-backdrop" role="dialog" aria-modal="true">
-      <div className="drawer">
+      <div className="drawer drawer--wide">
         <DrawerHeader
           stagingId={stagingId}
           loading={loading}
           actionBusy={actionBusy}
+          actionError={actionError}
+          title="Review staging"
           onClose={onClose}
           onMarkReady={handleMarkReady}
           onProcess={handleProcessNow}
@@ -86,11 +109,35 @@ export function GiftStagingDrawer({
           <div className="f-state-block">Record not found.</div>
         ) : (
           <>
-            <DrawerStatusSummary
-              detail={detail}
-              actionError={actionError}
-              actionNotice={actionNotice}
-            />
+            <section className="drawer-section status-summary">
+              <div className="f-flex f-flex-wrap f-gap-2 f-items-center">
+                <span className="f-badge f-bg-slate-200 f-text-ink">
+                  Donor: {detail.donorId ? <code>{detail.donorId}</code> : 'New donor'}
+                </span>
+                {detail.giftBatchId ? (
+                  <span className="f-badge f-bg-slate-200 f-text-ink">
+                    Batch: <code>{detail.giftBatchId}</code>
+                  </span>
+                ) : null}
+                {detail.receiptStatus ? (
+                  <span className="f-badge f-bg-slate-200 f-text-ink">
+                    Receipt: {detail.receiptStatus}
+                    {detail.receiptPolicyApplied ? ` (${detail.receiptPolicyApplied})` : ''}
+                  </span>
+                ) : null}
+              </div>
+              {actionError ? (
+                <div className="f-alert f-alert--error f-mt-3" role="alert">
+                  {actionError}
+                </div>
+              ) : null}
+              {actionNotice ? (
+                <div className="f-alert f-alert--info f-mt-2" role="status">
+                  {actionNotice}
+                </div>
+              ) : null}
+            </section>
+
             <DrawerStatusDetails
               detail={detail}
               dedupeStatusLabel={dedupeStatusLabel}
@@ -100,14 +147,11 @@ export function GiftStagingDrawer({
             <DrawerReviewSection
               detail={detail}
               editForm={editForm}
-              activeSection={activeSection}
-              onSectionChange={setActiveSection}
               onFieldChange={handleFieldChange}
               onInKindToggle={handleInKindEditToggle}
               appealsLoading={appealsLoading}
               appealError={appealError}
               appealOptions={appealOptions}
-              appealListId={appealListId}
               actionBusy={actionBusy}
               loading={loading}
               onSaveEdits={handleSaveEdits}
@@ -115,7 +159,72 @@ export function GiftStagingDrawer({
               dedupeDiagnostics={dedupeDiagnostics}
               onAssignDonor={handleAssignDonor}
               intentOptions={intentOptions}
+              onAcknowledgeDuplicate={() => {
+                void handleMarkReady();
+              }}
+              donorPanel={{
+                selectedDonor,
+                classifiedDuplicates,
+                selectedDuplicateId: detail.donorId ?? null,
+                onSelectDuplicate: (id: string) => {
+                  void handleAssignDonor(id);
+                },
+                onOpenSearch: donorSearch.open,
+                onChangeDonor: donorSearch.open,
+                potentialDuplicateMessage: dedupeDiagnostics
+                  ? `Possible match (${dedupeDiagnostics.matchType ?? 'review'})`
+                  : null,
+                duplicateLookupError: null,
+                disableActions: loading || actionBusy === 'update',
+              }}
             />
+
+            <DonorSearchModal
+              isOpen={donorSearch.isOpen}
+              onClose={donorSearch.close}
+              searchTerm={donorSearch.searchTerm}
+              onSearchTermChange={donorSearch.setSearchTerm}
+              onSearchSubmit={(event) =>
+                donorSearch.search(event, {
+                  firstName: detail.donorFirstName ?? undefined,
+                  lastName: detail.donorLastName ?? undefined,
+                  email: detail.donorEmail ?? undefined,
+                })
+              }
+              searchLoading={donorSearch.loading}
+              searchError={donorSearch.error}
+              searchResults={donorSearch.results}
+              onSelectDonor={(id) => {
+                void handleAssignDonor(id);
+                donorSearch.close();
+              }}
+              formState={{
+                contactFirstName: detail.donorFirstName ?? '',
+                contactLastName: detail.donorLastName ?? '',
+                contactEmail: detail.donorEmail ?? '',
+              }}
+            />
+
+            {detail.promotionStatus === 'commit_failed' ? (
+              <section className="drawer-section">
+                <div className="drawer-section-header">
+                  <h4>Commit failed</h4>
+                  <button
+                    type="button"
+                    className="f-btn--secondary"
+                    onClick={() => {
+                      void handleProcessNow();
+                    }}
+                    disabled={actionBusy === 'process' || loading}
+                  >
+                    {actionBusy === 'process' ? 'Retrying…' : 'Retry processing'}
+                  </button>
+                </div>
+                <p className="small-text f-m-0 f-text-danger">
+                  {detail.errorDetail ?? 'Unknown error'}
+                </p>
+              </section>
+            ) : null}
 
             <section className="drawer-section">
               <div className="drawer-section-header">

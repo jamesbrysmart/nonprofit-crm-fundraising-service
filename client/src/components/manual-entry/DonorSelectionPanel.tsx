@@ -1,4 +1,4 @@
-import { PersonDuplicate } from '../../api';
+import { DonorDisplay } from '../../types/donor';
 import {
   DuplicateTier,
   describeDuplicate,
@@ -7,13 +7,13 @@ import {
   formatMatchDate,
 } from './duplicateHelpers';
 
-interface ClassifiedDuplicate {
-  match: PersonDuplicate;
+export interface ClassifiedDuplicate {
+  match: DonorDisplay;
   tier: DuplicateTier;
 }
 
 interface DonorSelectionPanelProps {
-  selectedDonor?: PersonDuplicate;
+  selectedDonor?: DonorDisplay;
   onChangeDonor(): void;
   onClearSelectedDonor(): void;
   duplicateLookupError: string | null;
@@ -69,9 +69,7 @@ export function DonorSelectionPanel({
               <dt className="f-text-xs f-uppercase f-tracking-[0.08em] f-text-slate-500 f-mb-1">
                 Email
               </dt>
-              <dd className="f-m-0 f-text-sm f-text-ink">
-                {selectedDonor.emails?.primaryEmail ?? '—'}
-              </dd>
+              <dd className="f-m-0 f-text-sm f-text-ink">{selectedDonor.email ?? '—'}</dd>
             </div>
             <div>
               <dt className="f-text-xs f-uppercase f-tracking-[0.08em] f-text-slate-500 f-mb-1">
@@ -84,7 +82,7 @@ export function DonorSelectionPanel({
                 Updated
               </dt>
               <dd className="f-m-0 f-text-sm f-text-ink">
-                {formatMatchDate(selectedDonor.updatedAt ?? selectedDonor.createdAt)}
+                {formatMatchDate(selectedDonor.updatedAt ?? null)}
               </dd>
             </div>
           </dl>
@@ -153,18 +151,15 @@ export function DonorSelectionPanel({
                 const isSelected = selectedDuplicateId === match.id;
                 const rowClass = isSelected ? 'f-bg-primary/5' : 'f-bg-white';
                 return (
-                  <tr
-                    key={match.id}
-                    className={`${rowClass} f-transition-colors`}
-                  >
+                  <tr key={match.id} className={`${rowClass} f-transition-colors`}>
                     <td>
                       <span className={duplicateTierBadgeClass(tier)}>
                         {duplicateTierLabel(tier)}
                       </span>
                     </td>
                     <td>{describeDuplicate(match)}</td>
-                    <td>{match.emails?.primaryEmail ?? '—'}</td>
-                    <td>{formatMatchDate(match.updatedAt ?? match.createdAt)}</td>
+                    <td>{match.email ?? '—'}</td>
+                    <td>{formatMatchDate(match.updatedAt)}</td>
                     <td>
                       <button
                         type="button"

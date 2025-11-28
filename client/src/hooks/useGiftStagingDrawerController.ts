@@ -17,8 +17,6 @@ export type EditFormState = {
   dateReceived: string;
   fundId: string;
   appealId: string;
-  trackingCodeId: string;
-  giftBatchId: string;
   notes: string;
   giftIntent: string;
   opportunityId: string;
@@ -51,7 +49,6 @@ export function useGiftStagingDrawerController(
   focus: GiftDrawerFocus,
   onRefreshList: () => void,
 ) {
-  const [activeSection, setActiveSection] = useState<GiftDrawerFocus>(focus);
   const [actionBusy, setActionBusy] = useState<'mark-ready' | 'process' | 'update' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
@@ -61,8 +58,6 @@ export function useGiftStagingDrawerController(
     dateReceived: '',
     fundId: '',
     appealId: '',
-    trackingCodeId: '',
-    giftBatchId: '',
     notes: '',
     giftIntent: 'standard',
     opportunityId: '',
@@ -94,10 +89,6 @@ export function useGiftStagingDrawerController(
     [detail?.rawPayload],
   );
 
-  useEffect(() => {
-    setActiveSection(focus);
-  }, [focus]);
-
   const initializeEditForm = useCallback(() => {
     if (!detail) {
       setEditForm({
@@ -106,8 +97,6 @@ export function useGiftStagingDrawerController(
         dateReceived: '',
         fundId: '',
         appealId: '',
-        trackingCodeId: '',
-        giftBatchId: '',
         notes: '',
         giftIntent: 'standard',
         opportunityId: '',
@@ -133,8 +122,6 @@ export function useGiftStagingDrawerController(
       dateReceived: derivedDate,
       fundId: detail.fundId ?? '',
       appealId: detail.appealId ?? '',
-      trackingCodeId: detail.trackingCodeId ?? '',
-      giftBatchId: detail.giftBatchId ?? '',
       notes: detail.notes ?? '',
       giftIntent: detail.giftIntent ?? 'standard',
       opportunityId: detail.opportunityId ?? '',
@@ -216,20 +203,6 @@ export function useGiftStagingDrawerController(
       payload.appealId = appealValue;
     } else if (detail.appealId) {
       payload.appealId = null;
-    }
-
-    const trackingValue = editForm.trackingCodeId.trim();
-    if (trackingValue.length > 0) {
-      payload.trackingCodeId = trackingValue;
-    } else if (detail.trackingCodeId) {
-      payload.trackingCodeId = null;
-    }
-
-    const batchValue = editForm.giftBatchId.trim();
-    if (batchValue.length > 0) {
-      payload.giftBatchId = batchValue;
-    } else if (detail.giftBatchId) {
-      payload.giftBatchId = null;
     }
 
     const notesValue = editForm.notes.trim();
@@ -388,8 +361,6 @@ export function useGiftStagingDrawerController(
     actionBusy,
     actionError,
     actionNotice,
-    activeSection,
-    setActiveSection,
     dedupeStatusLabel,
     dedupeDiagnostics,
     intentLabel,

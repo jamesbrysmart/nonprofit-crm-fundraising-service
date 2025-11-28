@@ -1,61 +1,9 @@
-import { PersonDuplicate } from '../../api';
+import { DonorDisplay } from '../../types/donor';
 
 export type DuplicateTier = 'exact' | 'review' | 'partial';
 
-export function describeDuplicate(match: PersonDuplicate): string {
-  const parts: string[] = [];
-  const firstName = match.name?.firstName?.trim() ?? '';
-  const lastName = match.name?.lastName?.trim() ?? '';
-  const fullName = match.name?.fullName?.trim() ?? '';
-  const email = match.emails?.primaryEmail?.trim() ?? '';
-
-  if (fullName.length > 0) {
-    parts.push(fullName);
-  } else if (firstName || lastName) {
-    parts.push(`${firstName} ${lastName}`.trim());
-  }
-
-  if (email.length > 0) {
-    parts.push(`<${email}>`);
-  }
-
-  return parts.length > 0 ? parts.join(' ') : 'Existing donor';
-}
-
-export function classifyDuplicate(match: PersonDuplicate, state: {
-  contactFirstName: string;
-  contactLastName: string;
-  contactEmail: string;
-}): DuplicateTier {
-  const contactEmail = state.contactEmail.trim().toLowerCase();
-  const matchEmail = match.emails?.primaryEmail?.trim().toLowerCase() ?? '';
-  if (contactEmail && matchEmail && contactEmail === matchEmail) {
-    return 'exact';
-  }
-
-  const contactFull = `${state.contactFirstName} ${state.contactLastName}`
-    .trim()
-    .toLowerCase();
-  const matchFull = (
-    match.name?.fullName ??
-    `${match.name?.firstName ?? ''} ${match.name?.lastName ?? ''}`
-  )
-    .trim()
-    .toLowerCase();
-
-  if (contactFull && matchFull && contactFull === matchFull) {
-    return 'review';
-  }
-
-  if (matchFull) {
-    const first = state.contactFirstName.trim().toLowerCase();
-    const last = state.contactLastName.trim().toLowerCase();
-    if ((last && matchFull.includes(last)) || (first && matchFull.includes(first))) {
-      return 'review';
-    }
-  }
-
-  return 'partial';
+export function describeDuplicate(match: DonorDisplay): string {
+  return match.displayName || match.email || 'Existing donor';
 }
 
 export function duplicateTierLabel(tier: DuplicateTier): string {
@@ -80,7 +28,7 @@ export function duplicateTierBadgeClass(tier: DuplicateTier): string {
   }
 }
 
-export function formatMatchDate(value?: string): string {
+export function formatMatchDate(value?: string | null): string {
   if (!value) {
     return '—';
   }
@@ -89,6 +37,34 @@ export function formatMatchDate(value?: string): string {
     return value;
   }
   return date.toISOString().slice(0, 10);
+}
+
+export function classifyDuplicateFromContext(
+  match: DonorDisplay,
+  state: { contactFirstName: string; contactLastName: string; contactEmail: string },
+): DuplicateTier {
+  const contactEmail = state.contactEmail.trim().toLowerCase();
+  const matchEmail = match.email?.trim().toLowerCase() ?? '';
+  if (contactEmail && matchEmail && contactEmail === matchEmail) {
+    return 'exact';
+  }
+
+  const contactFull = `${state.contactFirstName} ${state.contactLastName}`.trim().toLowerCase();
+  const matchFull = match.displayName?.trim().toLowerCase() ?? '';
+
+  if (contactFull && matchFull && contactFull === matchFull) {
+    return 'review';
+  }
+
+  if (matchFull) {
+    const first = state.contactFirstName.trim().toLowerCase();
+    const last = state.contactLastName.trim().toLowerCase();
+    if ((last && matchFull.includes(last)) || (first && matchFull.includes(first))) {
+      return 'review';
+    }
+  }
+
+  return 'partial';
 }
 
 export function buildDuplicateLookupPayload(state: {

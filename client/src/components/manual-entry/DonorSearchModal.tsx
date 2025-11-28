@@ -1,11 +1,12 @@
 import { PersonDuplicate } from '../../api';
 import {
-  classifyDuplicate,
   describeDuplicate,
   duplicateTierBadgeClass,
   duplicateTierLabel,
   formatMatchDate,
+  classifyDuplicateFromContext,
 } from './duplicateHelpers';
+import { personDuplicateToDisplay } from '../../utils/donorAdapters';
 
 interface DonorSearchModalProps {
   isOpen: boolean;
@@ -87,15 +88,16 @@ export function DonorSearchModal({
                 if (!match?.id) {
                   return null;
                 }
-                const tier = classifyDuplicate(match, formState);
+                const display = personDuplicateToDisplay(match);
+                const tier = classifyDuplicateFromContext(display, formState);
                 return (
                   <tr key={match.id}>
                     <td>
                       <span className={duplicateTierBadgeClass(tier)}>{duplicateTierLabel(tier)}</span>
                     </td>
-                    <td>{describeDuplicate(match)}</td>
-                    <td>{match.emails?.primaryEmail ?? '—'}</td>
-                    <td>{formatMatchDate(match.updatedAt ?? match.createdAt)}</td>
+                    <td>{describeDuplicate(display)}</td>
+                    <td>{display.email ?? '—'}</td>
+                    <td>{formatMatchDate(display.updatedAt ?? display.createdAt)}</td>
                     <td>
                       <button
                         type="button"

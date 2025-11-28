@@ -32,13 +32,10 @@ export const buildTwentyGiftPayload = (
   delete body.amountMinor;
   delete body.currency;
   delete body.dateReceived;
-  delete body.giftBatchId;
   delete body.intakeSource;
   delete body.sourceFingerprint;
   delete body.autoPromote;
-  delete body.giftAidEligible;
   delete body.amountMajor;
-  delete body.expectedAt;
 
   if (!body.giftDate && typeof payload.dateReceived === 'string') {
     body.giftDate = payload.dateReceived;
@@ -80,9 +77,6 @@ export const buildTwentyGiftPayload = (
   delete body.feeAmountMinor;
   delete body.feeCurrency;
   delete body.dedupeDiagnostics;
-  delete body.appealSegmentId;
-  delete body.trackingCodeId;
-  delete body.fundId;
 
   return body;
 };

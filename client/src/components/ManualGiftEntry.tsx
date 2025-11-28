@@ -1,3 +1,4 @@
+import type { ChangeEvent } from 'react';
 import { useManualGiftEntryController } from '../hooks/useManualGiftEntryController';
 import { GIFT_INTENT_OPTIONS } from '../types/giftIntent';
 import { GiftBasicsCard } from './manual-entry/GiftBasicsCard';
@@ -11,6 +12,7 @@ import { RecurringAssociationsCard } from './manual-entry/RecurringAssociationsC
 import { ManualGiftStatus } from './manual-entry/ManualGiftStatus';
 import { RecurringAgreementSelector } from './manual-entry/RecurringAgreementSelector';
 import { DuplicatePanel } from './manual-entry/DuplicatePanel';
+import { GiftDetailsForm } from './common/GiftDetailsForm';
 
 export function ManualGiftEntry(): JSX.Element {
   const {
@@ -69,6 +71,26 @@ export function ManualGiftEntry(): JSX.Element {
     setRecurringSearch,
     handleSelectRecurring,
   } = useManualGiftEntryController();
+
+  const handleDetailsChange = (field: string, value: string | boolean) => {
+    const mapping: Record<string, string> = {
+      amount: 'amountValue',
+      currency: 'currencyCode',
+      date: 'giftDate',
+      appealId: 'appealId',
+    };
+    const targetName = mapping[field as string];
+    if (!targetName) {
+      return;
+    }
+    const syntheticEvent = {
+      target: {
+        name: targetName,
+        value: typeof value === 'string' ? value : value.toString(),
+      },
+    } as ChangeEvent<HTMLInputElement>;
+    handleChange(syntheticEvent);
+  };
 
   const donorSelection = (
     <DonorSelectionPanel
@@ -220,77 +242,24 @@ export function ManualGiftEntry(): JSX.Element {
           ) : null}
 
           <GiftBasicsCard>
-            <div className="f-field">
-              <label htmlFor="amountValue" className="f-field-label">
-                Amount
-              </label>
-              <div className="f-flex f-flex-col sm:f-flex-row f-gap-3">
-                <input
-                  id="amountValue"
-                  name="amountValue"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  required
-                  value={formState.amountValue}
-                  onChange={handleChange}
-                  className="f-input sm:f-flex-1"
-                />
-                <select
-                  id="currencyCode"
-                  name="currencyCode"
-                  value={formState.currencyCode}
-                  onChange={handleChange}
-                  className="f-input sm:f-w-28"
-                >
-                  <option value="GBP">GBP</option>
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="f-field">
-              <label htmlFor="giftDate" className="f-field-label">
-                Gift date
-              </label>
-              <input
-                id="giftDate"
-                name="giftDate"
-                type="date"
-                required
-                value={formState.giftDate}
-                onChange={handleChange}
-                className="f-input"
-              />
-            </div>
-
-            <div className="f-field">
-              <label htmlFor="appealId" className="f-field-label">
-                Appeal (optional)
-              </label>
-              <select
-                id="appealId"
-                name="appealId"
-                value={formState.appealId}
-                onChange={handleChange}
-                disabled={appealsLoading && appealOptions.length === 0}
-                className="f-input"
-              >
-                <option value="">No appeal</option>
-                {appealOptions.map((appeal) => (
-                  <option key={appeal.id} value={appeal.id}>
-                    {appeal.name ?? 'Untitled appeal'}
-                  </option>
-                ))}
-              </select>
-              {appealsLoading ? (
-                <span className="f-help-text f-text-slate-500">Loading appeals…</span>
-              ) : appealLoadError ? (
-                <span className="f-help-text f-text-danger">{appealLoadError}</span>
-              ) : null}
-            </div>
+            <GiftDetailsForm
+              values={{
+                amount: formState.amountValue,
+                currency: formState.currencyCode,
+                date: formState.giftDate,
+                appealId: formState.appealId,
+              }}
+              onChange={handleDetailsChange}
+              appealOptions={appealOptions}
+              appealsLoading={appealsLoading}
+              appealsError={appealLoadError}
+              disabled={status.state === 'submitting'}
+              showFund={false}
+              showOpportunity={false}
+              showIntent={false}
+              showNotes={false}
+              showInKind={false}
+            />
 
             <p className="f-text-sm f-font-semibold f-text-ink f-mt-4 f-mb-0">Gift context</p>
 

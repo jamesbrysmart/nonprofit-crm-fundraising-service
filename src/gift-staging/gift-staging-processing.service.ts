@@ -372,13 +372,9 @@ export class GiftStagingProcessingService {
   private canProcess(stagingRecord: GiftStagingRecordModel): boolean {
     const promotionStatus = stagingRecord.promotionStatus ?? 'pending';
     const eligibleStatuses = new Set(['ready_for_commit', 'commit_failed']);
-
-    const validationPassed = stagingRecord.validationStatus === 'passed';
-    const dedupePassed = stagingRecord.dedupeStatus === 'passed';
-
-    return (
-      validationPassed && dedupePassed && eligibleStatuses.has(promotionStatus)
-    );
+    // Ready/commit_failed are the only gates; we don’t block on dedupe/validation
+    // because “Mark ready” is the reviewer’s explicit signal to proceed.
+    return eligibleStatuses.has(promotionStatus);
   }
 
   private parseRawPayload(

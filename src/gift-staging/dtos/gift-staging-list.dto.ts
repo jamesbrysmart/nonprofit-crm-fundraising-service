@@ -113,4 +113,21 @@ export class GiftStagingListQueryDto {
   @IsString()
   @Transform(({ value }) => toTrimmedString(value))
   recurringAgreementId?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Transform(({ value }) => toLimit(value))
+  minAmountMinor?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Transform(({ value }) => toLimit(value))
+  maxAmountMinor?: number;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => toTrimmedString(value))
+  giftBatchId?: string;
 }

@@ -69,6 +69,9 @@ export class GiftStagingController {
       ...query,
       statuses: query.statuses ?? query.status,
       intakeSources: query.intakeSources ?? query.intakeSource,
+      giftBatchId: query.giftBatchId ?? query.batchId,
+      minAmountMinor: query.minAmountMinor ?? query.minAmount,
+      maxAmountMinor: query.maxAmountMinor ?? query.maxAmount,
     };
 
     const dto = plainToInstance(GiftStagingListQueryDto, mergedQuery, {

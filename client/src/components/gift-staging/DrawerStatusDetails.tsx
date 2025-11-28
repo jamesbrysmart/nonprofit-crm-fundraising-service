@@ -15,35 +15,29 @@ export function DrawerStatusDetails({
 }: DrawerStatusDetailsProps): JSX.Element {
   return (
     <section className="drawer-section">
-      <h4>Status</h4>
+      <h4>Donor & duplicates</h4>
       <dl className="drawer-meta">
         <div>
-          <dt>Processing</dt>
-          <dd>{detail.promotionStatus ?? '—'}</dd>
+          <dt>Staged donor name</dt>
+          <dd>
+            {[detail.donorFirstName, detail.donorLastName].filter(Boolean).join(' ') || '—'}
+          </dd>
         </div>
         <div>
-          <dt>Validation</dt>
-          <dd>{detail.validationStatus ?? '—'}</dd>
+          <dt>Staged donor email</dt>
+          <dd>{detail.donorEmail || '—'}</dd>
         </div>
         <div>
-          <dt>Dedupe</dt>
+          <dt>Linked donor</dt>
+          <dd>{detail.donorId ? <code>{detail.donorId}</code> : 'New donor'}</dd>
+        </div>
+        <div>
+          <dt>Duplicate check</dt>
           <dd>{dedupeStatusLabel}</dd>
-        </div>
-        <div>
-          <dt>Error detail</dt>
-          <dd>{detail.errorDetail ?? '—'}</dd>
         </div>
         <div>
           <dt>Intent</dt>
           <dd>{intentLabel ?? '—'}</dd>
-        </div>
-        <div>
-          <dt>Opportunity</dt>
-          <dd>{detail.opportunityId ? <code>{detail.opportunityId}</code> : '—'}</dd>
-        </div>
-        <div>
-          <dt>In-kind</dt>
-          <dd>{detail.isInKind ? 'Yes' : 'No'}</dd>
         </div>
       </dl>
     </section>

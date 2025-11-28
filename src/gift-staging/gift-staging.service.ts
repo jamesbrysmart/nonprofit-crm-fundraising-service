@@ -68,6 +68,9 @@ export interface GiftStagingListQuery {
   limit?: number;
   sort?: string;
   recurringAgreementId?: string;
+  minAmountMinor?: number;
+  maxAmountMinor?: number;
+  giftBatchId?: string;
 }
 
 export interface GiftStagingListItem {
@@ -160,7 +163,7 @@ export class GiftStagingService {
       this.configService.get<string>(
         'FUNDRAISING_STAGING_AUTO_PROMOTE_DEFAULT',
       ),
-      true,
+      false,
     );
   }
 
@@ -565,6 +568,9 @@ export class GiftStagingService {
       limit: this.normalizeLimit(dto.limit),
       sort: dto.sort,
       recurringAgreementId: dto.recurringAgreementId,
+      minAmountMinor: dto.minAmountMinor,
+      maxAmountMinor: dto.maxAmountMinor,
+      giftBatchId: dto.giftBatchId,
     };
   }
 
@@ -592,6 +598,15 @@ export class GiftStagingService {
     }
     if (query.recurringAgreementId) {
       params.recurringAgreementId = query.recurringAgreementId;
+    }
+    if (typeof query.minAmountMinor === 'number') {
+      params.minAmountMinor = query.minAmountMinor.toString();
+    }
+    if (typeof query.maxAmountMinor === 'number') {
+      params.maxAmountMinor = query.maxAmountMinor.toString();
+    }
+    if (query.giftBatchId) {
+      params.giftBatchId = query.giftBatchId;
     }
     return params;
   }

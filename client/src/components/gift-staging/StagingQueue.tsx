@@ -60,7 +60,7 @@ export function StagingQueue(): JSX.Element {
       const next = !prev;
       if (next) {
         applyFilter({
-          statuses: ['dedupe_review', 'pending'],
+          statuses: ['needs_review', 'pending'],
         });
       } else {
         clearFilterKey('statuses');

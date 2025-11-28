@@ -18,10 +18,12 @@ import { useAppealOptions } from './useAppealOptions';
 import {
   DuplicateTier,
   buildDuplicateLookupPayload,
-  classifyDuplicate,
+  classifyDuplicateFromContext,
 } from '../components/manual-entry/duplicateHelpers';
 import { buildGiftPayload } from '../components/manual-entry/giftPayload';
 import { GiftIntentOption } from '../types/giftIntent';
+import { DonorDisplay } from '../types/donor';
+import { personDuplicateToDisplay } from '../utils/donorAdapters';
 
 export interface GiftFormState {
   amountValue: string;
@@ -48,7 +50,7 @@ export type FormStatus =
   | { state: 'success'; giftId: string };
 
 export interface ClassifiedDuplicate {
-  match: PersonDuplicate;
+  match: DonorDisplay;
   tier: DuplicateTier;
 }
 
@@ -756,21 +758,26 @@ export function useManualGiftEntryController() {
       partial: 2,
     };
     return duplicateMatches
-      .map((match) => ({
-        match,
-        tier: classifyDuplicate(match, formState),
-      }))
+      .map((match) => {
+        const display = personDuplicateToDisplay(match);
+        const tier = classifyDuplicateFromContext(display, {
+          contactFirstName: formState.contactFirstName,
+          contactLastName: formState.contactLastName,
+          contactEmail: formState.contactEmail,
+        });
+        return { match: { ...display, tier }, tier };
+      })
       .sort((a, b) => order[a.tier] - order[b.tier]);
   }, [duplicateMatches, formState]);
 
-  const selectedDonor = useMemo(() => {
+  const selectedDonor = useMemo<DonorDisplay | undefined>(() => {
     if (!selectedDuplicateId) {
       return undefined;
     }
-    const merged: Record<string, PersonDuplicate> = {};
+    const merged: Record<string, DonorDisplay> = {};
     for (const candidate of duplicateMatches.concat(searchResults)) {
       if (candidate?.id) {
-        merged[candidate.id] = candidate;
+        merged[candidate.id] = personDuplicateToDisplay(candidate);
       }
     }
     return merged[selectedDuplicateId];

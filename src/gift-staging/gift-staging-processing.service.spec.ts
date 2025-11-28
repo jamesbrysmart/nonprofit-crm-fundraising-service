@@ -153,21 +153,25 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     expect(updateStatusByIdMock).not.toHaveBeenCalled();
   });
 
-  it('defers when validation or dedupe has not passed', async () => {
+  it('processes when marked ready even if validation/dedupe are not passed', async () => {
     getGiftStagingByIdMock.mockResolvedValue({
       ...baseStaging,
       validationStatus: 'pending',
+      dedupeStatus: 'needs_review',
+    });
+    twentyRequestMock.mockResolvedValue({
+      data: { createGift: { id: 'gift-200' } },
     });
 
     const result = await service.processGift({ stagingId: 'stg-123' });
 
     expect(result).toEqual({
-      status: 'deferred',
+      status: 'committed',
       stagingId: 'stg-123',
-      reason: 'not_ready',
+      giftId: 'gift-200',
     });
-    expect(twentyRequestMock).not.toHaveBeenCalled();
-    expect(updateStatusByIdMock).not.toHaveBeenCalled();
+    expect(twentyRequestMock).toHaveBeenCalled();
+    expect(markCommittedByIdMock).toHaveBeenCalledWith('stg-123', 'gift-200');
   });
 
   it('defers when raw payload is missing', async () => {

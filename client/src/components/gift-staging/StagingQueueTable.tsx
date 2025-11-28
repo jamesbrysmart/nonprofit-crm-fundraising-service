@@ -112,6 +112,13 @@ export function StagingQueueTable({
                   <span className={statusToneClass(row.statusMeta.tone)}>
                     {row.statusMeta.label}
                   </span>
+                  {row.statusMeta.label === 'Commit failed' && row.errorDetail ? (
+                    <span className={statusToneClass('danger')}>
+                      {typeof row.errorDetail === 'string'
+                        ? row.errorDetail
+                        : JSON.stringify(row.errorDetail)}
+                    </span>
+                  ) : null}
                   {row.receiptMeta ? (
                     <span
                       className={statusToneClass(
