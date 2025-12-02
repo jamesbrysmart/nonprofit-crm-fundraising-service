@@ -62,7 +62,7 @@ const buildPayloadFromEntity = (
   const payload: NormalizedGiftCreatePayload = {
     amount: {
       currencyCode: currency,
-      value: inferredAmountMajor,
+      amountMicros: inferredAmountMinor * 10_000,
     },
     amountMinor: inferredAmountMinor,
     amountMajor: inferredAmountMajor,
@@ -163,16 +163,25 @@ export const mergePayloadForUpdate = (
       ? merged.amountMajor
       : typeof merged.amountMinor === 'number'
         ? Number((merged.amountMinor / 100).toFixed(2))
-        : merged.amount?.value;
+        : typeof merged.amount?.amountMicros === 'number'
+          ? Number((merged.amount.amountMicros / 1_000_000).toFixed(2))
+          : undefined;
+
+  const resolvedAmountMicros =
+    typeof merged.amountMinor === 'number'
+      ? Math.round(merged.amountMinor * 10_000)
+      : typeof resolvedAmountMajor === 'number'
+        ? Math.round(resolvedAmountMajor * 1_000_000)
+        : merged.amount?.amountMicros;
 
   if (!merged.amount) {
     merged.amount = {
-      value: resolvedAmountMajor ?? 0,
+      amountMicros: resolvedAmountMicros ?? 0,
       currencyCode: merged.currency ?? 'GBP',
     };
   } else {
-    if (resolvedAmountMajor !== undefined) {
-      merged.amount.value = resolvedAmountMajor;
+    if (resolvedAmountMicros !== undefined) {
+      merged.amount.amountMicros = resolvedAmountMicros;
     }
     if (merged.currency) {
       merged.amount.currencyCode = merged.currency;

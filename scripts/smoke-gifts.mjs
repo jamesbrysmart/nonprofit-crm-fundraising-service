@@ -136,7 +136,7 @@ async function main() {
   );
 
   const stagedResponse = await httpJson('POST', '/gifts', {
-    amount: { currencyCode: 'GBP', value: 15.5 },
+    amount: { currencyCode: 'GBP', amountMicros: 15_500_000 },
     name: `Smoke Test Staged Gift ${uniqueSuffix}`,
     autoPromote: false,
     appealId: createdAppeal.id,
@@ -187,10 +187,15 @@ async function main() {
   console.log('\n--- Gift proxy CRUD flow ---');
   console.log('Creating gift via fundraising-service → Twenty proxy');
   const createResponse = await httpJson('POST', '/gifts', {
-    amount: { currencyCode: 'USD', value: 42 },
+    amount: { currencyCode: 'USD', amountMicros: 42_000_000 },
     name: 'Smoke Test Gift',
     autoPromote: true,
     appealId: createdAppeal.id,
+    contact: {
+      firstName: 'Smoke',
+      lastName: 'Proxy',
+      email: `smoke.proxy+${uniqueSuffix}@example.org`,
+    },
   });
 
   const createdGift = createResponse?.data?.createGift;
@@ -226,10 +231,15 @@ async function main() {
 
   console.log('\nCreating a persistent gift for UI verification');
   const persistentCreateResponse = await httpJson('POST', '/gifts', {
-    amount: { currencyCode: 'EUR', value: 99 },
+    amount: { currencyCode: 'EUR', amountMicros: 99_000_000 },
     name: 'Persistent Smoke Test Gift',
     autoPromote: true,
     appealId: createdAppeal.id,
+    contact: {
+      firstName: 'Persistent',
+      lastName: 'Smoke',
+      email: `persistent.smoke+${uniqueSuffix}@example.org`,
+    },
   });
 
   const persistentGift = persistentCreateResponse?.data?.createGift;

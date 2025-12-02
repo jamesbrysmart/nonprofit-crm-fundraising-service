@@ -29,6 +29,21 @@ export const buildTwentyGiftPayload = (
     ...payload,
   };
 
+  const amountMicros =
+    typeof payload.amount?.amountMicros === 'number' &&
+    Number.isFinite(payload.amount.amountMicros)
+      ? Math.round(payload.amount.amountMicros)
+      : typeof payload.amountMinor === 'number' && Number.isFinite(payload.amountMinor)
+        ? Math.round(payload.amountMinor * 10_000)
+        : typeof payload.amountMajor === 'number'
+          ? Math.round(payload.amountMajor * 1_000_000)
+          : undefined;
+
+  const currencyCode =
+    payload.currency ??
+    payload.amount?.currencyCode ??
+    (typeof payload.feeCurrency === 'string' ? payload.feeCurrency : undefined);
+
   delete body.amountMinor;
   delete body.currency;
   delete body.dateReceived;
@@ -41,28 +56,42 @@ export const buildTwentyGiftPayload = (
     body.giftDate = payload.dateReceived;
   }
 
-  if (payload.amountMajor && payload.currency) {
+  if (typeof amountMicros === 'number' && currencyCode) {
     body.amount = {
-      value: payload.amountMajor,
-      currencyCode: payload.currency,
+      amountMicros,
+      currencyCode,
     };
   }
 
   if (
-    typeof payload.feeAmountMajor === 'number' &&
-    (typeof payload.feeCurrency === 'string' ||
-      typeof payload.currency === 'string')
+    (typeof payload.feeAmountMajor === 'number' ||
+      typeof payload.feeAmountMinor === 'number') &&
+    (typeof payload.feeCurrency === 'string' || typeof payload.currency === 'string')
   ) {
-    body.feeAmount = {
-      value: payload.feeAmountMajor,
-      currencyCode: payload.feeCurrency ?? payload.currency,
-    };
+    const feeAmountMinor =
+      typeof payload.feeAmountMinor === 'number' && Number.isFinite(payload.feeAmountMinor)
+        ? payload.feeAmountMinor
+        : typeof payload.feeAmountMajor === 'number'
+          ? Math.round(payload.feeAmountMajor * 100)
+          : undefined;
+
+    const feeAmountMicros =
+      typeof feeAmountMinor === 'number' ? Math.round(feeAmountMinor * 10_000) : undefined;
+
+    const feeCurrencyCode = payload.feeCurrency ?? payload.currency ?? currencyCode;
+
+    if (typeof feeAmountMicros === 'number' && feeCurrencyCode) {
+      body.feeAmount = {
+        amountMicros: feeAmountMicros,
+        currencyCode: feeCurrencyCode,
+      };
+    }
   } else if (
     typeof payload.feeAmountMinor === 'number' &&
     typeof payload.currency === 'string'
   ) {
     body.feeAmount = {
-      value: Number((payload.feeAmountMinor / 100).toFixed(2)),
+      amountMicros: Math.round(payload.feeAmountMinor * 10_000),
       currencyCode: payload.currency,
     };
   }

@@ -7,6 +7,27 @@ export const mapCreateGiftStagingPayload = (
 ): CreateGiftStagingDto & { rawPayload: string } => {
   const promotionStatus = autoPromote ? 'committing' : 'pending';
 
+  const amountMicrosFromPayload =
+    typeof payload.amount?.amountMicros === 'number'
+      ? Math.round(payload.amount.amountMicros)
+      : undefined;
+
+  const amountMinor =
+    typeof amountMicrosFromPayload === 'number'
+      ? Math.round(amountMicrosFromPayload / 10_000)
+      : typeof payload.amountMinor === 'number' && Number.isFinite(payload.amountMinor)
+        ? payload.amountMinor
+        : typeof payload.amountMajor === 'number'
+          ? Math.round(payload.amountMajor * 100)
+          : 0;
+
+  const amountMicros =
+    typeof amountMicrosFromPayload === 'number'
+      ? amountMicrosFromPayload
+      : Math.round(amountMinor * 10_000);
+
+  const currencyCode = payload.currency ?? payload.amount?.currencyCode ?? 'GBP';
+
   const rawPayload = JSON.stringify(payload);
 
   const providerContext: Record<string, unknown> | undefined =
@@ -18,12 +39,10 @@ export const mapCreateGiftStagingPayload = (
     autoPromote,
     promotionStatus,
     amount: {
-      value: payload.amountMajor ?? payload.amount?.value ?? 0,
-      currencyCode: payload.currency ?? payload.amount?.currencyCode ?? 'GBP',
+      amountMicros,
+      currencyCode,
     },
-    amountMinor: payload.amountMinor,
-    amountMajor: payload.amountMajor,
-    currency: payload.currency ?? payload.amount?.currencyCode ?? 'GBP',
+    amountMinor,
     feeAmountMinor: payload.feeAmountMinor,
     intakeSource: payload.intakeSource,
     sourceFingerprint: payload.sourceFingerprint,

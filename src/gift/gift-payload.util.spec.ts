@@ -3,7 +3,7 @@ import { buildTwentyGiftPayload } from './gift-payload.util';
 describe('buildTwentyGiftPayload', () => {
   it('preserves optional attribution and batch fields when present', () => {
     const payload = {
-      amount: { currencyCode: 'GBP', value: 25 },
+      amount: { currencyCode: 'GBP', amountMicros: 25_000_000 },
       amountMinor: 2500,
       amountMajor: 25,
       currency: 'GBP',
@@ -31,6 +31,6 @@ describe('buildTwentyGiftPayload', () => {
       expectedAt: '2025-02-02',
     });
     expect(result).toHaveProperty('amount');
-    expect(result.amount).toEqual({ value: 25, currencyCode: 'GBP' });
+    expect(result.amount).toEqual({ amountMicros: 25_000_000, currencyCode: 'GBP' });
   });
 });

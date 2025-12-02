@@ -282,7 +282,7 @@ async function main(): Promise<void> {
   const committedGift = await giftService.createGift({
     amount: {
       currencyCode: 'GBP',
-      value: 45,
+      amountMicros: 45_000_000,
     },
     giftDate: today,
     name: `Seeded committed gift ${runId}`,
@@ -307,11 +307,11 @@ async function main(): Promise<void> {
       await giftService.createGift({
         amount: {
           currencyCode: 'GBP',
-          value: 72.5,
+          amountMicros: 72_500_000,
         },
         feeAmount: {
           currencyCode: 'GBP',
-          value: 2.5,
+          amountMicros: 2_500_000,
         },
         giftDate: today,
         name: `Seeded payout gift ${runId}`,
@@ -447,7 +447,7 @@ async function seedManualStaging(options: {
   const payload = {
     amount: {
       currencyCode: 'GBP',
-      value: amountMajor,
+      amountMicros: amountMinor * 10_000,
     },
     amountMinor,
     currency: 'GBP',
@@ -489,7 +489,7 @@ async function seedManualStaging(options: {
     payload.feeAmountMinor = feeAmountMinor;
     payload.feeAmount = {
       currencyCode: 'GBP',
-      value: Number((feeAmountMinor / 100).toFixed(2)),
+      amountMicros: feeAmountMinor * 10_000,
     };
   }
 
@@ -582,15 +582,15 @@ async function seedGiftPayout(args: {
     payoutReference: `SEED-POUT-${runId}`,
     depositDate: today,
     depositGrossAmount: {
-      value: 150,
+      amountMicros: 150_000_000,
       currencyCode: 'GBP',
     },
     depositFeeAmount: {
-      value: 5,
+      amountMicros: 5_000_000,
       currencyCode: 'GBP',
     },
     depositNetAmount: {
-      value: 145,
+      amountMicros: 145_000_000,
       currencyCode: 'GBP',
     },
     expectedItemCount: 2,

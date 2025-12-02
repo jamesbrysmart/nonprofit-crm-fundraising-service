@@ -427,7 +427,7 @@ export class GiftStagingProcessingService {
 
     const amount = payload.amount as Record<string, unknown>;
     const currencyCode = amount.currencyCode;
-    const value = amount.value;
+    const amountMicros = amount.amountMicros;
 
     const hasDonor =
       typeof payload.donorId === 'string' && payload.donorId.trim().length > 0;
@@ -443,8 +443,8 @@ export class GiftStagingProcessingService {
       (hasDonor || hasCompany) &&
       typeof currencyCode === 'string' &&
       currencyCode.trim().length > 0 &&
-      typeof value === 'number' &&
-      Number.isFinite(value)
+      typeof amountMicros === 'number' &&
+      Number.isFinite(amountMicros)
     );
   }
 

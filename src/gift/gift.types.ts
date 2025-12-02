@@ -1,7 +1,7 @@
 export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   amount: {
+    amountMicros: number;
     currencyCode: string;
-    value: number;
   };
   amountMajor?: number;
   amountMinor: number;

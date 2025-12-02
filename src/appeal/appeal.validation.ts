@@ -1,8 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 
 export interface CurrencyAmount {
-  value: number;
   currencyCode: string;
+  amountMicros: number;
 }
 
 export interface AppealWritePayload extends Record<string, unknown> {
@@ -141,7 +141,12 @@ const normalizeCurrencyAmount = (
   let rawCurrency: unknown;
 
   if (isPlainObject(value)) {
-    rawValue = value.value ?? value.amount ?? value.total ?? value.num;
+    rawValue =
+      value.amountMicros ??
+      value.value ??
+      value.amount ??
+      value.total ??
+      value.num;
     rawCurrency = value.currencyCode ?? value.currency ?? value.ccy;
   } else if (typeof value === 'number' || typeof value === 'string') {
     rawValue = value;
@@ -151,18 +156,20 @@ const normalizeCurrencyAmount = (
     );
   }
 
-  const numeric =
+  const isMicrosInput = isPlainObject(value) && (value as Record<string, unknown>).amountMicros !== undefined;
+
+  const numericRaw =
     typeof rawValue === 'number'
       ? rawValue
       : typeof rawValue === 'string'
         ? Number.parseFloat(rawValue.trim())
         : Number.NaN;
 
-  if (!Number.isFinite(numeric)) {
+  if (!Number.isFinite(numericRaw)) {
     throw new BadRequestException(`${fieldName} must contain a numeric value`);
   }
 
-  if (numeric < 0) {
+  if (numericRaw < 0) {
     throw new BadRequestException(`${fieldName} cannot be negative`);
   }
 
@@ -172,8 +179,12 @@ const normalizeCurrencyAmount = (
     currency = rawCurrency.trim().toUpperCase();
   }
 
+  const amountMicros = isMicrosInput
+    ? Math.round(numericRaw)
+    : Math.round(numericRaw * 1_000_000);
+
   return {
-    value: Number.parseFloat(numeric.toFixed(2)),
+    amountMicros,
     currencyCode: currency ?? 'GBP',
   };
 };

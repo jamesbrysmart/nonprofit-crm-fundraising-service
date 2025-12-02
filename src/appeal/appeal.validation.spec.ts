@@ -27,7 +27,7 @@ describe('appeal.validation', () => {
         appealType: ' email ',
         startDate: '2026-03-15',
         endDate: '2026-04-15',
-        goalAmount: { value: 25000.456, currencyCode: 'gbp' },
+        goalAmount: { amountMicros: 25_000_000_000, currencyCode: 'gbp' },
         targetSolicitedCount: '5000',
       });
 
@@ -37,7 +37,7 @@ describe('appeal.validation', () => {
         startDate: '2026-03-15',
         endDate: '2026-04-15',
         targetSolicitedCount: 5000,
-        goalAmount: { value: 25000.46, currencyCode: 'GBP' },
+        goalAmount: { amountMicros: 25_000_000_000, currencyCode: 'GBP' },
       });
     });
   });
@@ -52,12 +52,12 @@ describe('appeal.validation', () => {
     it('accepts partial updates', () => {
       const payload = validateUpdateAppealPayload({
         description: 'Updated copy',
-        budgetAmount: 1250,
+        budgetAmount: { amountMicros: 1_250_000_000, currencyCode: 'GBP' },
       });
 
       expect(payload).toEqual({
         description: 'Updated copy',
-        budgetAmount: { value: 1250, currencyCode: 'GBP' },
+        budgetAmount: { amountMicros: 1_250_000_000, currencyCode: 'GBP' },
       });
     });
   });

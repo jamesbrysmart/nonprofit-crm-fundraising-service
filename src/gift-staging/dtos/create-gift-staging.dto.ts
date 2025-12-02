@@ -9,7 +9,7 @@ import { Type } from 'class-transformer';
 
 class AmountDto {
   @IsNumber()
-  value!: number;
+  amountMicros!: number;
 
   @IsString()
   currencyCode!: string;
@@ -43,9 +43,6 @@ export class CreateGiftStagingDto {
   @IsOptional()
   @IsNumber()
   amountMajor?: number;
-
-  @IsString()
-  currency!: string;
 
   @IsOptional()
   @IsString()

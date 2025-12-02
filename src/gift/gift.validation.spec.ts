@@ -8,11 +8,14 @@ describe('gift.validation', () => {
   describe('validateCreateGiftPayload', () => {
     it('accepts minimal payload with contact', () => {
       const result = validateCreateGiftPayload({
-        amount: { currencyCode: 'GBP', value: 10 },
+        amount: { currencyCode: 'GBP', amountMicros: 10_000_000 },
         contact: { firstName: 'Ada', lastName: 'Lovelace' },
       });
 
-      expect(result.amount).toEqual({ currencyCode: 'GBP', value: 10 });
+      expect(result.amount).toEqual({
+        currencyCode: 'GBP',
+        amountMicros: 10_000_000,
+      });
       expect(result.contact).toEqual({
         firstName: 'Ada',
         lastName: 'Lovelace',
@@ -23,7 +26,7 @@ describe('gift.validation', () => {
 
     it('retains optional email on contact', () => {
       const result = validateCreateGiftPayload({
-        amount: { currencyCode: 'USD', value: 25 },
+        amount: { currencyCode: 'USD', amountMicros: 25_000_000 },
         contact: {
           firstName: 'Alan',
           lastName: 'Turing',
@@ -43,7 +46,7 @@ describe('gift.validation', () => {
     it('throws when contact fields are missing', () => {
       expect(() =>
         validateCreateGiftPayload({
-          amount: { currencyCode: 'GBP', value: 10 },
+          amount: { currencyCode: 'GBP', amountMicros: 10_000_000 },
           contact: {},
         }),
       ).toThrow(BadRequestException);
@@ -52,7 +55,7 @@ describe('gift.validation', () => {
     it('throws when email is present but empty', () => {
       expect(() =>
         validateCreateGiftPayload({
-          amount: { currencyCode: 'USD', value: 30 },
+          amount: { currencyCode: 'USD', amountMicros: 30_000_000 },
           contact: { firstName: 'Mary', lastName: 'Seacole', email: ' ' },
         }),
       ).toThrow(BadRequestException);
@@ -60,7 +63,7 @@ describe('gift.validation', () => {
 
     it('retains appealId when provided directly', () => {
       const result = validateCreateGiftPayload({
-        amount: { currencyCode: 'GBP', value: 5 },
+        amount: { currencyCode: 'GBP', amountMicros: 5_000_000 },
         contact: { firstName: 'Edsger', lastName: 'Dijkstra' },
         appealId: 'apl-456',
       });
@@ -70,7 +73,7 @@ describe('gift.validation', () => {
 
     it('preserves provided amountMinor/currency when supplied', () => {
       const result = validateCreateGiftPayload({
-        amount: { currencyCode: 'GBP', value: 12.34 },
+        amount: { currencyCode: 'GBP', amountMicros: 12_340_000 },
         amountMinor: 1235,
         currency: 'GBP',
         contact: { firstName: 'Grace', lastName: 'Hopper' },
@@ -82,7 +85,7 @@ describe('gift.validation', () => {
 
     it('allows intake metadata fields', () => {
       const result = validateCreateGiftPayload({
-        amount: { currencyCode: 'USD', value: 1 },
+        amount: { currencyCode: 'USD', amountMicros: 1_000_000 },
         contact: { firstName: 'Pat', lastName: 'Lee' },
         intakeSource: 'portal',
         sourceFingerprint: 'fingerprint-123',

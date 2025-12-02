@@ -45,8 +45,8 @@ const ALLOWED_BOOLEAN_FIELDS = new Set([
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
 
 export type GiftAmount = {
+  amountMicros: number;
   currencyCode: string;
-  value: number;
 };
 
 export type GiftCreatePayload = Writable<
@@ -80,7 +80,7 @@ const parseAmount = (
     throw new BadRequestException('amount must be an object');
   }
 
-  const { currencyCode, value } = input;
+  const { currencyCode, amountMicros } = input;
 
   if (typeof currencyCode !== 'string' || currencyCode.trim() === '') {
     throw new BadRequestException(
@@ -88,27 +88,24 @@ const parseAmount = (
     );
   }
 
-  if (value === undefined || value === null) {
+  if (amountMicros === undefined || amountMicros === null) {
     if (context === 'create') {
-      throw new BadRequestException('amount.value is required');
+      throw new BadRequestException('amount.amountMicros is required');
     }
-    throw new BadRequestException('amount.value cannot be null');
+    throw new BadRequestException('amount.amountMicros cannot be null');
   }
 
-  if (typeof value !== 'number' && typeof value !== 'string') {
-    throw new BadRequestException('amount.value must be numeric');
+  if (typeof amountMicros !== 'number') {
+    throw new BadRequestException('amount.amountMicros must be numeric');
   }
 
-  const numericValue =
-    typeof value === 'number' ? value : Number.parseFloat(value);
-
-  if (Number.isNaN(numericValue)) {
-    throw new BadRequestException('amount.value must be numeric');
+  if (!Number.isFinite(amountMicros)) {
+    throw new BadRequestException('amount.amountMicros must be numeric');
   }
 
   return {
+    amountMicros,
     currencyCode: currencyCode.trim(),
-    value: numericValue,
   };
 };
 
@@ -294,7 +291,7 @@ export const validateCreateGiftPayload = (body: unknown): GiftCreatePayload => {
   sanitized.amount = parsedAmount;
 
   if (typeof sanitized.amountMinor !== 'number') {
-    sanitized.amountMinor = Math.round(parsedAmount.value * 100);
+    sanitized.amountMinor = Math.round(parsedAmount.amountMicros / 10_000);
   }
 
   if (typeof sanitized.currency !== 'string') {
@@ -304,7 +301,7 @@ export const validateCreateGiftPayload = (body: unknown): GiftCreatePayload => {
   if (sanitized.feeAmount && typeof sanitized.feeAmount === 'object') {
     const feeAmount = sanitized.feeAmount as GiftAmount;
     if (typeof sanitized.feeAmountMinor !== 'number') {
-      sanitized.feeAmountMinor = Math.round(feeAmount.value * 100);
+      sanitized.feeAmountMinor = Math.round(feeAmount.amountMicros / 10_000);
     }
   }
 
@@ -359,14 +356,14 @@ export const validateUpdateGiftPayload = (body: unknown): GiftUpdatePayload => {
   if (body.amount !== undefined) {
     const parsedAmount = parseAmount(body.amount, 'update');
     sanitized.amount = parsedAmount;
-    sanitized.amountMinor = Math.round(parsedAmount.value * 100);
+    sanitized.amountMinor = Math.round(parsedAmount.amountMicros / 10_000);
     sanitized.currency = parsedAmount.currencyCode;
   }
 
   if (body.feeAmount !== undefined) {
     const parsedFeeAmount = parseAmount(body.feeAmount, 'update');
     sanitized.feeAmount = parsedFeeAmount;
-    sanitized.feeAmountMinor = Math.round(parsedFeeAmount.value * 100);
+    sanitized.feeAmountMinor = Math.round(parsedFeeAmount.amountMicros / 10_000);
   }
 
   if (Object.keys(sanitized).length === 0) {

@@ -36,8 +36,9 @@ describe('GiftStagingProcessingService (manual processing)', () => {
   };
 
   const basePayload: NormalizedGiftCreatePayload = {
-    amount: { currencyCode: 'GBP', value: 12.34 },
+    amount: { currencyCode: 'GBP', amountMicros: 12_340_000 },
     amountMinor: 1234,
+    amountMajor: 12.34,
     currency: 'GBP',
     donorId: 'person-123',
     intakeSource: 'manual_ui',
@@ -335,7 +336,9 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     expect(twentyRequestMock).toHaveBeenCalledWith(
       'POST',
       '/gifts',
-      expect.objectContaining({ amount: basePayload.amount }),
+      expect.objectContaining({
+        amount: { amountMicros: 12_340_000, currencyCode: 'GBP' },
+      }),
       'GiftStagingProcessingService',
     );
     expect(markCommittedByIdMock).toHaveBeenCalledWith('stg-123', 'gift-100');

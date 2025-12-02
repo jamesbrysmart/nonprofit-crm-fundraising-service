@@ -64,15 +64,16 @@ describe('GiftService - staging auto promote', () => {
 
   it('returns staging acknowledgement when autoPromote is false', async () => {
     const sanitizedPayload = {
-      amount: { currencyCode: 'GBP', value: 15 },
+      amount: { currencyCode: 'GBP', amountMicros: 15_000_000 },
     } as GiftCreatePayload;
     jest
       .spyOn(giftValidation, 'validateCreateGiftPayload')
       .mockReturnValue(sanitizedPayload);
 
     const preparedPayload: NormalizedGiftCreatePayload = {
-      amount: { currencyCode: 'GBP', value: 15 },
+      amount: { currencyCode: 'GBP', amountMicros: 15_000_000 },
       amountMinor: 1500,
+      amountMajor: 15,
       currency: 'GBP',
       intakeSource: 'manual_ui',
       sourceFingerprint: 'fp-123',
@@ -118,15 +119,16 @@ describe('GiftService - staging auto promote', () => {
 
   it('commits gift immediately when autoPromote resolves true', async () => {
     const sanitizedPayload = {
-      amount: { currencyCode: 'GBP', value: 20 },
+      amount: { currencyCode: 'GBP', amountMicros: 20_000_000 },
     } as GiftCreatePayload;
     jest
       .spyOn(giftValidation, 'validateCreateGiftPayload')
       .mockReturnValue(sanitizedPayload);
 
     const preparedPayload: NormalizedGiftCreatePayload = {
-      amount: { currencyCode: 'GBP', value: 20 },
+      amount: { currencyCode: 'GBP', amountMicros: 20_000_000 },
       amountMinor: 2000,
+      amountMajor: 20,
       currency: 'GBP',
       intakeSource: 'manual_ui',
       sourceFingerprint: 'fp-456',
@@ -176,15 +178,16 @@ describe('GiftService - staging auto promote', () => {
 
   it('updates dedupe status when diagnostics present', async () => {
     const sanitizedPayload = {
-      amount: { currencyCode: 'GBP', value: 30 },
+      amount: { currencyCode: 'GBP', amountMicros: 30_000_000 },
     } as GiftCreatePayload;
     jest
       .spyOn(giftValidation, 'validateCreateGiftPayload')
       .mockReturnValue(sanitizedPayload);
 
     const preparedPayload: NormalizedGiftCreatePayload = {
-      amount: { currencyCode: 'GBP', value: 30 },
+      amount: { currencyCode: 'GBP', amountMicros: 30_000_000 },
       amountMinor: 3000,
+      amountMajor: 30,
       currency: 'GBP',
       intakeSource: 'csv_import',
       sourceFingerprint: 'fp-789',
@@ -236,7 +239,7 @@ describe('GiftService - staging auto promote', () => {
 
   it('passes appealId through to the Twenty API payload when present', async () => {
     const sanitizedPayload = {
-      amount: { currencyCode: 'GBP', value: 25 },
+      amount: { currencyCode: 'GBP', amountMicros: 25_000_000 },
       appealId: 'apl-123',
     } as GiftCreatePayload;
 
@@ -245,8 +248,9 @@ describe('GiftService - staging auto promote', () => {
       .mockReturnValue(sanitizedPayload);
 
     const preparedPayload: NormalizedGiftCreatePayload = {
-      amount: { currencyCode: 'GBP', value: 25 },
+      amount: { currencyCode: 'GBP', amountMicros: 25_000_000 },
       amountMinor: 2500,
+      amountMajor: 25,
       currency: 'GBP',
       appealId: 'apl-123',
       autoPromote: true,

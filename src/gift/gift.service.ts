@@ -171,32 +171,54 @@ export class GiftService {
           : undefined;
     }
 
+    const amountMicros =
+      typeof payload.amount?.amountMicros === 'number'
+        ? Math.round(payload.amount.amountMicros)
+        : undefined;
+
+    const currencyCode =
+      typeof payload.currency === 'string'
+        ? payload.currency
+        : payload.amount?.currencyCode ?? 'GBP';
+
+    const amountMinor =
+      typeof amountMicros === 'number'
+        ? Math.round(amountMicros / 10_000)
+        : typeof payload.amountMinor === 'number'
+          ? payload.amountMinor
+          : undefined;
+
+    const amountMajor =
+      typeof amountMicros === 'number'
+        ? Number((amountMicros / 1_000_000).toFixed(2))
+        : typeof amountMinor === 'number'
+          ? Number((amountMinor / 100).toFixed(2))
+          : undefined;
+
     const prepared: NormalizedGiftCreatePayload = {
       ...payload,
-      currency:
-        typeof payload.currency === 'string'
-          ? payload.currency
-          : (payload.amount?.currencyCode ?? 'GBP'),
-      amountMinor:
-        typeof payload.amountMinor === 'number'
-          ? payload.amountMinor
-          : Math.round((payload.amount?.value ?? 0) * 100),
-      amountMajor:
-        typeof payload.amount?.value === 'number'
-          ? payload.amount.value
-          : typeof payload.amountMinor === 'number'
-            ? Number((payload.amountMinor / 100).toFixed(2))
-            : undefined,
+      amount: {
+        amountMicros: amountMicros ?? 0,
+        currencyCode,
+      },
+      currency: currencyCode,
+      amountMinor: amountMinor ?? 0,
+      amountMajor,
     };
 
     if (payload.feeAmount && typeof payload.feeAmount === 'object') {
-      const feeValue = payload.feeAmount.value;
-      if (typeof feeValue === 'number' && Number.isFinite(feeValue)) {
-        prepared.feeAmountMajor = feeValue;
+      const feeMicros =
+        typeof payload.feeAmount.amountMicros === 'number'
+          ? Math.round(payload.feeAmount.amountMicros)
+          : undefined;
+      if (typeof feeMicros === 'number' && Number.isFinite(feeMicros)) {
         prepared.feeAmountMinor =
           typeof payload.feeAmountMinor === 'number'
             ? payload.feeAmountMinor
-            : Math.round(feeValue * 100);
+            : Math.round(feeMicros / 10_000);
+        prepared.feeAmountMajor = Number(
+          ((prepared.feeAmountMinor ?? 0) / 100).toFixed(2),
+        );
         prepared.feeCurrency =
           typeof payload.feeAmount.currencyCode === 'string'
             ? payload.feeAmount.currencyCode

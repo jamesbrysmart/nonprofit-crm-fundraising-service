@@ -198,8 +198,9 @@ describe('GiftStagingController', () => {
     isEnabledMock.mockReturnValue(true);
 
     const normalizedPayload: NormalizedGiftCreatePayload = {
-      amount: { currencyCode: 'GBP', value: 25 },
+      amount: { currencyCode: 'GBP', amountMicros: 25_000_000 },
       amountMinor: 2500,
+      amountMajor: 25,
       currency: 'GBP',
       intakeSource: 'manual_ui',
       sourceFingerprint: 'fp-1',
@@ -228,7 +229,7 @@ describe('GiftStagingController', () => {
 
     await expect(
       controller.createGiftStaging({
-        amount: { currencyCode: 'GBP', value: 25 },
+        amount: { currencyCode: 'GBP', amountMicros: 25_000_000 },
       }),
     ).resolves.toEqual({
       data: {
@@ -248,7 +249,7 @@ describe('GiftStagingController', () => {
     });
 
     expect(normalizeGiftPayloadMock).toHaveBeenCalledWith({
-      amount: { currencyCode: 'GBP', value: 25 },
+      amount: { currencyCode: 'GBP', amountMicros: 25_000_000 },
     });
     expect(stageGiftMock).toHaveBeenCalledWith(
       expect.objectContaining({ autoPromote: false }),
@@ -258,8 +259,9 @@ describe('GiftStagingController', () => {
   it('throws when staging creation fails', async () => {
     isEnabledMock.mockReturnValue(true);
     normalizeGiftPayloadMock.mockResolvedValue({
-      amount: { currencyCode: 'GBP', value: 10 },
+      amount: { currencyCode: 'GBP', amountMicros: 10_000_000 },
       amountMinor: 1000,
+      amountMajor: 10,
       currency: 'GBP',
       intakeSource: 'manual_ui',
       sourceFingerprint: 'fp-2',
