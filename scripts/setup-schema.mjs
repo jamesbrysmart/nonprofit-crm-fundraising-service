@@ -44,6 +44,44 @@ const TWENTY_GRAPHQL_METADATA_URL = process.env.TWENTY_METADATA_GRAPHQL_URL
   ? process.env.TWENTY_METADATA_GRAPHQL_URL
   : 'http://localhost:3000/metadata';
 const API_KEY = process.env.TWENTY_API_KEY;
+let objectCache = null;
+
+async function fetchAllObjects() {
+  if (objectCache) {
+    return objectCache;
+  }
+
+  const url = `${TWENTY_REST_METADATA_URL}/objects`;
+  const headers = {
+    'Authorization': `Bearer ${API_KEY}`,
+  };
+
+  const response = await fetch(url, { method: 'GET', headers });
+  const result = await response.json();
+
+  if (!response.ok) {
+    console.error('Failed to fetch objects:');
+    console.error(JSON.stringify(result, null, 2));
+    const messages = result?.messages || result?.message;
+    throw new Error(`REST API Error: ${messages || response.statusText}`);
+  }
+
+  const objects = result?.data?.objects || result?.data || [];
+  const byId = new Map();
+  const byName = new Map();
+
+  for (const object of objects) {
+    if (object?.id) {
+      byId.set(object.id, object);
+    }
+    if (object?.nameSingular) {
+      byName.set(object.nameSingular, object);
+    }
+  }
+
+  objectCache = { list: objects, byId, byName };
+  return objectCache;
+}
 
 async function restCall(method, endpoint, payload) {
   const url = `${TWENTY_REST_METADATA_URL}${endpoint}`;
@@ -87,29 +125,12 @@ async function restCall(method, endpoint, payload) {
 }
 
 async function findObjectByNameSingular(nameSingular) {
-  const url = `${TWENTY_REST_METADATA_URL}/objects`;
-  const headers = {
-    'Authorization': `Bearer ${API_KEY}`,
-  };
-
   console.log(`Fetching all objects to find: ${nameSingular}`);
-
-  const response = await fetch(url, { method: 'GET', headers });
-  const result = await response.json();
-
-  if (!response.ok) {
-    console.error(`Failed to fetch objects:`);
-    console.error(JSON.stringify(result, null, 2));
-    const messages = result?.messages || result?.message;
-    throw new Error(`REST API Error: ${messages || response.statusText}`);
-  }
-
-  if (result.data && result.data.objects) {
-    const foundObject = result.data.objects.find(obj => obj.nameSingular === nameSingular);
-    if (foundObject) {
-      console.log(`Found object ${nameSingular} with ID: ${foundObject.id}`);
-      return foundObject.id;
-    }
+  const { byName } = await fetchAllObjects();
+  const foundObject = byName.get(nameSingular);
+  if (foundObject) {
+    console.log(`Found object ${nameSingular} with ID: ${foundObject.id}`);
+    return foundObject.id;
   }
   
   console.log(`Object ${nameSingular} not found.`);
@@ -117,28 +138,14 @@ async function findObjectByNameSingular(nameSingular) {
 }
 
 async function findFieldByNameAndObject(name, objectMetadataId) {
-  const url = `${TWENTY_REST_METADATA_URL}/fields`;
-  const headers = {
-    Authorization: `Bearer ${API_KEY}`,
-  };
-
-  console.log(`Fetching fields to find ${name} on ${objectMetadataId}`);
-
-  const response = await fetch(url, { method: 'GET', headers });
-  const result = await response.json();
-
-  if (!response.ok) {
-    console.error('Failed to fetch fields for lookup:');
-    console.error(JSON.stringify(result, null, 2));
-    const messages = result?.messages || result?.message;
-    throw new Error(`REST API Error: ${messages || response.statusText}`);
+  console.log(`Fetching object ${objectMetadataId} fields to find ${name}`);
+  const { byId } = await fetchAllObjects();
+  const object = byId.get(objectMetadataId);
+  if (!object) {
+    return undefined;
   }
-
-  const fields = result?.data?.fields || result?.data || [];
-  return fields.find(
-    (field) =>
-      field.name === name && field.objectMetadataId === objectMetadataId,
-  );
+  const fields = object.fields || [];
+  return fields.find((field) => field.name === name);
 }
 
 async function ensureObject(objectData) {
@@ -154,10 +161,20 @@ async function ensureObject(objectData) {
   if (!createdId) {
     throw new Error(`Failed to create object ${objectData.nameSingular}; missing id in response`);
   }
+  objectCache = null;
   return createdId;
 }
 
 async function createField(fieldData) {
+  const existingField = await findFieldByNameAndObject(
+    fieldData.name,
+    fieldData.objectMetadataId,
+  );
+  if (existingField) {
+    console.log(`Field ${fieldData.name} already exists. Skipping.`);
+    return existingField;
+  }
+
   console.log(`Creating field: ${fieldData.name} for object ID: ${fieldData.objectMetadataId}`);
   try {
     return await restCall('POST', '/fields', fieldData);
@@ -168,12 +185,12 @@ async function createField(fieldData) {
       : typeof messages === 'string'
         ? [messages]
         : [];
-        if (messageList.some(msg => msg.includes('Field already exists') || msg.includes('is not available'))) {
-          console.log(`Field ${fieldData.name} already exists. Skipping.`);
-          return null;
-        }
-        throw error;
-      }
+    if (messageList.some(msg => msg.includes('Field already exists') || msg.includes('is not available'))) {
+      console.log(`Field ${fieldData.name} already exists. Skipping.`);
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function graphQLCall(payload) {
@@ -572,8 +589,8 @@ async function main() {
     { name: 'status', label: 'Status', type: 'TEXT' },
     { name: 'cadence', label: 'Cadence', type: 'TEXT' },
     { name: 'intervalCount', label: 'Interval Count', type: 'NUMBER' },
+    { name: 'amount', label: 'Amount', type: 'CURRENCY' },
     { name: 'amountMinor', label: 'Amount (minor units)', type: 'NUMBER' },
-    { name: 'currency', label: 'Currency', type: 'TEXT' },
     { name: 'startDate', label: 'Start Date', type: 'DATE' },
     { name: 'endDate', label: 'End Date', type: 'DATE' },
     { name: 'nextExpectedAt', label: 'Next Expected At', type: 'DATE' },
@@ -638,7 +655,7 @@ async function main() {
 
   console.log('--- Linking Objects (GraphQL Metadata API) ---');
   console.log(
-    'NOTE: GraphQL helper is newly added; only the Gift→Person relation below has been exercised so far. Treat this as experimental until we wire more relations through it.',
+    'NOTE: GraphQL helper provisions relation fields for core fundraising links.',
   );
   await ensureRelationField({
     name: 'giftPayout',
@@ -649,6 +666,66 @@ async function main() {
       targetObjectMetadataId: giftPayoutObjectId,
       targetFieldLabel: 'Gifts',
       targetFieldIcon: 'IconReceipt2',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'donor',
+    label: 'Donor',
+    objectMetadataId: giftObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: personObjectId,
+      targetFieldLabel: 'Gifts',
+      targetFieldIcon: 'IconGift',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'company',
+    label: 'Company',
+    objectMetadataId: giftObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: companyObjectId,
+      targetFieldLabel: 'Gifts',
+      targetFieldIcon: 'IconGift',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'opportunity',
+    label: 'Opportunity',
+    objectMetadataId: giftObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: opportunityObjectId,
+      targetFieldLabel: 'Gifts',
+      targetFieldIcon: 'IconGift',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'appeal',
+    label: 'Appeal',
+    objectMetadataId: giftObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: appealObjectId,
+      targetFieldLabel: 'Gifts',
+      targetFieldIcon: 'IconGift',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'recurringAgreement',
+    label: 'Recurring Agreement',
+    objectMetadataId: giftObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: recurringAgreementObjectId,
+      targetFieldLabel: 'Gifts',
+      targetFieldIcon: 'IconGift',
     },
   });
 
@@ -664,8 +741,128 @@ async function main() {
     },
   });
 
+  await ensureRelationField({
+    name: 'donor',
+    label: 'Donor',
+    objectMetadataId: giftStagingObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: personObjectId,
+      targetFieldLabel: 'Gift Staging Rows',
+      targetFieldIcon: 'IconInbox',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'company',
+    label: 'Company',
+    objectMetadataId: giftStagingObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: companyObjectId,
+      targetFieldLabel: 'Gift Staging Rows',
+      targetFieldIcon: 'IconInbox',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'opportunity',
+    label: 'Opportunity',
+    objectMetadataId: giftStagingObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: opportunityObjectId,
+      targetFieldLabel: 'Gift Staging Rows',
+      targetFieldIcon: 'IconInbox',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'appeal',
+    label: 'Appeal',
+    objectMetadataId: giftStagingObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: appealObjectId,
+      targetFieldLabel: 'Gift Staging Rows',
+      targetFieldIcon: 'IconInbox',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'recurringAgreement',
+    label: 'Recurring Agreement',
+    objectMetadataId: giftStagingObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: recurringAgreementObjectId,
+      targetFieldLabel: 'Gift Staging Rows',
+      targetFieldIcon: 'IconInbox',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'gift',
+    label: 'Gift',
+    objectMetadataId: giftStagingObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: giftObjectId,
+      targetFieldLabel: 'Gift Staging Rows',
+      targetFieldIcon: 'IconInbox',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'donor',
+    label: 'Donor',
+    objectMetadataId: recurringAgreementObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: personObjectId,
+      targetFieldLabel: 'Recurring Agreements',
+      targetFieldIcon: 'IconRepeat',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'appeal',
+    label: 'Appeal',
+    objectMetadataId: solicitationSnapshotObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: appealObjectId,
+      targetFieldLabel: 'Solicitation Snapshots',
+      targetFieldIcon: 'IconListNumbers',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'primaryContact',
+    label: 'Primary Contact',
+    objectMetadataId: householdObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: personObjectId,
+      targetFieldLabel: 'Primary Households',
+      targetFieldIcon: 'IconUsersGroup',
+    },
+  });
+
+  await ensureRelationField({
+    name: 'household',
+    label: 'Household',
+    objectMetadataId: personObjectId,
+    relationCreationPayload: {
+      type: 'MANY_TO_ONE',
+      targetObjectMetadataId: householdObjectId,
+      targetFieldLabel: 'Members',
+      targetFieldIcon: 'IconUser',
+    },
+  });
+
   console.log(
-    'TODO: Add additional ensureRelationField calls for Gift→Appeal, Gift→RecurringAgreement, GiftStaging links, etc. Until then, create the remaining lookups manually (see docs/METADATA_RUNBOOK.md).',
+    '✅ Relation fields provisioned via GraphQL metadata endpoint.',
   );
 
   console.log('✅ Twenty CRM custom objects and fields setup complete (relations partially automated).');
