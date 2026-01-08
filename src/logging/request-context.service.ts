@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 
 export interface RequestContextStore {
   readonly requestId?: string;
+  readonly authToken?: string;
 }
 
 @Injectable()
@@ -19,5 +20,9 @@ export class RequestContextService {
 
   getRequestId(): string | undefined {
     return this.storage.getStore()?.requestId;
+  }
+
+  getAuthToken(): string | undefined {
+    return this.storage.getStore()?.authToken;
   }
 }

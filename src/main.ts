@@ -9,6 +9,8 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 import { RequestContextService } from './logging/request-context.service';
 import { RequestMethod } from '@nestjs/common';
+import { extractAccessToken, hasFundraisingSession } from './auth/auth.utils';
+import { createFundraisingAuthMiddleware } from './auth/fundraising-auth.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -29,12 +31,26 @@ async function bootstrap() {
 
     res.setHeader('x-request-id', requestId);
 
-    requestContextService.runWith({ requestId }, () => next());
+    const authToken = extractAccessToken(req);
+    requestContextService.runWith({ requestId, authToken }, () => next());
   });
+
+  app.use(
+    '/api/fundraising',
+    createFundraisingAuthMiddleware(requestContextService),
+  );
 
   const fundraisingRouter = express.Router();
   fundraisingRouter.use(express.static(clientAssetsPath));
-  fundraisingRouter.use((_req: Request, res: Response) => {
+  fundraisingRouter.use((req: Request, res: Response) => {
+    if (!hasFundraisingSession(req)) {
+      const redirectTarget = req.originalUrl || '/fundraising/';
+      const redirectUrl = `/welcome?redirect=${encodeURIComponent(
+        redirectTarget,
+      )}`;
+      res.redirect(redirectUrl);
+      return;
+    }
     res.sendFile(join(clientAssetsPath, 'index.html'));
   });
   app.use('/fundraising', fundraisingRouter);

@@ -1,6 +1,11 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  HttpException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { StructuredLoggerService } from '../logging/structured-logger.service';
+import { RequestContextService } from '../logging/request-context.service';
 
 export type TwentyHttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
@@ -14,6 +19,7 @@ export class TwentyApiService {
   constructor(
     private readonly configService: ConfigService,
     private readonly structuredLogger: StructuredLoggerService,
+    private readonly requestContextService: RequestContextService,
   ) {
     const configuredBaseUrl =
       this.configService.get<string>('TWENTY_API_BASE_URL') ??
@@ -29,16 +35,17 @@ export class TwentyApiService {
     body?: unknown,
     context = TwentyApiService.name,
   ): Promise<unknown> {
+    const requestAuthToken = this.requestContextService.getAuthToken();
     const apiKey = this.configService.get<string>('TWENTY_API_KEY') ?? '';
 
-    if (!apiKey) {
+    if (!requestAuthToken && !apiKey) {
       throw new ServiceUnavailableException('TWENTY_API_KEY not configured');
     }
 
     const url = `${this.twentyApiBaseUrl}${path.startsWith('/') ? path : `/${path}`}`;
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${requestAuthToken ?? apiKey}`,
     };
 
     const init: RequestInit = {
@@ -138,9 +145,10 @@ export class TwentyApiService {
           context,
         );
 
-        const error = new Error(rawBody || 'Twenty API request failed');
-        (error as Error & { status?: number }).status = response.status;
-        throw error;
+        throw new HttpException(
+          rawBody || 'Twenty API request failed',
+          response.status,
+        );
       }
 
       if (!rawBody) {

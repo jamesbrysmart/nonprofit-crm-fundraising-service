@@ -1,3 +1,11 @@
+import {
+  clearTokenPair,
+  getAccessToken,
+  refreshTokenPair,
+  redirectToSignIn,
+  setTokenPair,
+} from './auth';
+
 export interface FetchJsonOptions {
   method?: string;
   params?: Record<string, unknown>;
@@ -99,19 +107,37 @@ const serializeBody = (
   return JSON.stringify(body);
 };
 
-export async function fetchJson<T>(
+const addAuthorizationHeader = (
+  headers: Record<string, string>,
+): Record<string, string> => {
+  if (headers.Authorization || headers.authorization) {
+    return headers;
+  }
+  const token = getAccessToken();
+  if (!token) {
+    return headers;
+  }
+  return {
+    ...headers,
+    Authorization: `Bearer ${token}`,
+  };
+};
+
+const fetchJsonInternal = async <T>(
   path: string,
-  options: FetchJsonOptions = {},
-): Promise<T> {
+  options: FetchJsonOptions,
+  hasRefreshed: boolean,
+): Promise<T> => {
   const method = options.method?.toUpperCase() ?? 'GET';
 
   const queryString = buildQueryString(options.params);
   const url = queryString ? `${path}?${queryString}` : path;
 
-  const headers: Record<string, string> = {
+  const baseHeaders: Record<string, string> = {
     Accept: 'application/json',
     ...(options.headers ?? {}),
   };
+  const headers = addAuthorizationHeader(baseHeaders);
 
   const body = serializeBody(options.body, headers);
 
@@ -148,6 +174,15 @@ export async function fetchJson<T>(
   }
 
   if (!response.ok) {
+    if (response.status === 401 && !hasRefreshed) {
+      const refreshed = await refreshTokenPair();
+      if (refreshed?.accessOrWorkspaceAgnosticToken?.token) {
+        setTokenPair(refreshed);
+        return fetchJsonInternal<T>(path, options, true);
+      }
+      clearTokenPair();
+      redirectToSignIn();
+    }
     const messageFromBody =
       typeof parsedBody === 'object' && parsedBody !== null
         ? ('message' in (parsedBody as Record<string, unknown>) &&
@@ -183,4 +218,11 @@ export async function fetchJson<T>(
   }
 
   return parsedBody as T;
+};
+
+export async function fetchJson<T>(
+  path: string,
+  options: FetchJsonOptions = {},
+): Promise<T> {
+  return fetchJsonInternal<T>(path, options, false);
 }

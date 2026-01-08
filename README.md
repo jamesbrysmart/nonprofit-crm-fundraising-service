@@ -34,6 +34,14 @@ Fundraising service is the managed-extension API that brokers donation intake in
 - GoCardless webhook skeleton (`POST /webhooks/gocardless`) logs incoming events and prepares for Direct Debit ingestion.
 - Health: `GET /health` is exposed separately without the `/api/fundraising` prefix.
 
+### Authentication
+- `/api/fundraising/*` requires a Twenty access token in `Authorization: Bearer <token>` (or `?token=` for edge cases where headers are not available).
+- `/fundraising` UI is gated behind the Twenty login and will redirect to `/welcome` if no session is detected.
+- `/health` and `/api/fundraising/webhooks/*` remain unauthenticated for probes and external providers.
+
+The service forwards the inbound user token to Twenty when present, falling back to `TWENTY_API_KEY` only for unauthenticated webhook contexts. This preserves Twenty role permissions for user-driven actions.
+For the full auth flow and client refresh behavior, see `docs/ARCHITECTURE.md` (Managed Extension Auth Enforcement).
+
 ### Getting Started
 - **Docker (recommended for dev stack)**  
   ```
