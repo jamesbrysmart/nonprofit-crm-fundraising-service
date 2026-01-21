@@ -55,7 +55,9 @@ async function bootstrap() {
   });
   app.use('/fundraising', fundraisingRouter);
 
-  await app.listen(process.env.PORT ?? 3000);
+  // Railway private networking can be IPv6-only (legacy envs) or dual-stack (new envs).
+  // Bind to :: to ensure the service is reachable over the private network.
+  await app.listen(process.env.PORT ?? 3000, '::');
 }
 
 void bootstrap();

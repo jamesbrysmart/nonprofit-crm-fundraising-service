@@ -13,6 +13,9 @@ const gatewayBaseCandidates = [
 let resolvedGatewayBase;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const authToken = process.env.SMOKE_AUTH_TOKEN || process.env.TWENTY_API_KEY;
+const requestTimeoutMs = Number.parseInt(process.env.SMOKE_TIMEOUT_MS || '', 10) || 20_000;
+
 async function httpJson(method, path, body) {
   const basesToTry = resolvedGatewayBase
     ? [resolvedGatewayBase]
@@ -33,6 +36,10 @@ async function httpJson(method, path, body) {
       },
     };
 
+    if (authToken) {
+      init.headers.Authorization = `Bearer ${authToken}`;
+    }
+
     if (body !== undefined) {
       init.body = JSON.stringify(body);
     } else if (method === 'PATCH') {
@@ -42,7 +49,13 @@ async function httpJson(method, path, body) {
 
     let response;
     try {
-      response = await fetch(url, init);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+      try {
+        response = await fetch(url, { ...init, signal: controller.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
     } catch (error) {
       console.warn(`Request failed for base ${base}: ${error}`);
       lastError = error;
@@ -71,6 +84,11 @@ async function httpJson(method, path, body) {
         body,
         response: parsed,
       });
+      if (response.status === 401 && !authToken) {
+        console.error(
+          'Missing auth: set SMOKE_AUTH_TOKEN (or TWENTY_API_KEY) so smoke requests include Authorization: Bearer <token>.',
+        );
+      }
       throw new Error(`HTTP ${response.status} ${response.statusText}`);
     }
 
@@ -86,6 +104,11 @@ async function httpJson(method, path, body) {
 }
 
 async function main() {
+  if (!authToken) {
+    console.warn(
+      'WARN: No SMOKE_AUTH_TOKEN (or TWENTY_API_KEY) found. Requests will likely fail with 401.',
+    );
+  }
   console.log('--- Gift staging manual processing flow ---');
   const uniqueSuffix = Date.now();
   console.log('\n--- Appeals API smoke ---');

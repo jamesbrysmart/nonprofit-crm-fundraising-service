@@ -4,7 +4,101 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
-// --- Start Diagnostics ---
+const DEBUG = String(process.env.SETUP_SCHEMA_DEBUG || '').toLowerCase() === 'true';
+const DEFAULT_TIMEOUT_MS = Number.parseInt(process.env.SETUP_SCHEMA_TIMEOUT_MS || '', 10) || 20_000;
+const DEFAULT_MAX_RETRIES = Number.parseInt(process.env.SETUP_SCHEMA_MAX_RETRIES || '', 10) || 5;
+const DEFAULT_RETRY_BASE_DELAY_MS =
+  Number.parseInt(process.env.SETUP_SCHEMA_RETRY_BASE_DELAY_MS || '', 10) || 500;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function redactSecrets(value) {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map(redactSecrets);
+  if (typeof value !== 'object') return value;
+
+  const redacted = {};
+  for (const [key, raw] of Object.entries(value)) {
+    if (
+      /key|secret|password|token|auth|encryption/i.test(key) &&
+      typeof raw === 'string' &&
+      raw.length > 0
+    ) {
+      redacted[key] = '***';
+    } else {
+      redacted[key] = redactSecrets(raw);
+    }
+  }
+  return redacted;
+}
+
+function shouldRetryError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const code = error && typeof error === 'object' ? error.code : undefined;
+  return (
+    message.toLowerCase().includes('socket hang up') ||
+    message.toLowerCase().includes('econnreset') ||
+    message.toLowerCase().includes('timeout') ||
+    message.toLowerCase().includes('timed out') ||
+    code === 'ECONNRESET' ||
+    code === 'ETIMEDOUT' ||
+    code === 'EAI_AGAIN' ||
+    code === 'ENOTFOUND'
+  );
+}
+
+function shouldRetryStatus(status) {
+  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+async function fetchWithRetry(url, init, options = {}) {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
+  const baseDelayMs = options.baseDelayMs ?? DEFAULT_RETRY_BASE_DELAY_MS;
+
+  let lastError;
+  for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { ...init, signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!response.ok && shouldRetryStatus(response.status) && attempt < maxRetries) {
+        const delayMs = baseDelayMs * 2 ** (attempt - 1);
+        if (DEBUG) {
+          console.log(
+            `WARN: ${init?.method || 'GET'} ${url} -> HTTP ${response.status}; retrying in ${delayMs}ms (attempt ${attempt}/${maxRetries})`,
+          );
+        }
+        await sleep(delayMs);
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      clearTimeout(timeout);
+      lastError = error;
+      if (!shouldRetryError(error) || attempt >= maxRetries) {
+        throw error;
+      }
+      const delayMs = baseDelayMs * 2 ** (attempt - 1);
+      if (DEBUG) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(
+          `WARN: ${init?.method || 'GET'} ${url} failed: ${message}; retrying in ${delayMs}ms (attempt ${attempt}/${maxRetries})`,
+        );
+      }
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+}
+
+// --- Environment loading (quiet by default; enable SETUP_SCHEMA_DEBUG=true for diagnostics) ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const localEnvPath = path.resolve(__dirname, '..', '.env');
@@ -15,27 +109,43 @@ const envCandidates = [
   rootEnvPath,
 ].filter(Boolean);
 const envFilePath = envCandidates[0];
-console.log(`Script execution started.`);
-console.log(`Script's absolute path: ${__filename}`);
-console.log(`Script's dirname: ${__dirname}`);
-console.log(`Calculated .env path: ${envFilePath}`);
-console.log(`Current working directory (process.cwd()): ${process.cwd()}`);
+console.log('Script execution started.');
+if (DEBUG) {
+  console.log(`Script path: ${__filename}`);
+  console.log(`Script dirname: ${__dirname}`);
+  console.log(`Env candidates: ${envCandidates.join(', ')}`);
+  console.log(`Calculated .env path: ${envFilePath}`);
+  console.log(`Current working directory (process.cwd()): ${process.cwd()}`);
+}
 
 let resolvedEnvPath = null;
 for (const candidate of envCandidates) {
-  const result = dotenv.config({ path: candidate, debug: true });
+  const result = dotenv.config({ path: candidate, debug: false });
   if (result.error) {
-    console.warn(`WARN: failed to load ${candidate}:`, result.error.message);
+    if (DEBUG) {
+      console.warn(`WARN: failed to load ${candidate}:`, result.error.message);
+    }
     continue;
   }
   resolvedEnvPath = candidate;
-  console.log(`Dotenv parsed object from ${candidate}:`, result.parsed);
+  if (DEBUG) {
+    console.log(`Loaded env file: ${candidate}`);
+    if (result.parsed) {
+      console.log('Dotenv parsed keys:', Object.keys(result.parsed));
+      console.log('Dotenv parsed (redacted):', redactSecrets(result.parsed));
+    }
+  }
   if (process.env.TWENTY_API_KEY) {
     break;
   }
 }
-console.log(`TWENTY_API_KEY from process.env (after dotenv): ${process.env.TWENTY_API_KEY}`);
-// --- End Diagnostics ---
+if (DEBUG) {
+  const apiKey = process.env.TWENTY_API_KEY;
+  console.log(
+    `TWENTY_API_KEY present: ${apiKey ? `yes (len=${apiKey.length})` : 'no'}`,
+  );
+  console.log(`Resolved env path: ${resolvedEnvPath || 'none'}`);
+}
 
 const TWENTY_REST_METADATA_URL = process.env.TWENTY_METADATA_BASE_URL
   ? process.env.TWENTY_METADATA_BASE_URL.replace(/\/$/, '')
@@ -56,7 +166,7 @@ async function fetchAllObjects() {
     'Authorization': `Bearer ${API_KEY}`,
   };
 
-  const response = await fetch(url, { method: 'GET', headers });
+  const response = await fetchWithRetry(url, { method: 'GET', headers });
   const result = await response.json();
 
   if (!response.ok) {
@@ -99,9 +209,17 @@ async function restCall(method, endpoint, payload) {
     init.body = JSON.stringify(payload);
   }
 
-  console.log(`Calling REST API: ${method} ${url} with payload:`, payload);
+  if (DEBUG) {
+    console.log(`Calling REST API: ${method} ${url} with payload:`, payload);
+  } else {
+    const hint =
+      payload && typeof payload === 'object' && 'name' in payload
+        ? ` name=${payload.name}`
+        : '';
+    console.log(`Calling REST API: ${method} ${endpoint}${hint}`);
+  }
 
-  const response = await fetch(url, init);
+  const response = await fetchWithRetry(url, init);
   const resultText = await response.text();
   let parsed;
 
@@ -120,25 +238,35 @@ async function restCall(method, endpoint, payload) {
     throw customError;
   }
 
-  console.log('Success:', JSON.stringify(parsed, null, 2), '\n');
+  if (DEBUG) {
+    console.log('Success:', JSON.stringify(parsed, null, 2), '\n');
+  }
   return parsed;
 }
 
 async function findObjectByNameSingular(nameSingular) {
-  console.log(`Fetching all objects to find: ${nameSingular}`);
+  if (DEBUG) {
+    console.log(`Fetching all objects to find: ${nameSingular}`);
+  }
   const { byName } = await fetchAllObjects();
   const foundObject = byName.get(nameSingular);
   if (foundObject) {
-    console.log(`Found object ${nameSingular} with ID: ${foundObject.id}`);
+    if (DEBUG) {
+      console.log(`Found object ${nameSingular} with ID: ${foundObject.id}`);
+    }
     return foundObject.id;
   }
   
-  console.log(`Object ${nameSingular} not found.`);
+  if (DEBUG) {
+    console.log(`Object ${nameSingular} not found.`);
+  }
   return null;
 }
 
 async function findFieldByNameAndObject(name, objectMetadataId) {
-  console.log(`Fetching object ${objectMetadataId} fields to find ${name}`);
+  if (DEBUG) {
+    console.log(`Fetching object ${objectMetadataId} fields to find ${name}`);
+  }
   const { byId } = await fetchAllObjects();
   const object = byId.get(objectMetadataId);
   if (!object) {
@@ -199,9 +327,11 @@ async function graphQLCall(payload) {
     Authorization: `Bearer ${API_KEY}`,
   };
 
-  console.log(`GraphQL metadata call payload: ${JSON.stringify(payload)}`);
+  if (DEBUG) {
+    console.log(`GraphQL metadata call payload: ${JSON.stringify(payload)}`);
+  }
 
-  const response = await fetch(TWENTY_GRAPHQL_METADATA_URL, {
+  const response = await fetchWithRetry(TWENTY_GRAPHQL_METADATA_URL, {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
