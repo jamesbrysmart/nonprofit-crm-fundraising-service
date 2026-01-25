@@ -72,9 +72,6 @@ describe('GiftService - staging auto promote', () => {
 
     const preparedPayload: NormalizedGiftCreatePayload = {
       amount: { currencyCode: 'GBP', amountMicros: 15_000_000 },
-      amountMinor: 1500,
-      amountMajor: 15,
-      currency: 'GBP',
       intakeSource: 'manual_ui',
       sourceFingerprint: 'fp-123',
       autoPromote: false,
@@ -127,9 +124,6 @@ describe('GiftService - staging auto promote', () => {
 
     const preparedPayload: NormalizedGiftCreatePayload = {
       amount: { currencyCode: 'GBP', amountMicros: 20_000_000 },
-      amountMinor: 2000,
-      amountMajor: 20,
-      currency: 'GBP',
       intakeSource: 'manual_ui',
       sourceFingerprint: 'fp-456',
       autoPromote: true,
@@ -186,9 +180,6 @@ describe('GiftService - staging auto promote', () => {
 
     const preparedPayload: NormalizedGiftCreatePayload = {
       amount: { currencyCode: 'GBP', amountMicros: 30_000_000 },
-      amountMinor: 3000,
-      amountMajor: 30,
-      currency: 'GBP',
       intakeSource: 'csv_import',
       sourceFingerprint: 'fp-789',
       autoPromote: false,
@@ -249,9 +240,6 @@ describe('GiftService - staging auto promote', () => {
 
     const preparedPayload: NormalizedGiftCreatePayload = {
       amount: { currencyCode: 'GBP', amountMicros: 25_000_000 },
-      amountMinor: 2500,
-      amountMajor: 25,
-      currency: 'GBP',
       appealId: 'apl-123',
       autoPromote: true,
     };

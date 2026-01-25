@@ -58,7 +58,7 @@ export function DrawerReviewSection({
   donorPanel,
 }: DrawerReviewSectionProps): JSX.Element {
   const handleDetailsChange = (
-    field: keyof EditFormState,
+    field: string,
     value: string | boolean,
   ): void => {
     if (field === 'isInKind') {
@@ -68,10 +68,18 @@ export function DrawerReviewSection({
       onInKindToggle(synthetic);
       return;
     }
+    const mappedField =
+      field === 'amount'
+        ? 'amountMajor'
+        : field === 'currency'
+          ? 'currencyCode'
+          : field === 'date'
+            ? 'giftDate'
+            : field;
     const synthetic = {
       target: { value },
     } as unknown as ChangeEvent<HTMLInputElement>;
-    onFieldChange(field)(synthetic);
+    onFieldChange(mappedField as keyof EditFormState)(synthetic);
   };
 
   return (
@@ -103,8 +111,8 @@ export function DrawerReviewSection({
       <GiftDetailsForm
         values={{
           amount: editForm.amountMajor,
-          currency: editForm.currency,
-          date: editForm.dateReceived,
+          currency: editForm.currencyCode,
+          date: editForm.giftDate,
           fundId: editForm.fundId,
           appealId: editForm.appealId,
           opportunityId: editForm.opportunityId,
@@ -114,7 +122,7 @@ export function DrawerReviewSection({
           inKindDescription: editForm.inKindDescription,
           estimatedValue: editForm.estimatedValue,
         }}
-        onChange={(field, value) => handleDetailsChange(field as keyof EditFormState, value)}
+        onChange={(field, value) => handleDetailsChange(field as string, value)}
         appealOptions={appealOptions}
         appealsLoading={appealsLoading}
         appealsError={appealError}

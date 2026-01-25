@@ -37,9 +37,6 @@ describe('GiftStagingProcessingService (manual processing)', () => {
 
   const basePayload: NormalizedGiftCreatePayload = {
     amount: { currencyCode: 'GBP', amountMicros: 12_340_000 },
-    amountMinor: 1234,
-    amountMajor: 12.34,
-    currency: 'GBP',
     donorId: 'person-123',
     intakeSource: 'manual_ui',
     sourceFingerprint: 'fp-123',

@@ -8,7 +8,6 @@ const ALLOWED_STRING_FIELDS = new Set([
   'trackingCodeId',
   'fundId',
   'opportunityId',
-  'date',
   'giftDate',
   'name',
   'description',
@@ -29,12 +28,7 @@ const ALLOWED_STRING_FIELDS = new Set([
   'giftPayoutId',
 ]);
 
-const ALLOWED_NUMBER_FIELDS = new Set([
-  'amountMicros',
-  'amountMinor',
-  'estimatedValue',
-  'feeAmountMinor',
-]);
+const ALLOWED_NUMBER_FIELDS = new Set(['estimatedValue']);
 
 const ALLOWED_BOOLEAN_FIELDS = new Set([
   'giftAidEligible',
@@ -55,15 +49,12 @@ export type GiftCreatePayload = Writable<
     feeAmount?: GiftAmount;
   } & Record<string, unknown>
 > & {
-  amountMinor?: number;
-  currency?: string;
   giftAidEligible?: boolean;
   giftBatchId?: string;
   paymentMethod?: string;
   intakeSource?: string;
   sourceFingerprint?: string;
   autoPromote?: boolean;
-  feeAmountMinor?: number;
   giftPayoutId?: string;
 };
 
@@ -290,21 +281,6 @@ export const validateCreateGiftPayload = (body: unknown): GiftCreatePayload => {
   const parsedAmount = parseAmount(body.amount, 'create');
   sanitized.amount = parsedAmount;
 
-  if (typeof sanitized.amountMinor !== 'number') {
-    sanitized.amountMinor = Math.round(parsedAmount.amountMicros / 10_000);
-  }
-
-  if (typeof sanitized.currency !== 'string') {
-    sanitized.currency = parsedAmount.currencyCode;
-  }
-
-  if (sanitized.feeAmount && typeof sanitized.feeAmount === 'object') {
-    const feeAmount = sanitized.feeAmount as GiftAmount;
-    if (typeof sanitized.feeAmountMinor !== 'number') {
-      sanitized.feeAmountMinor = Math.round(feeAmount.amountMicros / 10_000);
-    }
-  }
-
   const giftIntent =
     typeof sanitized.giftIntent === 'string' ? sanitized.giftIntent : undefined;
   const companyId =
@@ -356,14 +332,11 @@ export const validateUpdateGiftPayload = (body: unknown): GiftUpdatePayload => {
   if (body.amount !== undefined) {
     const parsedAmount = parseAmount(body.amount, 'update');
     sanitized.amount = parsedAmount;
-    sanitized.amountMinor = Math.round(parsedAmount.amountMicros / 10_000);
-    sanitized.currency = parsedAmount.currencyCode;
   }
 
   if (body.feeAmount !== undefined) {
     const parsedFeeAmount = parseAmount(body.feeAmount, 'update');
     sanitized.feeAmount = parsedFeeAmount;
-    sanitized.feeAmountMinor = Math.round(parsedFeeAmount.amountMicros / 10_000);
   }
 
   if (Object.keys(sanitized).length === 0) {

@@ -13,11 +13,11 @@ const currencyFormatters = new Map<string, Intl.NumberFormat>();
 type AgreementStatusTone = 'info' | 'success' | 'warning' | 'danger';
 
 function formatAmount(item: RecurringAgreementListItem): string {
-  if (typeof item.amountMinor !== 'number') {
+  if (typeof item.amountMicros !== 'number') {
     return '—';
   }
 
-  const currency = item.currency ?? 'GBP';
+  const currency = item.currencyCode ?? 'GBP';
   let formatter = currencyFormatters.get(currency);
   if (!formatter) {
     formatter = new Intl.NumberFormat(undefined, {
@@ -29,7 +29,7 @@ function formatAmount(item: RecurringAgreementListItem): string {
     currencyFormatters.set(currency, formatter);
   }
 
-  return formatter.format(item.amountMinor / 100);
+  return formatter.format(item.amountMicros / 1_000_000);
 }
 
 function formatDate(value?: string): string {

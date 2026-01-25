@@ -216,12 +216,16 @@ async function main() {
     appealId: createdAppeal.id,
     contact: {
       firstName: 'Smoke',
-      lastName: 'Proxy',
-      email: `smoke.proxy+${uniqueSuffix}@example.org`,
+      lastName: `Proxy${uniqueSuffix}`,
     },
   });
 
   const createdGift = createResponse?.data?.createGift;
+  if (!createdGift && createResponse?.meta?.stagedOnly) {
+    throw new Error(
+      'createGift missing because gift was staged (autoPromote overridden by dedupe)',
+    );
+  }
   assert(createdGift, 'createGift payload missing');
   assert(uuidPattern.test(createdGift.id), 'gift id not a UUID');
 

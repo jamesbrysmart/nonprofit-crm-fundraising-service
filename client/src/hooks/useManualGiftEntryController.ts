@@ -437,22 +437,22 @@ export function useManualGiftEntryController() {
         if (cancelled) {
           return;
         }
-        const amountMinor = Math.round(amountMajor * 100);
+        const amountMicros = Math.round(amountMajor * 1_000_000);
         const target = new Date(giftDate).getTime();
         const duplicate = (response.data ?? []).find((item: GiftStagingListItem) => {
           if (item.donorId !== donorId) {
             return false;
           }
-          if (typeof item.amountMinor !== 'number') {
+          if (typeof item.amountMicros !== 'number') {
             return false;
           }
-          if (item.amountMinor !== amountMinor) {
+          if (item.amountMicros !== amountMicros) {
             return false;
           }
-          if (!item.dateReceived) {
+          if (!item.giftDate) {
             return false;
           }
-          const existing = new Date(item.dateReceived).getTime();
+          const existing = new Date(item.giftDate).getTime();
           return Math.abs(existing - target) <= 24 * 60 * 60 * 1000;
         });
         if (duplicate) {

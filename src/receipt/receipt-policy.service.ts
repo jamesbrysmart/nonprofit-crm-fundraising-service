@@ -31,9 +31,9 @@ export class ReceiptPolicyService {
     const clone: NormalizedGiftCreatePayload = { ...payload };
 
     const amountMinor =
-      typeof payload.amountMinor === 'number' &&
-      Number.isFinite(payload.amountMinor)
-        ? payload.amountMinor
+      typeof payload.amount?.amountMicros === 'number' &&
+      Number.isFinite(payload.amount.amountMicros)
+        ? Math.round(payload.amount.amountMicros / 10_000)
         : undefined;
 
     const dedupeKey =

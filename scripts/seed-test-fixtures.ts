@@ -70,7 +70,7 @@ async function main(): Promise<void> {
       label: 'pending-review',
       giftService,
       giftStagingService,
-      amountMinor: 1850,
+      amountMicros: 18_500_000,
       giftDate: today,
       runId,
       statuses: {
@@ -99,7 +99,7 @@ async function main(): Promise<void> {
       label: 'ready-for-commit',
       giftService,
       giftStagingService,
-      amountMinor: 3200,
+      amountMicros: 32_000_000,
       giftDate: today,
       runId,
       statuses: {
@@ -127,7 +127,7 @@ async function main(): Promise<void> {
       label: 'commit-failed',
       giftService,
       giftStagingService,
-      amountMinor: 2700,
+      amountMicros: 27_000_000,
       giftDate: today,
       runId,
     statuses: {
@@ -162,7 +162,7 @@ async function main(): Promise<void> {
       label: 'grant-high-value',
       giftService,
       giftStagingService,
-      amountMinor: 250000,
+      amountMicros: 2_500_000_000,
       giftDate: today,
       runId,
       giftIntent: companyId ? 'grant' : 'standard',
@@ -191,7 +191,7 @@ async function main(): Promise<void> {
       label: 'corporate-in-kind',
       giftService,
       giftStagingService,
-      amountMinor: 7800,
+      amountMicros: 78_000_000,
       giftDate: today,
       runId,
       giftIntent: companyId ? 'corporateInKind' : 'standard',
@@ -221,7 +221,7 @@ async function main(): Promise<void> {
       label: 'recurring-stripe',
       giftService,
       giftStagingService,
-      amountMinor: 1550,
+      amountMicros: 15_500_000,
       giftDate: today,
       runId,
       recurringAgreementId,
@@ -256,7 +256,7 @@ async function main(): Promise<void> {
       label: 'missing-email',
       giftService,
       giftStagingService,
-      amountMinor: 1950,
+      amountMicros: 19_500_000,
       giftDate: today,
       runId,
       omitEmail: true,
@@ -329,8 +329,8 @@ async function main(): Promise<void> {
         label: 'payout-staging',
         giftService,
         giftStagingService,
-        amountMinor: 6350,
-        feeAmountMinor: 150,
+        amountMicros: 63_500_000,
+        feeAmountMicros: 1_500_000,
         giftDate: today,
         runId,
         giftPayoutId: payoutInfo.id,
@@ -395,8 +395,8 @@ async function seedManualStaging(options: {
   label: string;
   giftService: GiftService;
   giftStagingService: GiftStagingService;
-  amountMinor: number;
-  feeAmountMinor?: number;
+  amountMicros: number;
+  feeAmountMicros?: number;
   giftDate: string;
   runId: string;
   statuses?: GiftStagingStatusUpdate;
@@ -424,8 +424,8 @@ async function seedManualStaging(options: {
     label,
     giftService,
     giftStagingService,
-    amountMinor,
-    feeAmountMinor,
+    amountMicros,
+    feeAmountMicros,
     giftDate,
     runId,
     statuses,
@@ -443,14 +443,11 @@ async function seedManualStaging(options: {
   } =
     options;
 
-  const amountMajor = Number((amountMinor / 100).toFixed(2));
   const payload = {
     amount: {
       currencyCode: 'GBP',
-      amountMicros: amountMinor * 10_000,
+      amountMicros,
     },
-    amountMinor,
-    currency: 'GBP',
     giftDate,
     name: `Seeded gift ${label} ${runId}`,
     contact: {
@@ -485,11 +482,10 @@ async function seedManualStaging(options: {
     payload.estimatedValue = estimatedValue;
   }
 
-  if (typeof feeAmountMinor === 'number' && Number.isFinite(feeAmountMinor)) {
-    payload.feeAmountMinor = feeAmountMinor;
+  if (typeof feeAmountMicros === 'number' && Number.isFinite(feeAmountMicros)) {
     payload.feeAmount = {
       currencyCode: 'GBP',
-      amountMicros: feeAmountMinor * 10_000,
+      amountMicros: feeAmountMicros,
     };
   }
 
@@ -541,7 +537,13 @@ async function seedRecurringAgreement(args: {
     status: 'active',
     cadence: 'monthly',
     intervalCount: 1,
-    amountMinor: basePreparedPayload.amountMinor ?? 2000,
+    amount: {
+      amountMicros:
+        typeof basePreparedPayload.amount?.amountMicros === 'number'
+          ? basePreparedPayload.amount.amountMicros
+          : 20_000_000,
+      currencyCode: basePreparedPayload.amount?.currencyCode ?? 'GBP',
+    },
     startDate: today,
     nextExpectedAt: today,
     autoPromoteEnabled: true,

@@ -13,8 +13,8 @@ import { GIFT_INTENT_OPTIONS, GiftIntentOption, getGiftIntentLabel } from '../ty
 
 export type EditFormState = {
   amountMajor: string;
-  currency: string;
-  dateReceived: string;
+  currencyCode: string;
+  giftDate: string;
   fundId: string;
   appealId: string;
   notes: string;
@@ -54,8 +54,8 @@ export function useGiftStagingDrawerController(
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditFormState>({
     amountMajor: '',
-    currency: '',
-    dateReceived: '',
+    currencyCode: '',
+    giftDate: '',
     fundId: '',
     appealId: '',
     notes: '',
@@ -93,8 +93,8 @@ export function useGiftStagingDrawerController(
     if (!detail) {
       setEditForm({
         amountMajor: '',
-        currency: '',
-        dateReceived: '',
+        currencyCode: '',
+        giftDate: '',
         fundId: '',
         appealId: '',
         notes: '',
@@ -108,18 +108,16 @@ export function useGiftStagingDrawerController(
     }
 
     const derivedAmount =
-      typeof detail.amountMinor === 'number'
-        ? (detail.amountMinor / 100).toFixed(2)
-        : typeof detail.amount === 'number'
-          ? detail.amount.toFixed(2)
-          : '';
+      typeof detail.amountMicros === 'number'
+        ? (detail.amountMicros / 1_000_000).toFixed(2)
+        : '';
 
-    const derivedDate = detail.dateReceived ? detail.dateReceived.slice(0, 10) : '';
+    const derivedDate = detail.giftDate ? detail.giftDate.slice(0, 10) : '';
 
     setEditForm({
       amountMajor: derivedAmount,
-      currency: detail.currency ?? '',
-      dateReceived: derivedDate,
+      currencyCode: detail.currencyCode ?? '',
+      giftDate: derivedDate,
       fundId: detail.fundId ?? '',
       appealId: detail.appealId ?? '',
       notes: detail.notes ?? '',
@@ -174,21 +172,21 @@ export function useGiftStagingDrawerController(
         setActionError('Amount must be a valid number.');
         return;
       }
-      payload.amountMajor = parsed;
+      payload.amountMicros = Math.round(parsed * 1_000_000);
     }
 
-    const currencyInput = editForm.currency.trim();
+    const currencyInput = editForm.currencyCode.trim();
     if (currencyInput.length > 0) {
-      payload.currency = currencyInput.toUpperCase();
-    } else if (detail.currency) {
-      payload.currency = null;
+      payload.currencyCode = currencyInput.toUpperCase();
+    } else if (detail.currencyCode) {
+      payload.currencyCode = null;
     }
 
-    const dateValue = editForm.dateReceived.trim();
+    const dateValue = editForm.giftDate.trim();
     if (dateValue.length > 0) {
-      payload.dateReceived = dateValue;
-    } else if (detail.dateReceived) {
-      payload.dateReceived = null;
+      payload.giftDate = dateValue;
+    } else if (detail.giftDate) {
+      payload.giftDate = null;
     }
 
     const fundValue = editForm.fundId.trim();

@@ -33,13 +33,11 @@ export interface GiftStagingUpdateInput {
   donorFirstName?: string | null;
   donorLastName?: string | null;
   donorEmail?: string | null;
-  amountMinor?: number;
-  amountMajor?: number;
-  currency?: string | null;
-  feeAmountMinor?: number;
-  feeAmountMajor?: number;
-  feeCurrency?: string | null;
-  dateReceived?: string | null;
+  amountMicros?: number;
+  currencyCode?: string | null;
+  feeAmountMicros?: number;
+  feeCurrencyCode?: string | null;
+  giftDate?: string | null;
   expectedAt?: string | null;
   fundId?: string | null;
   appealId?: string | null;
@@ -68,8 +66,6 @@ export interface GiftStagingListQuery {
   limit?: number;
   sort?: string;
   recurringAgreementId?: string;
-  minAmountMinor?: number;
-  maxAmountMinor?: number;
   giftBatchId?: string;
 }
 
@@ -86,12 +82,11 @@ export interface GiftStagingListItem {
   externalId?: string;
   giftBatchId?: string;
   autoPromote: boolean;
-  amountMinor?: number;
-  amount?: number;
-  currency?: string;
-  feeAmount?: number;
-  feeAmountMinor?: number;
-  dateReceived?: string;
+  amountMicros?: number;
+  currencyCode?: string;
+  feeAmountMicros?: number;
+  feeCurrencyCode?: string;
+  giftDate?: string;
   expectedAt?: string;
   paymentMethod?: string;
   giftAidEligible: boolean;
@@ -423,7 +418,7 @@ export class GiftStagingService {
         event: 'gift_staging_payload_updated',
         stagingId,
         donorId: mergedPayload.donorId,
-        amountMinor: mergedPayload.amountMinor,
+        amountMicros: mergedPayload.amount?.amountMicros,
       },
       GiftStagingService.name,
     );
@@ -478,10 +473,9 @@ export class GiftStagingService {
       donorFirstName: payload.donorFirstName,
       donorLastName: payload.donorLastName,
       donorEmail: payload.donorEmail,
-      amountMinor: payload.amountMinor,
       amount: payload.amount,
-      dateReceived:
-        payload.dateReceived ?? payload.giftDate ?? existing.dateReceived,
+      feeAmount: payload.feeAmount,
+      giftDate: payload.giftDate ?? existing.giftDate,
       expectedAt: payload.expectedAt,
       fundId: payload.fundId,
       appealId: payload.appealId,
@@ -568,8 +562,6 @@ export class GiftStagingService {
       limit: this.normalizeLimit(dto.limit),
       sort: dto.sort,
       recurringAgreementId: dto.recurringAgreementId,
-      minAmountMinor: dto.minAmountMinor,
-      maxAmountMinor: dto.maxAmountMinor,
       giftBatchId: dto.giftBatchId,
     };
   }
@@ -599,12 +591,6 @@ export class GiftStagingService {
     if (query.recurringAgreementId) {
       params.recurringAgreementId = query.recurringAgreementId;
     }
-    if (typeof query.minAmountMinor === 'number') {
-      params.minAmountMinor = query.minAmountMinor.toString();
-    }
-    if (typeof query.maxAmountMinor === 'number') {
-      params.maxAmountMinor = query.maxAmountMinor.toString();
-    }
     if (query.giftBatchId) {
       params.giftBatchId = query.giftBatchId;
     }
@@ -626,12 +612,11 @@ export class GiftStagingService {
       externalId: entity.externalId,
       giftBatchId: entity.giftBatchId,
       autoPromote: entity.autoPromote ?? false,
-      amount: entity.amount,
-      amountMinor: entity.amountMinor,
-      currency: entity.currency,
-      feeAmount: entity.feeAmount,
-      feeAmountMinor: entity.feeAmountMinor,
-      dateReceived: entity.dateReceived,
+      amountMicros: entity.amountMicros,
+      currencyCode: entity.currencyCode,
+      feeAmountMicros: entity.feeAmountMicros,
+      feeCurrencyCode: entity.feeCurrencyCode,
+      giftDate: entity.giftDate,
       expectedAt: entity.expectedAt,
       paymentMethod: entity.paymentMethod,
       giftAidEligible: entity.giftAidEligible ?? false,

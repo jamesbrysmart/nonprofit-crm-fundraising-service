@@ -6,8 +6,8 @@ export interface RecurringAgreementListItem {
   status?: string;
   cadence?: string;
   intervalCount?: number;
-  amountMinor?: number;
-  currency?: string;
+  amountMicros?: number;
+  currencyCode?: string;
   nextExpectedAt?: string;
   autoPromoteEnabled?: boolean;
   provider?: string;
@@ -47,9 +47,19 @@ function normalizeRecurringAgreement(entry: unknown): RecurringAgreementListItem
     return null;
   }
 
-  const amountMinor =
-    typeof record.amountMinor === 'number' && Number.isFinite(record.amountMinor)
-      ? record.amountMinor
+  const amountField = record.amount;
+  const amountMicros =
+    amountField && typeof amountField === 'object'
+      ? typeof (amountField as Record<string, unknown>).amountMicros === 'number' &&
+        Number.isFinite((amountField as Record<string, unknown>).amountMicros as number)
+        ? ((amountField as Record<string, unknown>).amountMicros as number)
+        : undefined
+      : undefined;
+  const currencyCode =
+    amountField && typeof amountField === 'object'
+      ? typeof (amountField as Record<string, unknown>).currencyCode === 'string'
+        ? ((amountField as Record<string, unknown>).currencyCode as string)
+        : undefined
       : undefined;
 
   return {
@@ -61,8 +71,8 @@ function normalizeRecurringAgreement(entry: unknown): RecurringAgreementListItem
       typeof record.intervalCount === 'number' && Number.isFinite(record.intervalCount)
         ? record.intervalCount
         : undefined,
-    amountMinor,
-    currency: typeof record.currency === 'string' ? record.currency : undefined,
+    amountMicros,
+    currencyCode,
     nextExpectedAt: typeof record.nextExpectedAt === 'string' ? record.nextExpectedAt : undefined,
     autoPromoteEnabled:
       typeof record.autoPromoteEnabled === 'boolean' ? record.autoPromoteEnabled : undefined,

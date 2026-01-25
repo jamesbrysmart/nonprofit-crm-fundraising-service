@@ -7,18 +7,14 @@ export const normalizeCurrencyField = (entry: unknown): CurrencyAmount | undefin
 
   const record = entry as Record<string, unknown>;
   const value =
-    typeof record.value === 'number' && Number.isFinite(record.value)
-      ? record.value
-      : typeof record.amountMinor === 'number' && Number.isFinite(record.amountMinor)
-        ? Number((record.amountMinor / 100).toFixed(2))
-        : undefined;
+    typeof record.amountMicros === 'number' && Number.isFinite(record.amountMicros)
+      ? Number((record.amountMicros / 1_000_000).toFixed(2))
+      : undefined;
 
   const currencyCode =
     typeof record.currencyCode === 'string'
       ? record.currencyCode
-      : typeof record.currency === 'string'
-        ? record.currency
-        : undefined;
+      : undefined;
 
   if (value === undefined && !currencyCode) {
     return undefined;
@@ -124,7 +120,12 @@ export const toGiftRecord = (entry: unknown): GiftRecord | null => {
     id,
     name: typeof record.name === 'string' ? record.name : undefined,
     amount,
-    giftDate: typeof record.giftDate === 'string' ? record.giftDate : undefined,
+    giftDate:
+      typeof record.giftDate === 'string'
+        ? record.giftDate
+        : typeof record.date === 'string'
+          ? record.date
+          : undefined,
     contactId: typeof record.contactId === 'string' ? record.contactId : undefined,
     contactName,
     externalId: typeof record.externalId === 'string' ? record.externalId : undefined,

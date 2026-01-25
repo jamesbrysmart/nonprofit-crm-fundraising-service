@@ -177,23 +177,7 @@ export class GiftService {
         : undefined;
 
     const currencyCode =
-      typeof payload.currency === 'string'
-        ? payload.currency
-        : payload.amount?.currencyCode ?? 'GBP';
-
-    const amountMinor =
-      typeof amountMicros === 'number'
-        ? Math.round(amountMicros / 10_000)
-        : typeof payload.amountMinor === 'number'
-          ? payload.amountMinor
-          : undefined;
-
-    const amountMajor =
-      typeof amountMicros === 'number'
-        ? Number((amountMicros / 1_000_000).toFixed(2))
-        : typeof amountMinor === 'number'
-          ? Number((amountMinor / 100).toFixed(2))
-          : undefined;
+      payload.amount?.currencyCode ?? 'GBP';
 
     const prepared: NormalizedGiftCreatePayload = {
       ...payload,
@@ -201,9 +185,6 @@ export class GiftService {
         amountMicros: amountMicros ?? 0,
         currencyCode,
       },
-      currency: currencyCode,
-      amountMinor: amountMinor ?? 0,
-      amountMajor,
     };
 
     if (payload.feeAmount && typeof payload.feeAmount === 'object') {
@@ -212,27 +193,14 @@ export class GiftService {
           ? Math.round(payload.feeAmount.amountMicros)
           : undefined;
       if (typeof feeMicros === 'number' && Number.isFinite(feeMicros)) {
-        prepared.feeAmountMinor =
-          typeof payload.feeAmountMinor === 'number'
-            ? payload.feeAmountMinor
-            : Math.round(feeMicros / 10_000);
-        prepared.feeAmountMajor = Number(
-          ((prepared.feeAmountMinor ?? 0) / 100).toFixed(2),
-        );
-        prepared.feeCurrency =
-          typeof payload.feeAmount.currencyCode === 'string'
-            ? payload.feeAmount.currencyCode
-            : prepared.currency;
+        prepared.feeAmount = {
+          amountMicros: feeMicros,
+          currencyCode:
+            typeof payload.feeAmount.currencyCode === 'string'
+              ? payload.feeAmount.currencyCode
+              : currencyCode,
+        };
       }
-    } else if (
-      typeof payload.feeAmountMinor === 'number' &&
-      Number.isFinite(payload.feeAmountMinor)
-    ) {
-      prepared.feeAmountMinor = payload.feeAmountMinor;
-      prepared.feeAmountMajor = Number(
-        (payload.feeAmountMinor / 100).toFixed(2),
-      );
-      prepared.feeCurrency = prepared.currency;
     }
 
     if (
@@ -293,13 +261,6 @@ export class GiftService {
     ) {
       prepared.donorId = prepared.contactId.trim();
       delete prepared.contactId;
-    }
-
-    if (
-      typeof prepared.giftDate === 'string' &&
-      typeof prepared.dateReceived !== 'string'
-    ) {
-      prepared.dateReceived = prepared.giftDate;
     }
 
     if (typeof prepared.externalId === 'string') {
@@ -370,8 +331,10 @@ export class GiftService {
         prepared.donorId,
         prepared.companyId,
         prepared.recurringAgreementId,
-        prepared.amountMinor?.toString(),
-        prepared.currency,
+        typeof prepared.amount?.amountMicros === 'number'
+          ? prepared.amount.amountMicros.toString()
+          : undefined,
+        prepared.amount?.currencyCode,
       ]
         .filter((value) => typeof value === 'string' && value.length > 0)
         .join('|');

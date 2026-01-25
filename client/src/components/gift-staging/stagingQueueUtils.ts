@@ -54,7 +54,7 @@ export function mapQueueRows(items: GiftStagingListItem[]): QueueRow[] {
     hasGiftDuplicate:
       typeof item.errorDetail === 'string' && item.errorDetail.toLowerCase().includes('duplicate'),
     alertFlags: getAlertFlags(item),
-    isHighValue: typeof item.amountMinor === 'number' && item.amountMinor >= HIGH_VALUE_THRESHOLD,
+    isHighValue: isHighValueAmount(item),
     intentLabel: getIntentLabel(item.giftIntent),
     receiptMeta: formatReceiptStatus(item),
   }));
@@ -103,7 +103,7 @@ function getAlertFlags(item: GiftStagingListItem): string[] {
   if (item.recurringAgreementId) {
     alerts.add('Recurring');
   }
-  if (typeof item.amountMinor === 'number' && item.amountMinor >= HIGH_VALUE_THRESHOLD) {
+  if (isHighValueAmount(item)) {
     alerts.add('High value');
   }
   if (item.receiptWarnings && item.receiptWarnings.length > 0) {
@@ -136,10 +136,10 @@ export function formatDate(value?: string): string {
 }
 
 function formatAmount(item: GiftStagingListItem): string {
-  if (typeof item.amountMinor !== 'number') {
+  if (typeof item.amountMicros !== 'number') {
     return '—';
   }
-  const currency = item.currency ?? 'GBP';
+  const currency = item.currencyCode ?? 'GBP';
   const formatter =
     currencyFormatters.get(currency) ??
     new Intl.NumberFormat(undefined, {
@@ -153,8 +153,16 @@ function formatAmount(item: GiftStagingListItem): string {
     currencyFormatters.set(currency, formatter);
   }
 
-  const pounds = item.amountMinor / 100;
-  return formatter.format(pounds);
+  const amountMajor = item.amountMicros / 1_000_000;
+  return formatter.format(amountMajor);
+}
+
+function isHighValueAmount(item: GiftStagingListItem): boolean {
+  if (typeof item.amountMicros !== 'number') {
+    return false;
+  }
+  const amountMinor = Math.round(item.amountMicros / 10_000);
+  return amountMinor >= HIGH_VALUE_THRESHOLD;
 }
 
 function resolveDonor(item: GiftStagingListItem): string {

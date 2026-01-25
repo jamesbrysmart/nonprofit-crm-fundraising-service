@@ -4,9 +4,6 @@ describe('buildTwentyGiftPayload', () => {
   it('preserves optional attribution and batch fields when present', () => {
     const payload = {
       amount: { currencyCode: 'GBP', amountMicros: 25_000_000 },
-      amountMinor: 2500,
-      amountMajor: 25,
-      currency: 'GBP',
       donorId: 'person-1',
       fundId: 'fund-123',
       appealId: 'appeal-456',

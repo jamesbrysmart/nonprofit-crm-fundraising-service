@@ -7,8 +7,8 @@ export interface GiftCreateResponse {
       id?: string;
       name?: string;
       amount?: {
+        amountMicros?: number;
         currencyCode?: string;
-        value?: number;
       };
     };
   };
@@ -17,7 +17,7 @@ export interface GiftCreateResponse {
 export interface GiftCreatePayload {
   amount: {
     currencyCode: string;
-    value: number;
+    amountMicros: number;
   };
   appealId?: string;
   giftDate?: string;

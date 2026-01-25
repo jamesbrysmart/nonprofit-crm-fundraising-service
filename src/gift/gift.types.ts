@@ -3,12 +3,10 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
     amountMicros: number;
     currencyCode: string;
   };
-  amountMajor?: number;
-  amountMinor: number;
-  currency: string;
-  feeAmountMajor?: number;
-  feeAmountMinor?: number;
-  feeCurrency?: string;
+  feeAmount?: {
+    amountMicros: number;
+    currencyCode: string;
+  };
   donorId?: string;
   companyId?: string;
   donorFirstName?: string;
@@ -25,7 +23,6 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   fundId?: string;
   opportunityId?: string;
   giftDate?: string;
-  dateReceived?: string;
   giftBatchId?: string;
   giftAidEligible?: boolean;
   dedupeDiagnostics?: GiftDedupeDiagnostics;

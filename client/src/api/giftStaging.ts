@@ -36,10 +36,9 @@ export interface GiftStagingUpdatePayload {
   donorFirstName?: string | null;
   donorLastName?: string | null;
   donorEmail?: string | null;
-  amountMinor?: number;
-  amountMajor?: number;
-  currency?: string | null;
-  dateReceived?: string | null;
+  amountMicros?: number;
+  currencyCode?: string | null;
+  giftDate?: string | null;
   expectedAt?: string | null;
   fundId?: string | null;
   appealId?: string | null;
@@ -94,10 +93,9 @@ export interface GiftStagingListItem {
   intakeSource?: string;
   sourceFingerprint?: string;
   externalId?: string;
-  amount?: number;
-  amountMinor?: number;
-  currency?: string;
-  dateReceived?: string;
+  amountMicros?: number;
+  currencyCode?: string;
+  giftDate?: string;
   expectedAt?: string;
   paymentMethod?: string;
   giftBatchId?: string;
@@ -151,8 +149,6 @@ export async function fetchGiftStagingList(
     statuses?: string[];
     intakeSources?: string[];
     search?: string;
-    minAmountMinor?: number;
-    maxAmountMinor?: number;
     giftBatchId?: string;
   } = {},
 ): Promise<GiftStagingListResponse> {
@@ -178,12 +174,6 @@ export async function fetchGiftStagingList(
   if (typeof params.search === 'string' && params.search.trim().length > 0) {
     queryParams.search = params.search.trim();
   }
-  if (typeof params.minAmountMinor === 'number' && Number.isFinite(params.minAmountMinor)) {
-    queryParams.minAmountMinor = params.minAmountMinor;
-  }
-  if (typeof params.maxAmountMinor === 'number' && Number.isFinite(params.maxAmountMinor)) {
-    queryParams.maxAmountMinor = params.maxAmountMinor;
-  }
   if (typeof params.giftBatchId === 'string' && params.giftBatchId.trim().length > 0) {
     queryParams.giftBatchId = params.giftBatchId.trim();
   }
@@ -207,14 +197,13 @@ export interface GiftStagingDetailResponse {
       autoPromote?: boolean;
       createdAt?: string;
       updatedAt?: string;
-      amountMinor?: number;
-      currency?: string;
+      amountMicros?: number;
+      currencyCode?: string;
       intakeSource?: string;
       sourceFingerprint?: string;
       externalId?: string;
-      amount?: number;
       paymentMethod?: string;
-      dateReceived?: string;
+      giftDate?: string;
       giftAidEligible?: boolean;
       donorId?: string;
       donorFirstName?: string;

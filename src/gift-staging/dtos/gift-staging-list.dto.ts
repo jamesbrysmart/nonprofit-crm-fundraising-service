@@ -8,7 +8,7 @@ import {
   Min,
 } from 'class-validator';
 
-const SORT_FIELDS = new Set(['createdAt', 'updatedAt', 'amountMinor']);
+const SORT_FIELDS = new Set(['createdAt', 'updatedAt', 'amount.amountMicros']);
 const SORT_DIRECTIONS = new Set(['asc', 'desc']);
 
 const toTrimmedString = (value: unknown): string | undefined => {
@@ -113,18 +113,6 @@ export class GiftStagingListQueryDto {
   @IsString()
   @Transform(({ value }) => toTrimmedString(value))
   recurringAgreementId?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Transform(({ value }) => toLimit(value))
-  minAmountMinor?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Transform(({ value }) => toLimit(value))
-  maxAmountMinor?: number;
 
   @IsOptional()
   @IsString()

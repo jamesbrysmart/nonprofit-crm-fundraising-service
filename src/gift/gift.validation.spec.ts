@@ -20,8 +20,6 @@ describe('gift.validation', () => {
         firstName: 'Ada',
         lastName: 'Lovelace',
       });
-      expect(result.amountMinor).toBe(1000);
-      expect(result.currency).toBe('GBP');
     });
 
     it('retains optional email on contact', () => {
@@ -39,8 +37,6 @@ describe('gift.validation', () => {
         lastName: 'Turing',
         email: 'alan@example.org',
       });
-      expect(result.currency).toBe('USD');
-      expect(result.amountMinor).toBe(2500);
     });
 
     it('throws when contact fields are missing', () => {
@@ -69,18 +65,6 @@ describe('gift.validation', () => {
       });
 
       expect(result.appealId).toBe('apl-456');
-    });
-
-    it('preserves provided amountMinor/currency when supplied', () => {
-      const result = validateCreateGiftPayload({
-        amount: { currencyCode: 'GBP', amountMicros: 12_340_000 },
-        amountMinor: 1235,
-        currency: 'GBP',
-        contact: { firstName: 'Grace', lastName: 'Hopper' },
-      });
-
-      expect(result.amountMinor).toBe(1235);
-      expect(result.currency).toBe('GBP');
     });
 
     it('allows intake metadata fields', () => {

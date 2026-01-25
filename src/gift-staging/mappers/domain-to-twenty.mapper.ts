@@ -7,26 +7,12 @@ export const mapCreateGiftStagingPayload = (
 ): CreateGiftStagingDto & { rawPayload: string } => {
   const promotionStatus = autoPromote ? 'committing' : 'pending';
 
-  const amountMicrosFromPayload =
+  const amountMicros =
     typeof payload.amount?.amountMicros === 'number'
       ? Math.round(payload.amount.amountMicros)
-      : undefined;
+      : 0;
 
-  const amountMinor =
-    typeof amountMicrosFromPayload === 'number'
-      ? Math.round(amountMicrosFromPayload / 10_000)
-      : typeof payload.amountMinor === 'number' && Number.isFinite(payload.amountMinor)
-        ? payload.amountMinor
-        : typeof payload.amountMajor === 'number'
-          ? Math.round(payload.amountMajor * 100)
-          : 0;
-
-  const amountMicros =
-    typeof amountMicrosFromPayload === 'number'
-      ? amountMicrosFromPayload
-      : Math.round(amountMinor * 10_000);
-
-  const currencyCode = payload.currency ?? payload.amount?.currencyCode ?? 'GBP';
+  const currencyCode = payload.amount?.currencyCode ?? 'GBP';
 
   const rawPayload = JSON.stringify(payload);
 
@@ -42,13 +28,12 @@ export const mapCreateGiftStagingPayload = (
       amountMicros,
       currencyCode,
     },
-    amountMinor,
-    feeAmountMinor: payload.feeAmountMinor,
+    feeAmount: payload.feeAmount,
     intakeSource: payload.intakeSource,
     sourceFingerprint: payload.sourceFingerprint,
     externalId: payload.externalId,
     paymentMethod: payload.paymentMethod,
-    dateReceived: payload.dateReceived ?? payload.giftDate,
+    giftDate: payload.giftDate,
     expectedAt: payload.expectedAt,
     giftAidEligible: payload.giftAidEligible ?? false,
     fundId: payload.fundId,

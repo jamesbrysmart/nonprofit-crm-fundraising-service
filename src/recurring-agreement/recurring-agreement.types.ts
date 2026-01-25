@@ -17,8 +17,10 @@ export interface RecurringAgreementPayload extends Record<string, unknown> {
   status?: RecurringAgreementStatus;
   cadence?: RecurringAgreementCadence;
   intervalCount?: number;
-  amountMinor?: number;
-  currency?: string;
+  amount?: {
+    amountMicros: number;
+    currencyCode: string;
+  };
   startDate?: string;
   endDate?: string;
   nextExpectedAt?: string;

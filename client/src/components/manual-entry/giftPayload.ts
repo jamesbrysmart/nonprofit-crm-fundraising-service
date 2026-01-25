@@ -15,7 +15,7 @@ export function buildGiftPayload(state: GiftFormState, existingContactId?: strin
   const payload: GiftCreatePayload = {
     amount: {
       currencyCode: state.currencyCode,
-      value: amountValue,
+      amountMicros: Math.round(amountValue * 1_000_000),
     },
     giftDate: state.giftDate,
     name: state.giftName.trim() || undefined,

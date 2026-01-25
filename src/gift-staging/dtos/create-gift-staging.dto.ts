@@ -33,16 +33,9 @@ export class CreateGiftStagingDto {
   amount!: AmountDto;
 
   @IsOptional()
-  @IsNumber()
-  amountMinor?: number;
-
-  @IsOptional()
-  @IsNumber()
-  feeAmountMinor?: number;
-
-  @IsOptional()
-  @IsNumber()
-  amountMajor?: number;
+  @ValidateNested()
+  @Type(() => AmountDto)
+  feeAmount?: AmountDto;
 
   @IsOptional()
   @IsString()
@@ -62,7 +55,7 @@ export class CreateGiftStagingDto {
 
   @IsOptional()
   @IsString()
-  dateReceived?: string;
+  giftDate?: string;
 
   @IsOptional()
   @IsString()

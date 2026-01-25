@@ -465,7 +465,13 @@ async function main() {
   const giftFields = [
     { name: "amount", label: "Amount", type: "CURRENCY" },
     { name: "feeAmount", label: "Fee Amount", type: "CURRENCY" },
-    { name: "date", label: "Gift Date", type: "DATE" },
+    {
+      name: "giftDate",
+      label: "Gift Date",
+      type: "DATE",
+      description:
+        "Date the donor made the gift (not record entry, bank settlement, or payout date). For recurring gifts, this is the installment date.",
+    },
     { name: "externalId", label: "External ID", type: "TEXT" },
     { name: "paymentMethod", label: "Payment Method", type: "TEXT" },
     { name: "donorFirstName", label: "Donor First Name", type: "TEXT" },
@@ -630,11 +636,15 @@ async function main() {
     { name: 'sourceFingerprint', label: 'Source Fingerprint', type: 'TEXT' },
     { name: 'externalId', label: 'External ID', type: 'TEXT' },
     { name: 'amount', label: 'Amount', type: 'CURRENCY' },
-    { name: 'amountMinor', label: 'Amount (minor units)', type: 'NUMBER' },
     { name: 'feeAmount', label: 'Fee Amount', type: 'CURRENCY' },
-    { name: 'feeAmountMinor', label: 'Fee Amount (minor units)', type: 'NUMBER' },
     { name: 'paymentMethod', label: 'Payment Method', type: 'TEXT' },
-    { name: 'dateReceived', label: 'Date Received', type: 'DATE' },
+    {
+      name: 'giftDate',
+      label: 'Gift Date',
+      type: 'DATE',
+      description:
+        'Date the donor made the gift (not record entry, bank settlement, or payout date). For recurring gifts, this is the installment date.',
+    },
     { name: 'expectedAt', label: 'Expected At', type: 'DATE' },
     { name: 'validationStatus', label: 'Validation Status', type: 'TEXT' },
     { name: 'dedupeStatus', label: 'Dedupe Status', type: 'TEXT' },
@@ -720,7 +730,6 @@ async function main() {
     { name: 'cadence', label: 'Cadence', type: 'TEXT' },
     { name: 'intervalCount', label: 'Interval Count', type: 'NUMBER' },
     { name: 'amount', label: 'Amount', type: 'CURRENCY' },
-    { name: 'amountMinor', label: 'Amount (minor units)', type: 'NUMBER' },
     { name: 'startDate', label: 'Start Date', type: 'DATE' },
     { name: 'endDate', label: 'End Date', type: 'DATE' },
     { name: 'nextExpectedAt', label: 'Next Expected At', type: 'DATE' },

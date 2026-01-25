@@ -404,7 +404,7 @@ export class GiftStagingProcessingService {
     }
 
     // Fallback: add one month to the posted date to keep the agreement moving forward.
-    const referenceDate = stagingRecord.dateReceived ?? stagingRecord.createdAt;
+    const referenceDate = stagingRecord.giftDate ?? stagingRecord.createdAt;
     if (!referenceDate) {
       return undefined;
     }
@@ -436,10 +436,6 @@ export class GiftStagingProcessingService {
       payload.companyId.trim().length > 0;
 
     return (
-      typeof payload.amountMinor === 'number' &&
-      Number.isFinite(payload.amountMinor) &&
-      typeof payload.currency === 'string' &&
-      payload.currency.trim().length > 0 &&
       (hasDonor || hasCompany) &&
       typeof currencyCode === 'string' &&
       currencyCode.trim().length > 0 &&

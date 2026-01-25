@@ -27,33 +27,21 @@ const toFiniteNumber = (value: unknown): number | undefined => {
 const toBoolean = (value: unknown): boolean | undefined =>
   typeof value === 'boolean' ? value : undefined;
 
-const toAmountMinor = (
-  value: unknown,
-  fallback?: unknown,
-): number | undefined => {
-  const parsed = toFiniteNumber(value);
-  if (parsed !== undefined) {
-    return Math.round(parsed);
+const toAmountMicros = (value: unknown): number | undefined => {
+  if (isPlainObject(value)) {
+    const amountMicros = toFiniteNumber(value.amountMicros);
+    if (amountMicros !== undefined) {
+      return Math.round(amountMicros);
+    }
   }
 
-  const fallbackNumber = toFiniteNumber(fallback);
-  return fallbackNumber !== undefined ? Math.round(fallbackNumber) : undefined;
+  return undefined;
 };
 
-const toAmountMajor = (
-  value: unknown,
-  fallbackMinor?: unknown,
-): number | undefined => {
-  const parsed = toFiniteNumber(value);
-  if (parsed !== undefined) {
-    return parsed;
+const toCurrencyCode = (value: unknown): string | undefined => {
+  if (isPlainObject(value) && typeof value.currencyCode === 'string') {
+    return toTrimmedString(value.currencyCode);
   }
-
-  const minor = toFiniteNumber(fallbackMinor);
-  if (minor !== undefined) {
-    return Number((minor / 100).toFixed(2));
-  }
-
   return undefined;
 };
 
@@ -140,27 +128,27 @@ export class GiftStagingRecordModel {
 
   @Expose()
   @Transform(({ value, obj }) =>
-    toAmountMajor(value, (obj as Record<string, unknown>)?.amountMinor),
+    toAmountMicros(value ?? (obj as Record<string, unknown>)?.amount),
   )
-  amount?: number;
+  amountMicros?: number;
 
   @Expose()
   @Transform(({ value, obj }) =>
-    toAmountMinor(value, (obj as Record<string, unknown>)?.amount),
+    toCurrencyCode(value ?? (obj as Record<string, unknown>)?.amount),
   )
-  amountMinor?: number;
+  currencyCode?: string;
 
   @Expose()
-  @Transform(({ value }) => toTrimmedString(value))
-  currency?: string;
+  @Transform(({ value, obj }) =>
+    toAmountMicros(value ?? (obj as Record<string, unknown>)?.feeAmount),
+  )
+  feeAmountMicros?: number;
 
   @Expose()
-  @Transform(({ value }) => toFiniteNumber(value))
-  feeAmount?: number;
-
-  @Expose()
-  @Transform(({ value }) => toFiniteNumber(value))
-  feeAmountMinor?: number;
+  @Transform(({ value, obj }) =>
+    toCurrencyCode(value ?? (obj as Record<string, unknown>)?.feeAmount),
+  )
+  feeCurrencyCode?: string;
 
   @Expose()
   @Transform(({ value }) => toTrimmedString(value))
@@ -180,7 +168,7 @@ export class GiftStagingRecordModel {
 
   @Expose()
   @Transform(({ value }) => toTrimmedString(value))
-  dateReceived?: string;
+  giftDate?: string;
 
   @Expose()
   @Transform(({ value }) => toTrimmedString(value))

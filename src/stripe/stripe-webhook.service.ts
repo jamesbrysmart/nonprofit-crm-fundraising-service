@@ -114,10 +114,8 @@ export class StripeWebhookService {
     const giftPayload: Record<string, unknown> = {
       amount: {
         currencyCode: currency.toUpperCase(),
-        value: this.convertAmountToMajorUnits(amountTotal),
+        amountMicros: amountTotal * 10_000,
       },
-      amountMinor: amountTotal,
-      currency: currency.toUpperCase(),
       giftDate: this.formatEventDate(event.created),
       paymentMethod: 'card',
       externalId: paymentIntentId ?? session.id,
@@ -191,9 +189,6 @@ export class StripeWebhookService {
     return date.toISOString().slice(0, 10);
   }
 
-  private convertAmountToMajorUnits(amountMinor: number): number {
-    return amountMinor / 100;
-  }
 
   private buildSessionNote(): undefined {
     return undefined;

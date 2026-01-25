@@ -199,9 +199,6 @@ describe('GiftStagingController', () => {
 
     const normalizedPayload: NormalizedGiftCreatePayload = {
       amount: { currencyCode: 'GBP', amountMicros: 25_000_000 },
-      amountMinor: 2500,
-      amountMajor: 25,
-      currency: 'GBP',
       intakeSource: 'manual_ui',
       sourceFingerprint: 'fp-1',
       autoPromote: true,
@@ -260,9 +257,6 @@ describe('GiftStagingController', () => {
     isEnabledMock.mockReturnValue(true);
     normalizeGiftPayloadMock.mockResolvedValue({
       amount: { currencyCode: 'GBP', amountMicros: 10_000_000 },
-      amountMinor: 1000,
-      amountMajor: 10,
-      currency: 'GBP',
       intakeSource: 'manual_ui',
       sourceFingerprint: 'fp-2',
       autoPromote: false,

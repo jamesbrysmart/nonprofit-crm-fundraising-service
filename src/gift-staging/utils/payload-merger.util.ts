@@ -45,34 +45,20 @@ const parseRawPayload = (
 const buildPayloadFromEntity = (
   entity: GiftStagingRecordModel,
 ): NormalizedGiftCreatePayload => {
-  const inferredAmountMinor =
-    typeof entity.amountMinor === 'number'
-      ? entity.amountMinor
-      : typeof entity.amount === 'number'
-        ? Math.round(entity.amount * 100)
-        : 0;
-
-  const inferredAmountMajor =
-    typeof entity.amount === 'number'
-      ? entity.amount
-      : Number((inferredAmountMinor / 100).toFixed(2));
-
-  const currency = entity.currency ?? 'GBP';
+  const amountMicros =
+    typeof entity.amountMicros === 'number' ? entity.amountMicros : 0;
+  const currencyCode = entity.currencyCode ?? 'GBP';
 
   const payload: NormalizedGiftCreatePayload = {
     amount: {
-      currencyCode: currency,
-      amountMicros: inferredAmountMinor * 10_000,
+      currencyCode,
+      amountMicros,
     },
-    amountMinor: inferredAmountMinor,
-    amountMajor: inferredAmountMajor,
-    currency,
     donorId: entity.donorId,
     donorFirstName: entity.donorFirstName,
     donorLastName: entity.donorLastName,
     donorEmail: entity.donorEmail,
-    dateReceived: entity.dateReceived,
-    giftDate: entity.dateReceived,
+    giftDate: entity.giftDate,
     expectedAt: entity.expectedAt,
     fundId: entity.fundId,
     appealId: entity.appealId,
@@ -109,8 +95,8 @@ export const mergePayloadForUpdate = (
     ...basePayload,
     amount: {
       ...(basePayload.amount ?? {
-        currencyCode: existing.currency ?? 'GBP',
-        value: basePayload.amountMajor ?? 0,
+        currencyCode: existing.currencyCode ?? 'GBP',
+        amountMicros: existing.amountMicros ?? 0,
       }),
     },
     providerContext: basePayload.providerContext,
@@ -129,62 +115,37 @@ export const mergePayloadForUpdate = (
     merged.donorEmail = toNullableString(updates.donorEmail);
   }
 
-  let amountMinor =
-    updates.amountMinor !== undefined
-      ? (updates.amountMinor ?? undefined)
-      : undefined;
-  let amountMajor =
-    updates.amountMajor !== undefined
-      ? (updates.amountMajor ?? undefined)
-      : undefined;
-
-  if (amountMinor === undefined && amountMajor === undefined) {
-    amountMinor = merged.amountMinor ?? existing.amountMinor;
-    amountMajor = merged.amountMajor ?? existing.amount;
+  if (typeof updates.amountMicros === 'number') {
+    merged.amount.amountMicros = updates.amountMicros;
   }
 
-  if (amountMinor === undefined && amountMajor !== undefined) {
-    amountMinor = Math.round(amountMajor * 100);
-  }
-  if (amountMajor === undefined && amountMinor !== undefined) {
-    amountMajor = Number((amountMinor / 100).toFixed(2));
-  }
-
-  if (typeof amountMinor === 'number') {
-    merged.amountMinor = amountMinor;
-  }
-
-  if (typeof amountMajor === 'number') {
-    merged.amountMajor = amountMajor;
-  }
-
-  const resolvedAmountMajor =
-    typeof merged.amountMajor === 'number'
-      ? merged.amountMajor
-      : typeof merged.amountMinor === 'number'
-        ? Number((merged.amountMinor / 100).toFixed(2))
-        : typeof merged.amount?.amountMicros === 'number'
-          ? Number((merged.amount.amountMicros / 1_000_000).toFixed(2))
-          : undefined;
-
-  const resolvedAmountMicros =
-    typeof merged.amountMinor === 'number'
-      ? Math.round(merged.amountMinor * 10_000)
-      : typeof resolvedAmountMajor === 'number'
-        ? Math.round(resolvedAmountMajor * 1_000_000)
-        : merged.amount?.amountMicros;
-
-  if (!merged.amount) {
-    merged.amount = {
-      amountMicros: resolvedAmountMicros ?? 0,
-      currencyCode: merged.currency ?? 'GBP',
-    };
-  } else {
-    if (resolvedAmountMicros !== undefined) {
-      merged.amount.amountMicros = resolvedAmountMicros;
+  if (updates.currencyCode !== undefined) {
+    const normalized = toNullableString(updates.currencyCode);
+    if (normalized) {
+      merged.amount.currencyCode = normalized;
     }
-    if (merged.currency) {
-      merged.amount.currencyCode = merged.currency;
+  }
+
+  if (
+    typeof updates.feeAmountMicros === 'number' &&
+    Number.isFinite(updates.feeAmountMicros)
+  ) {
+    merged.feeAmount = {
+      amountMicros: updates.feeAmountMicros,
+      currencyCode:
+        merged.feeAmount?.currencyCode ??
+        merged.amount.currencyCode ??
+        'GBP',
+    };
+  }
+
+  if (updates.feeCurrencyCode !== undefined) {
+    const normalized = toNullableString(updates.feeCurrencyCode);
+    if (normalized) {
+      merged.feeAmount = {
+        amountMicros: merged.feeAmount?.amountMicros ?? 0,
+        currencyCode: normalized,
+      };
     }
   }
 
@@ -200,13 +161,11 @@ export const mergePayloadForUpdate = (
     }
   };
 
-  if (updates.dateReceived !== undefined) {
-    const date = toNullableString(updates.dateReceived);
+  if (updates.giftDate !== undefined) {
+    const date = toNullableString(updates.giftDate);
     if (date) {
-      merged.dateReceived = date;
       merged.giftDate = date;
     } else {
-      delete merged.dateReceived;
       delete merged.giftDate;
     }
   }

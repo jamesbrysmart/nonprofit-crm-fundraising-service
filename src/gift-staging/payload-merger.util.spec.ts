@@ -7,37 +7,33 @@ import type {
 describe('payload-merger.util', () => {
   const baseEntity: GiftStagingRecordModel = {
     id: 'stg-1',
-    amountMinor: 1000,
-    currency: 'GBP',
+    amountMicros: 10_000_000,
+    currencyCode: 'GBP',
     donorId: 'donor-1',
     rawPayload: JSON.stringify({
-      amountMinor: 1000,
-      currency: 'GBP',
+      amount: { amountMicros: 10_000_000, currencyCode: 'GBP' },
       donorId: 'donor-1',
     }),
   };
 
-  it('updates amountMinor and derives amountMajor', () => {
+  it('updates amountMicros', () => {
     const updates: GiftStagingUpdateInput = {
-      amountMinor: 1234,
+      amountMicros: 12_340_000,
     };
 
     const result = mergePayloadForUpdate(baseEntity, updates);
 
-    expect(result.amountMinor).toBe(1234);
-    expect(result.amountMajor).toBeCloseTo(12.34);
+    expect(result.amount.amountMicros).toBe(12_340_000);
   });
 
-  it('updates amountMajor and derives amountMinor when missing', () => {
+  it('updates currencyCode', () => {
     const updates: GiftStagingUpdateInput = {
-      amountMajor: 42.5,
-      amountMinor: undefined,
+      currencyCode: 'USD',
     };
 
     const result = mergePayloadForUpdate(baseEntity, updates);
 
-    expect(result.amountMajor).toBeCloseTo(42.5);
-    expect(result.amountMinor).toBe(4250);
+    expect(result.amount.currencyCode).toBe('USD');
   });
 
   it('null string fields clear values', () => {
