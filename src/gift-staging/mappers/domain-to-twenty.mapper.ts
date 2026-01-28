@@ -3,9 +3,9 @@ import type { NormalizedGiftCreatePayload } from '../../gift/gift.types';
 
 export const mapCreateGiftStagingPayload = (
   payload: NormalizedGiftCreatePayload,
-  autoPromote: boolean,
+  autoProcess: boolean,
 ): CreateGiftStagingDto & { rawPayload: string } => {
-  const promotionStatus = autoPromote ? 'committing' : 'pending';
+  const processingStatus = autoProcess ? 'processing' : 'pending';
 
   const amountMicros =
     typeof payload.amount?.amountMicros === 'number'
@@ -22,8 +22,8 @@ export const mapCreateGiftStagingPayload = (
       : payload.providerContext;
 
   const body: CreateGiftStagingDto & { rawPayload: string } = {
-    autoPromote,
-    promotionStatus,
+    autoProcess,
+    processingStatus,
     amount: {
       amountMicros,
       currencyCode,
@@ -56,6 +56,9 @@ export const mapCreateGiftStagingPayload = (
     isInKind: payload.isInKind,
     inKindDescription: payload.inKindDescription,
     estimatedValue: payload.estimatedValue,
+    processingDiagnostics: payload.processingDiagnostics
+      ? (payload.processingDiagnostics as unknown as Record<string, unknown>)
+      : undefined,
     rawPayload,
   };
 

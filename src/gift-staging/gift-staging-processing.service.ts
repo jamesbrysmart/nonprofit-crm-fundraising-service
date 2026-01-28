@@ -30,7 +30,7 @@ export type ProcessGiftErrorReason =
   | 'gift_api_failed';
 
 export type ProcessGiftResult =
-  | { status: 'committed'; giftId: string; stagingId: string }
+  | { status: 'processed'; giftId: string; stagingId: string }
   | { status: 'deferred'; stagingId: string; reason: ProcessGiftDeferredReason }
   | { status: 'error'; stagingId: string; error: ProcessGiftErrorReason };
 
@@ -75,12 +75,12 @@ export class GiftStagingProcessingService {
       };
     }
 
-    const committedResult = this.handleAlreadyCommitted(stagingRecord);
-    if (committedResult) {
-      return { ...committedResult, stagingId };
+    const processedResult = this.handleAlreadyProcessed(stagingRecord);
+    if (processedResult) {
+      return { ...processedResult, stagingId };
     }
 
-    if (stagingRecord.promotionStatus === 'committing') {
+    if (stagingRecord.processingStatus === 'processing') {
       this.structuredLogger.info(
         'Staging record locked by active processing',
         {
@@ -102,7 +102,7 @@ export class GiftStagingProcessingService {
         {
           event: 'gift_staging_process_not_ready',
           stagingId,
-          promotionStatus: stagingRecord.promotionStatus,
+          processingStatus: stagingRecord.processingStatus,
           validationStatus: stagingRecord.validationStatus,
           dedupeStatus: stagingRecord.dedupeStatus,
         },
@@ -177,7 +177,7 @@ export class GiftStagingProcessingService {
     }
 
     await this.updateProcessingStatus(stagingId, {
-      promotionStatus: 'committing',
+      processingStatus: 'processing',
     });
 
     const enrichedPayload =
@@ -269,7 +269,7 @@ export class GiftStagingProcessingService {
       };
     }
 
-    await this.giftStagingService.markCommittedById(stagingId, giftId);
+    await this.giftStagingService.markProcessedById(stagingId, giftId);
 
     const agreementId = stagingRecord.recurringAgreementId;
     if (agreementId) {
@@ -281,11 +281,11 @@ export class GiftStagingProcessingService {
         });
       } catch (error) {
         this.structuredLogger.warn(
-          'Failed to update recurring agreement after staging promotion',
-          {
-            event: 'gift_staging_recurring_update_failed',
-            stagingId,
-            giftId,
+        'Failed to update recurring agreement after staging processing',
+        {
+          event: 'gift_staging_recurring_update_failed',
+          stagingId,
+          giftId,
             recurringAgreementId: agreementId,
             errorMessage:
               error instanceof Error ? error.message : String(error),
@@ -296,16 +296,16 @@ export class GiftStagingProcessingService {
     }
 
     return {
-      status: 'committed',
+      status: 'processed',
       stagingId,
       giftId,
     };
   }
 
-  private handleAlreadyCommitted(
+  private handleAlreadyProcessed(
     stagingRecord: GiftStagingRecordModel,
-  ): { status: 'committed'; giftId: string } | undefined {
-    if (stagingRecord.promotionStatus !== 'committed') {
+  ): { status: 'processed'; giftId: string } | undefined {
+    if (stagingRecord.processingStatus !== 'processed') {
       return undefined;
     }
 
@@ -314,24 +314,24 @@ export class GiftStagingProcessingService {
       stagingRecord.giftId.trim().length > 0
     ) {
       this.structuredLogger.info(
-        'Staging record already committed',
+        'Staging record already processed',
         {
-          event: 'gift_staging_process_already_committed',
+          event: 'gift_staging_process_already_processed',
           stagingId: stagingRecord.id,
           giftId: stagingRecord.giftId,
         },
         this.logContext,
       );
       return {
-        status: 'committed',
+        status: 'processed',
         giftId: stagingRecord.giftId,
       };
     }
 
     this.structuredLogger.warn(
-      'Staging record marked committed but missing gift id',
+      'Staging record marked processed but missing gift id',
       {
-        event: 'gift_staging_process_committed_missing_gift',
+        event: 'gift_staging_process_processed_missing_gift',
         stagingId: stagingRecord.id,
       },
       this.logContext,
@@ -344,7 +344,7 @@ export class GiftStagingProcessingService {
     errorDetail: string,
   ): Promise<void> {
     await this.updateProcessingStatus(stagingId, {
-      promotionStatus: 'commit_failed',
+      processingStatus: 'process_failed',
       errorDetail,
     });
   }
@@ -370,11 +370,11 @@ export class GiftStagingProcessingService {
   }
 
   private canProcess(stagingRecord: GiftStagingRecordModel): boolean {
-    const promotionStatus = stagingRecord.promotionStatus ?? 'pending';
-    const eligibleStatuses = new Set(['ready_for_commit', 'commit_failed']);
-    // Ready/commit_failed are the only gates; we don’t block on dedupe/validation
+    const processingStatus = stagingRecord.processingStatus ?? 'pending';
+    const eligibleStatuses = new Set(['ready_for_process', 'process_failed']);
+    // Ready/process_failed are the only gates; we don’t block on dedupe/validation
     // because “Mark ready” is the reviewer’s explicit signal to proceed.
-    return eligibleStatuses.has(promotionStatus);
+    return eligibleStatuses.has(processingStatus);
   }
 
   private parseRawPayload(

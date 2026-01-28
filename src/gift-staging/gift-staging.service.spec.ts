@@ -41,7 +41,7 @@ describe('GiftStagingService', () => {
       if (key === 'FUNDRAISING_ENABLE_GIFT_STAGING') {
         return enabled ? 'true' : 'false';
       }
-      if (key === 'FUNDRAISING_STAGING_AUTO_PROMOTE_DEFAULT') {
+      if (key === 'FUNDRAISING_STAGING_AUTO_PROCESS_DEFAULT') {
         return 'true';
       }
       return undefined;
@@ -75,7 +75,7 @@ describe('GiftStagingService', () => {
         giftStagings: [
           {
             id: 'stg-1',
-            promotionStatus: 'ready_for_commit',
+            processingStatus: 'ready_for_process',
             validationStatus: 'passed',
             dedupeStatus: 'passed',
             createdAt: '2025-10-08T12:00:00Z',
@@ -85,12 +85,18 @@ describe('GiftStagingService', () => {
             sourceFingerprint: 'fp-1',
             externalId: 'ext-1',
             giftBatchId: 'batch-1',
-            autoPromote: false,
+            autoProcess: false,
             paymentMethod: 'card',
             giftDate: '2025-10-08',
             giftAidEligible: true,
             donorId: 'person-1',
             rawPayload: { foo: 'bar' },
+            processingDiagnostics: {
+              processingEligibility: 'eligible',
+              processingBlockers: [],
+              processingWarnings: ['payment_method_missing'],
+              identityConfidence: 'explicit',
+            },
           },
         ],
         pageInfo: {
@@ -112,14 +118,14 @@ describe('GiftStagingService', () => {
       id: 'stg-1',
       createdAt: '2025-10-08T12:00:00Z',
       updatedAt: '2025-10-08T12:10:00Z',
-      processingStatus: 'ready_for_commit',
+      processingStatus: 'ready_for_process',
       validationStatus: 'passed',
       dedupeStatus: 'passed',
       intakeSource: 'manual_ui',
       sourceFingerprint: 'fp-1',
       externalId: 'ext-1',
       giftBatchId: 'batch-1',
-      autoPromote: false,
+      autoProcess: false,
       amountMicros: 123_450_000,
       currencyCode: 'GBP',
       giftDate: '2025-10-08',
@@ -127,6 +133,12 @@ describe('GiftStagingService', () => {
       giftAidEligible: true,
       donorId: 'person-1',
       rawPayloadAvailable: true,
+      processingDiagnostics: {
+        processingEligibility: 'eligible',
+        processingBlockers: [],
+        processingWarnings: ['payment_method_missing'],
+        identityConfidence: 'explicit',
+      },
     });
   });
 
@@ -138,7 +150,7 @@ describe('GiftStagingService', () => {
         giftStagings: [
           {
             id: 'stg-1',
-            promotionStatus: 'ready_for_commit',
+            processingStatus: 'ready_for_process',
             validationStatus: 'passed',
             dedupeStatus: 'passed',
             createdAt: '2025-10-08T12:00:00Z',
@@ -148,7 +160,7 @@ describe('GiftStagingService', () => {
           },
           {
             id: 'stg-2',
-            promotionStatus: 'commit_failed',
+            processingStatus: 'process_failed',
             validationStatus: 'passed',
             dedupeStatus: 'passed',
             createdAt: '2025-10-08T11:00:00Z',
@@ -162,7 +174,7 @@ describe('GiftStagingService', () => {
     });
 
     const result: GiftStagingListResult = await service.listGiftStaging({
-      statuses: ['commit_failed'],
+      statuses: ['process_failed'],
       intakeSources: ['stripe_webhook'],
       search: 'does-not-exist',
       sort: 'amount.amountMicros:asc',

@@ -45,9 +45,7 @@ const toCurrencyCode = (value: unknown): string | undefined => {
   return undefined;
 };
 
-const toProviderContext = (
-  value: unknown,
-): Record<string, unknown> | undefined => {
+const toJsonObject = (value: unknown): Record<string, unknown> | undefined => {
   if (isPlainObject(value)) {
     return value;
   }
@@ -96,7 +94,7 @@ export class GiftStagingRecordModel {
 
   @Expose()
   @Transform(({ value }) => toTrimmedString(value))
-  promotionStatus?: string;
+  processingStatus?: string;
 
   @Expose()
   @Transform(({ value }) => toTrimmedString(value))
@@ -112,7 +110,7 @@ export class GiftStagingRecordModel {
 
   @Expose()
   @Transform(({ value }) => toBoolean(value))
-  autoPromote?: boolean;
+  autoProcess?: boolean;
 
   @Expose()
   @Transform(({ value }) => toTrimmedString(value))
@@ -183,7 +181,7 @@ export class GiftStagingRecordModel {
   providerPaymentId?: string;
 
   @Expose()
-  @Transform(({ value }) => toProviderContext(value))
+  @Transform(({ value }) => toJsonObject(value))
   providerContext?: Record<string, unknown>;
 
   @Expose()
@@ -261,6 +259,10 @@ export class GiftStagingRecordModel {
   @Expose()
   @Transform(({ value }) => toTrimmedString(value))
   errorDetail?: string;
+
+  @Expose()
+  @Transform(({ value }) => toJsonObject(value))
+  processingDiagnostics?: Record<string, unknown>;
 
   @Expose()
   @Transform(({ value }) => toTrimmedString(value))

@@ -98,7 +98,7 @@ describe('GiftStagingController', () => {
 
     await expect(
       controller.listGiftStaging({
-        status: ['ready_for_commit', 'commit_failed'],
+        status: ['ready_for_process', 'process_failed'],
         intakeSource: 'manual_ui,stripe_webhook',
         search: 'ABC',
         cursor: 'cursor123',
@@ -108,7 +108,7 @@ describe('GiftStagingController', () => {
     ).resolves.toEqual(result);
 
     expect(listGiftStagingMock).toHaveBeenCalledWith({
-      statuses: ['ready_for_commit', 'commit_failed'],
+      statuses: ['ready_for_process', 'process_failed'],
       intakeSources: ['manual_ui', 'stripe_webhook'],
       search: 'ABC',
       cursor: 'cursor123',
@@ -121,14 +121,26 @@ describe('GiftStagingController', () => {
     isEnabledMock.mockReturnValue(true);
     getGiftStagingByIdMock.mockResolvedValue({
       id: 'stg-200',
-      promotionStatus: 'pending',
+      processingStatus: 'pending',
+      processingDiagnostics: {
+        processingEligibility: 'eligible',
+        processingBlockers: [],
+        processingWarnings: ['payment_method_missing'],
+        identityConfidence: 'explicit',
+      },
     });
 
     await expect(controller.getGiftStaging('stg-200')).resolves.toEqual({
       data: {
         giftStaging: {
           id: 'stg-200',
-          promotionStatus: 'pending',
+          processingStatus: 'pending',
+          processingDiagnostics: {
+            processingEligibility: 'eligible',
+            processingBlockers: [],
+            processingWarnings: ['payment_method_missing'],
+            identityConfidence: 'explicit',
+          },
         },
       },
     });
@@ -146,7 +158,7 @@ describe('GiftStagingController', () => {
   it('delegates to processing service when enabled', async () => {
     isEnabledMock.mockReturnValue(true);
     const result: ProcessGiftResult = {
-      status: 'committed',
+      status: 'processed',
       stagingId: 'stg-123',
       giftId: 'gift-456',
     };
@@ -172,14 +184,14 @@ describe('GiftStagingController', () => {
 
     await expect(
       controller.updateStatus('stg-123', {
-        promotionStatus: 'ready_for_commit',
+        processingStatus: 'ready_for_process',
         validationStatus: 'passed',
         dedupeStatus: 'passed',
       }),
     ).resolves.toEqual({ ok: true });
 
     expect(updateStatusByIdMock).toHaveBeenCalledWith('stg-123', {
-      promotionStatus: 'ready_for_commit',
+      processingStatus: 'ready_for_process',
       validationStatus: 'passed',
       dedupeStatus: 'passed',
     });
@@ -201,7 +213,7 @@ describe('GiftStagingController', () => {
       amount: { currencyCode: 'GBP', amountMicros: 25_000_000 },
       intakeSource: 'manual_ui',
       sourceFingerprint: 'fp-1',
-      autoPromote: true,
+      autoProcess: true,
       donorId: 'person-1',
     };
 
@@ -211,17 +223,23 @@ describe('GiftStagingController', () => {
 
     stageGiftMock.mockResolvedValue({
       id: 'stg-111',
-      autoPromote: false,
-      promotionStatus: 'pending',
-      payload: { ...normalizedPayload, autoPromote: false },
+      autoProcess: false,
+      processingStatus: 'pending',
+      payload: { ...normalizedPayload, autoProcess: false },
     });
 
     getGiftStagingByIdMock.mockResolvedValue({
       id: 'stg-111',
-      promotionStatus: 'pending',
+      processingStatus: 'pending',
       validationStatus: 'pending',
       dedupeStatus: 'pending',
-      autoPromote: false,
+      autoProcess: false,
+      processingDiagnostics: {
+        processingEligibility: 'eligible',
+        processingBlockers: [],
+        processingWarnings: ['appeal_missing'],
+        identityConfidence: 'explicit',
+      },
     });
 
     await expect(
@@ -232,10 +250,16 @@ describe('GiftStagingController', () => {
       data: {
         giftStaging: {
           id: 'stg-111',
-          autoPromote: false,
-          promotionStatus: 'pending',
+          autoProcess: false,
+          processingStatus: 'pending',
           validationStatus: 'pending',
           dedupeStatus: 'pending',
+          processingDiagnostics: {
+            processingEligibility: 'eligible',
+            processingBlockers: [],
+            processingWarnings: ['appeal_missing'],
+            identityConfidence: 'explicit',
+          },
         },
       },
       meta: {
@@ -249,7 +273,7 @@ describe('GiftStagingController', () => {
       amount: { currencyCode: 'GBP', amountMicros: 25_000_000 },
     });
     expect(stageGiftMock).toHaveBeenCalledWith(
-      expect.objectContaining({ autoPromote: false }),
+      expect.objectContaining({ autoProcess: false }),
     );
   });
 
@@ -259,7 +283,7 @@ describe('GiftStagingController', () => {
       amount: { currencyCode: 'GBP', amountMicros: 10_000_000 },
       intakeSource: 'manual_ui',
       sourceFingerprint: 'fp-2',
-      autoPromote: false,
+      autoProcess: false,
       donorId: 'person-2',
     });
     stageGiftMock.mockResolvedValue(undefined);

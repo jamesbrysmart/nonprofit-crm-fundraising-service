@@ -9,7 +9,7 @@ export interface RecurringAgreementListItem {
   amountMicros?: number;
   currencyCode?: string;
   nextExpectedAt?: string;
-  autoPromoteEnabled?: boolean;
+  autoProcessEnabled?: boolean;
   provider?: string;
   providerAgreementId?: string;
   providerPaymentMethodId?: string;
@@ -74,8 +74,8 @@ function normalizeRecurringAgreement(entry: unknown): RecurringAgreementListItem
     amountMicros,
     currencyCode,
     nextExpectedAt: typeof record.nextExpectedAt === 'string' ? record.nextExpectedAt : undefined,
-    autoPromoteEnabled:
-      typeof record.autoPromoteEnabled === 'boolean' ? record.autoPromoteEnabled : undefined,
+    autoProcessEnabled:
+      typeof record.autoProcessEnabled === 'boolean' ? record.autoProcessEnabled : undefined,
     provider: typeof record.provider === 'string' ? record.provider : undefined,
     providerAgreementId:
       typeof record.providerAgreementId === 'string' ? record.providerAgreementId : undefined,

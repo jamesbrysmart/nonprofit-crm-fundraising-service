@@ -112,7 +112,7 @@ export function StagingQueueTable({
                   <span className={statusToneClass(row.statusMeta.tone)}>
                     {row.statusMeta.label}
                   </span>
-                  {row.statusMeta.label === 'Commit failed' && row.errorDetail ? (
+                  {row.statusMeta.label === 'Process failed' && row.errorDetail ? (
                     <span className={statusToneClass('danger')}>
                       {typeof row.errorDetail === 'string'
                         ? row.errorDetail
@@ -188,7 +188,7 @@ export function StagingQueueTable({
                       {processingIds[row.id] === 'process' ? 'Processing…' : 'Process now'}
                     </button>
                   ) : null}
-                  {row.statusMeta.label === 'Commit failed' ? (
+                  {row.statusMeta.label === 'Process failed' ? (
                     <button
                       type="button"
                       className="f-btn--ghost"

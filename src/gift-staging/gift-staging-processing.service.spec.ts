@@ -19,8 +19,8 @@ describe('GiftStagingProcessingService (manual processing)', () => {
   let getGiftStagingByIdMock: jest.MockedFunction<
     GiftStagingService['getGiftStagingById']
   >;
-  let markCommittedByIdMock: jest.MockedFunction<
-    GiftStagingService['markCommittedById']
+  let markProcessedByIdMock: jest.MockedFunction<
+    GiftStagingService['markProcessedById']
   >;
   let updateStatusByIdMock: jest.MockedFunction<
     GiftStagingService['updateStatusById']
@@ -44,7 +44,7 @@ describe('GiftStagingProcessingService (manual processing)', () => {
 
   const baseStaging: GiftStagingRecordModel = {
     id: 'stg-123',
-    promotionStatus: 'ready_for_commit',
+    processingStatus: 'ready_for_process',
     validationStatus: 'passed',
     dedupeStatus: 'passed',
     rawPayload: JSON.stringify(basePayload),
@@ -52,12 +52,12 @@ describe('GiftStagingProcessingService (manual processing)', () => {
 
   beforeEach(() => {
     getGiftStagingByIdMock = jest.fn();
-    markCommittedByIdMock = jest.fn().mockResolvedValue(undefined);
+    markProcessedByIdMock = jest.fn().mockResolvedValue(undefined);
     updateStatusByIdMock = jest.fn().mockResolvedValue(undefined);
 
     giftStagingService = {
       getGiftStagingById: getGiftStagingByIdMock,
-      markCommittedById: markCommittedByIdMock,
+      markProcessedById: markProcessedByIdMock,
       updateStatusById: updateStatusByIdMock,
     } as unknown as jest.Mocked<GiftStagingService>;
 
@@ -116,28 +116,28 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     expect(getGiftStagingByIdMock).toHaveBeenCalledWith('stg-404');
   });
 
-  it('returns committed immediately when the staging record is already committed', async () => {
+  it('returns processed immediately when the staging record is already processed', async () => {
     getGiftStagingByIdMock.mockResolvedValue({
       ...baseStaging,
-      promotionStatus: 'committed',
+      processingStatus: 'processed',
       giftId: 'gift-789',
     });
 
     const result = await service.processGift({ stagingId: 'stg-123' });
 
     expect(result).toEqual({
-      status: 'committed',
+      status: 'processed',
       stagingId: 'stg-123',
       giftId: 'gift-789',
     });
     expect(twentyRequestMock).not.toHaveBeenCalled();
-    expect(markCommittedByIdMock).not.toHaveBeenCalled();
+    expect(markProcessedByIdMock).not.toHaveBeenCalled();
   });
 
-  it('defers when the staging record is currently committing', async () => {
+  it('defers when the staging record is currently processing', async () => {
     getGiftStagingByIdMock.mockResolvedValue({
       ...baseStaging,
-      promotionStatus: 'committing',
+      processingStatus: 'processing',
     });
 
     const result = await service.processGift({ stagingId: 'stg-123' });
@@ -164,12 +164,12 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     const result = await service.processGift({ stagingId: 'stg-123' });
 
     expect(result).toEqual({
-      status: 'committed',
+      status: 'processed',
       stagingId: 'stg-123',
       giftId: 'gift-200',
     });
     expect(twentyRequestMock).toHaveBeenCalled();
-    expect(markCommittedByIdMock).toHaveBeenCalledWith('stg-123', 'gift-200');
+    expect(markProcessedByIdMock).toHaveBeenCalledWith('stg-123', 'gift-200');
   });
 
   it('defers when raw payload is missing', async () => {
@@ -188,7 +188,7 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     expect(twentyRequestMock).not.toHaveBeenCalled();
     expect(updateStatusByIdMock).toHaveBeenCalledTimes(1);
     expect(updateStatusByIdMock).toHaveBeenCalledWith('stg-123', {
-      promotionStatus: 'commit_failed',
+      processingStatus: 'process_failed',
       errorDetail: 'Staging record missing raw payload',
     });
   });
@@ -209,7 +209,7 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     expect(twentyRequestMock).not.toHaveBeenCalled();
     expect(updateStatusByIdMock).toHaveBeenCalledTimes(1);
     expect(updateStatusByIdMock).toHaveBeenCalledWith('stg-123', {
-      promotionStatus: 'commit_failed',
+      processingStatus: 'process_failed',
       errorDetail: 'Failed to parse staging raw payload',
     });
   });
@@ -233,7 +233,7 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     expect(twentyRequestMock).not.toHaveBeenCalled();
     expect(updateStatusByIdMock).toHaveBeenCalledTimes(1);
     expect(updateStatusByIdMock).toHaveBeenCalledWith('stg-123', {
-      promotionStatus: 'commit_failed',
+      processingStatus: 'process_failed',
       errorDetail: 'Staging payload missing required fields for gift creation',
     });
   });
@@ -257,10 +257,10 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     );
     expect(updateStatusByIdMock).toHaveBeenCalledTimes(2);
     expect(updateStatusByIdMock).toHaveBeenNthCalledWith(1, 'stg-123', {
-      promotionStatus: 'committing',
+      processingStatus: 'processing',
     });
     expect(updateStatusByIdMock).toHaveBeenNthCalledWith(2, 'stg-123', {
-      promotionStatus: 'commit_failed',
+      processingStatus: 'process_failed',
       errorDetail: 'network error',
     });
   });
@@ -276,16 +276,16 @@ describe('GiftStagingProcessingService (manual processing)', () => {
       stagingId: 'stg-123',
       error: 'gift_api_failed',
     });
-    expect(markCommittedByIdMock).not.toHaveBeenCalled();
+    expect(markProcessedByIdMock).not.toHaveBeenCalled();
     expect(updateStatusByIdMock).toHaveBeenCalledTimes(2);
     expect(updateStatusByIdMock).toHaveBeenNthCalledWith(1, 'stg-123', {
-      promotionStatus: 'committing',
+      processingStatus: 'processing',
     });
     expect(updateStatusByIdMock).toHaveBeenNthCalledWith(
       2,
       'stg-123',
       expect.objectContaining({
-        promotionStatus: 'commit_failed',
+        processingStatus: 'process_failed',
         errorDetail: 'unexpected Twenty response (missing createGift)',
       }),
     );
@@ -302,22 +302,22 @@ describe('GiftStagingProcessingService (manual processing)', () => {
       stagingId: 'stg-123',
       error: 'gift_api_failed',
     });
-    expect(markCommittedByIdMock).not.toHaveBeenCalled();
+    expect(markProcessedByIdMock).not.toHaveBeenCalled();
     expect(updateStatusByIdMock).toHaveBeenCalledTimes(2);
     expect(updateStatusByIdMock).toHaveBeenNthCalledWith(1, 'stg-123', {
-      promotionStatus: 'committing',
+      processingStatus: 'processing',
     });
     expect(updateStatusByIdMock).toHaveBeenNthCalledWith(
       2,
       'stg-123',
       expect.objectContaining({
-        promotionStatus: 'commit_failed',
+        processingStatus: 'process_failed',
         errorDetail: 'unexpected Twenty response (missing createGift)',
       }),
     );
   });
 
-  it('creates gift, marks staging committed, and returns success when eligible', async () => {
+  it('creates gift, marks staging processed, and returns success when eligible', async () => {
     getGiftStagingByIdMock.mockResolvedValue(baseStaging);
     twentyRequestMock.mockResolvedValue({
       data: { createGift: { id: 'gift-100' } },
@@ -326,7 +326,7 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     const result = await service.processGift({ stagingId: 'stg-123' });
 
     expect(result).toEqual({
-      status: 'committed',
+      status: 'processed',
       stagingId: 'stg-123',
       giftId: 'gift-100',
     });
@@ -338,10 +338,10 @@ describe('GiftStagingProcessingService (manual processing)', () => {
       }),
       'GiftStagingProcessingService',
     );
-    expect(markCommittedByIdMock).toHaveBeenCalledWith('stg-123', 'gift-100');
+    expect(markProcessedByIdMock).toHaveBeenCalledWith('stg-123', 'gift-100');
     expect(updateStatusByIdMock).toHaveBeenCalledTimes(1);
     expect(updateStatusByIdMock).toHaveBeenCalledWith('stg-123', {
-      promotionStatus: 'committing',
+      processingStatus: 'processing',
     });
     expect(updateRecurringAgreementMock).not.toHaveBeenCalled();
   });
@@ -359,11 +359,11 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     const result = await service.processGift({ stagingId: 'stg-123' });
 
     expect(result).toEqual({
-      status: 'committed',
+      status: 'processed',
       stagingId: 'stg-123',
       giftId: 'gift-101',
     });
-    expect(markCommittedByIdMock).toHaveBeenCalledWith('stg-123', 'gift-101');
+    expect(markProcessedByIdMock).toHaveBeenCalledWith('stg-123', 'gift-101');
     expect(updateRecurringAgreementMock).toHaveBeenCalledWith('ra-123', {
       nextExpectedAt: '2025-12-01',
       status: 'active',

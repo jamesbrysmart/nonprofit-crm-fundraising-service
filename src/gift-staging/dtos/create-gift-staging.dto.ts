@@ -18,7 +18,7 @@ class AmountDto {
 export class CreateGiftStagingDto {
   @IsOptional()
   @IsString()
-  promotionStatus?: string;
+  processingStatus?: string;
 
   @IsOptional()
   @IsString()
@@ -146,5 +146,8 @@ export class CreateGiftStagingDto {
 
   @IsOptional()
   @IsBoolean()
-  autoPromote?: boolean;
+  autoProcess?: boolean;
+
+  @IsOptional()
+  processingDiagnostics?: Record<string, unknown>;
 }

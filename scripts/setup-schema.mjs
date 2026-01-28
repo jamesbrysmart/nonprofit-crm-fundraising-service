@@ -627,7 +627,7 @@ async function main() {
     labelSingular: 'Gift Staging',
     labelPlural: 'Gift Stagings',
     icon: 'IconInbox',
-    description: 'Temporary staging record for gifts prior to commit.',
+    description: 'Temporary staging record for gifts prior to processing.',
   });
 
   const giftStagingFields = [
@@ -648,8 +648,8 @@ async function main() {
     { name: 'expectedAt', label: 'Expected At', type: 'DATE' },
     { name: 'validationStatus', label: 'Validation Status', type: 'TEXT' },
     { name: 'dedupeStatus', label: 'Dedupe Status', type: 'TEXT' },
-    { name: 'promotionStatus', label: 'Promotion Status', type: 'TEXT' },
-    { name: 'autoPromote', label: 'Auto Promote', type: 'BOOLEAN' },
+    { name: 'processingStatus', label: 'Processing Status', type: 'TEXT' },
+    { name: 'autoProcess', label: 'Auto Process', type: 'BOOLEAN' },
     { name: 'giftAidEligible', label: 'Gift Aid Eligible', type: 'BOOLEAN' },
     { name: 'giftBatchId', label: 'Gift Batch ID', type: 'TEXT' },
     { name: 'provider', label: 'Provider', type: 'TEXT' },
@@ -660,6 +660,7 @@ async function main() {
     { name: 'donorEmail', label: 'Donor Email', type: 'TEXT' },
     { name: 'notes', label: 'Notes', type: 'TEXT' },
     { name: 'errorDetail', label: 'Error Detail', type: 'RAW_JSON' },
+    { name: 'processingDiagnostics', label: 'Processing Diagnostics', type: 'RAW_JSON' },
     { name: 'rawPayload', label: 'Raw Payload', type: 'RAW_JSON' },
     { name: 'giftIntent', label: 'Gift Intent', type: 'TEXT' },
     { name: 'isInKind', label: 'Is In-Kind', type: 'BOOLEAN' },
@@ -733,7 +734,7 @@ async function main() {
     { name: 'startDate', label: 'Start Date', type: 'DATE' },
     { name: 'endDate', label: 'End Date', type: 'DATE' },
     { name: 'nextExpectedAt', label: 'Next Expected At', type: 'DATE' },
-    { name: 'autoPromoteEnabled', label: 'Auto Promote Enabled', type: 'BOOLEAN' },
+    { name: 'autoProcessEnabled', label: 'Auto Process Enabled', type: 'BOOLEAN' },
     { name: 'defaultAppealId', label: 'Default Appeal ID', type: 'TEXT' },
     { name: 'defaultFundId', label: 'Default Fund ID', type: 'TEXT' },
     { name: 'defaultSoftCreditJson', label: 'Default Soft Credit JSON', type: 'RAW_JSON' },

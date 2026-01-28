@@ -121,7 +121,7 @@ export class StripeWebhookService {
       externalId: paymentIntentId ?? session.id,
       intakeSource: 'stripe_webhook',
       sourceFingerprint: paymentIntentId ?? session.id,
-      autoPromote: true,
+      autoProcess: true,
     };
 
     const contact = this.buildContact(session, metadata);
@@ -129,11 +129,11 @@ export class StripeWebhookService {
       giftPayload.contact = contact;
     }
 
-    // Downgrade auto-promote when the contact cannot be matched exactly
+    // Downgrade auto-process when the contact cannot be matched exactly
     if (giftPayload.contact && contact?.email) {
-      giftPayload.autoPromote = true;
+      giftPayload.autoProcess = true;
     } else if (!giftPayload.contact) {
-      giftPayload.autoPromote = false;
+      giftPayload.autoProcess = false;
     }
 
     await this.enrichWithRecurringAgreement(
@@ -154,7 +154,7 @@ export class StripeWebhookService {
 
     try {
       await this.giftService.createGift(giftPayload);
-      if (giftPayload.autoPromote === false) {
+      if (giftPayload.autoProcess === false) {
         this.logger.info('Stripe webhook staged gift for manual review', {
           event: 'stripe_checkout_session_staged',
           stripeSessionId: session.id,

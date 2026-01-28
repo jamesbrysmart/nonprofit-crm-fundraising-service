@@ -205,10 +205,10 @@ export function GiftStagingDrawer({
               }}
             />
 
-            {detail.promotionStatus === 'commit_failed' ? (
+            {detail.processingStatus === 'process_failed' ? (
               <section className="drawer-section">
                 <div className="drawer-section-header">
-                  <h4>Commit failed</h4>
+                  <h4>Process failed</h4>
                   <button
                     type="button"
                     className="f-btn--secondary"

@@ -16,7 +16,7 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   paymentMethod?: string;
   intakeSource?: string;
   sourceFingerprint?: string;
-  autoPromote?: boolean;
+  autoProcess?: boolean;
   appealId?: string;
   appealSegmentId?: string;
   trackingCodeId?: string;
@@ -49,13 +49,39 @@ export interface NormalizedGiftCreatePayload extends Record<string, unknown> {
   receiptError?: string;
   receiptDedupeKey?: string;
   receiptSentAt?: string;
+  processingDiagnostics?: ProcessingDiagnostics;
 }
 
 export interface GiftStagingRecord {
   id: string;
-  autoPromote: boolean;
-  promotionStatus?: string;
+  autoProcess: boolean;
+  processingStatus?: string;
   payload: NormalizedGiftCreatePayload;
+}
+
+export type ProcessingEligibility = 'eligible' | 'blocked';
+
+export type IdentityConfidence = 'explicit' | 'strong' | 'weak' | 'none';
+
+export type ProcessingBlocker =
+  | 'identity_missing'
+  | 'company_missing_for_org_intent'
+  | 'recurring_agreement_missing';
+
+export type ProcessingWarning =
+  | 'identity_low_confidence'
+  | 'appeal_missing'
+  | 'fund_missing'
+  | 'opportunity_missing'
+  | 'payout_missing'
+  | 'payment_method_missing'
+  | 'gift_date_missing';
+
+export interface ProcessingDiagnostics {
+  processingEligibility: ProcessingEligibility;
+  processingBlockers: ProcessingBlocker[];
+  processingWarnings: ProcessingWarning[];
+  identityConfidence: IdentityConfidence;
 }
 
 export interface GiftDedupeDiagnostics {

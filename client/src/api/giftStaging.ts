@@ -5,8 +5,8 @@ export interface GiftStagingCreateResponse {
   data?: {
     giftStaging?: {
       id?: string;
-      autoPromote?: boolean;
-      promotionStatus?: string;
+      autoProcess?: boolean;
+      processingStatus?: string;
       validationStatus?: string;
       dedupeStatus?: string;
     };
@@ -23,7 +23,7 @@ export async function createGiftStaging(
 }
 
 export interface GiftStagingStatusUpdatePayload {
-  promotionStatus?: string;
+  processingStatus?: string;
   validationStatus?: string;
   dedupeStatus?: string;
   errorDetail?: string;
@@ -51,7 +51,7 @@ export interface GiftStagingUpdatePayload {
   estimatedValue?: number | null;
   notes?: string | null;
   giftAidEligible?: boolean;
-  promotionStatus?: string;
+  processingStatus?: string;
   validationStatus?: string;
   dedupeStatus?: string;
   errorDetail?: string | null;
@@ -72,7 +72,7 @@ export type ProcessGiftDeferredReason = 'not_ready' | 'locked' | 'missing_payloa
 export type ProcessGiftErrorReason = 'fetch_failed' | 'payload_invalid' | 'gift_api_failed';
 
 export type ProcessGiftResponse =
-  | { status: 'committed'; giftId: string; stagingId: string }
+  | { status: 'processed'; giftId: string; stagingId: string }
   | { status: 'deferred'; stagingId: string; reason: ProcessGiftDeferredReason }
   | { status: 'error'; stagingId: string; error: ProcessGiftErrorReason };
 
@@ -99,7 +99,7 @@ export interface GiftStagingListItem {
   expectedAt?: string;
   paymentMethod?: string;
   giftBatchId?: string;
-  autoPromote?: boolean;
+  autoProcess?: boolean;
   giftAidEligible?: boolean;
   donorId?: string;
   companyId?: string;
@@ -187,14 +187,14 @@ export interface GiftStagingDetailResponse {
   data?: {
     giftStaging?: {
       id?: string;
-      promotionStatus?: string;
+      processingStatus?: string;
       validationStatus?: string;
       dedupeStatus?: string;
       errorDetail?: string;
       rawPayload?: string;
       giftBatchId?: string;
       giftId?: string;
-      autoPromote?: boolean;
+      autoProcess?: boolean;
       createdAt?: string;
       updatedAt?: string;
       amountMicros?: number;

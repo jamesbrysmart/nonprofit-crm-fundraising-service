@@ -74,7 +74,7 @@ async function main(): Promise<void> {
       giftDate: today,
       runId,
       statuses: {
-        promotionStatus: 'pending',
+        processingStatus: 'pending',
         validationStatus: 'pending',
         dedupeStatus: 'needs_review',
       },
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
       id: pendingReview.entity.id,
       donorId: pendingReview.preparedPayload.donorId,
       scenario: 'Pending review',
-      status: pendingReview.entity.promotionStatus,
+      status: pendingReview.entity.processingStatus,
       intakeSource: pendingReview.entity.intakeSource,
       giftIntent: pendingReview.preparedPayload.giftIntent,
       opportunityId,
@@ -95,65 +95,65 @@ async function main(): Promise<void> {
       receiptWarnings: pendingReview.entity.receiptWarnings,
     });
 
-    const readyForCommit = await seedManualStaging({
-      label: 'ready-for-commit',
+    const readyForProcess = await seedManualStaging({
+      label: 'ready-for-process',
       giftService,
       giftStagingService,
       amountMicros: 32_000_000,
       giftDate: today,
       runId,
       statuses: {
-        promotionStatus: 'ready_for_commit',
+        processingStatus: 'ready_for_process',
         validationStatus: 'passed',
         dedupeStatus: 'passed',
       },
-      notes: 'Seeded test fixture (ready for commit)',
+      notes: 'Seeded test fixture (ready for process)',
       giftIntent: 'standard',
       opportunityId,
     });
     stagingSummaries.push({
-      id: readyForCommit.entity.id,
-      donorId: readyForCommit.preparedPayload.donorId,
-      scenario: 'Ready for commit',
-      status: readyForCommit.entity.promotionStatus,
-      intakeSource: readyForCommit.entity.intakeSource,
-      giftIntent: readyForCommit.preparedPayload.giftIntent,
+      id: readyForProcess.entity.id,
+      donorId: readyForProcess.preparedPayload.donorId,
+      scenario: 'Ready for process',
+      status: readyForProcess.entity.processingStatus,
+      intakeSource: readyForProcess.entity.intakeSource,
+      giftIntent: readyForProcess.preparedPayload.giftIntent,
       opportunityId,
-      receiptStatus: readyForCommit.entity.receiptStatus,
-      receiptWarnings: readyForCommit.entity.receiptWarnings,
+      receiptStatus: readyForProcess.entity.receiptStatus,
+      receiptWarnings: readyForProcess.entity.receiptWarnings,
     });
 
-    const commitFailed = await seedManualStaging({
-      label: 'commit-failed',
+    const processFailed = await seedManualStaging({
+      label: 'process-failed',
       giftService,
       giftStagingService,
       amountMicros: 27_000_000,
       giftDate: today,
       runId,
-    statuses: {
-      promotionStatus: 'commit_failed',
-      validationStatus: 'passed',
-      dedupeStatus: 'matched_existing',
-    },
-    notes: 'Seeded test fixture (commit failed)',
-    giftIntent: 'legacy',
-  });
+      statuses: {
+        processingStatus: 'process_failed',
+        validationStatus: 'passed',
+        dedupeStatus: 'matched_existing',
+      },
+      notes: 'Seeded test fixture (process failed)',
+      giftIntent: 'legacy',
+    });
     stagingSummaries.push({
-      id: commitFailed.entity.id,
-      donorId: commitFailed.preparedPayload.donorId,
-      scenario: 'Commit failed',
-      status: commitFailed.entity.promotionStatus,
-      intakeSource: commitFailed.entity.intakeSource,
-      giftIntent: commitFailed.preparedPayload.giftIntent,
-      receiptStatus: commitFailed.entity.receiptStatus,
-      receiptWarnings: commitFailed.entity.receiptWarnings,
+      id: processFailed.entity.id,
+      donorId: processFailed.preparedPayload.donorId,
+      scenario: 'Process failed',
+      status: processFailed.entity.processingStatus,
+      intakeSource: processFailed.entity.intakeSource,
+      giftIntent: processFailed.preparedPayload.giftIntent,
+      receiptStatus: processFailed.entity.receiptStatus,
+      receiptWarnings: processFailed.entity.receiptWarnings,
     });
 
     const recurringAgreementId = await seedRecurringAgreement({
       giftService,
       recurringAgreementService,
       giftStagingService,
-      basePreparedPayload: readyForCommit.preparedPayload,
+      basePreparedPayload: readyForProcess.preparedPayload,
       runId,
       today,
     });
@@ -169,7 +169,7 @@ async function main(): Promise<void> {
       opportunityId,
       notes: `High-value grant staged gift (${companyName ?? 'company'})`,
       statuses: {
-        promotionStatus: 'ready_for_commit',
+        processingStatus: 'ready_for_process',
         validationStatus: 'passed',
         dedupeStatus: 'passed',
       },
@@ -179,7 +179,7 @@ async function main(): Promise<void> {
       id: grantHighValue.entity.id,
       donorId: grantHighValue.preparedPayload.donorId,
       scenario: 'Grant high value',
-      status: grantHighValue.entity.promotionStatus,
+      status: grantHighValue.entity.processingStatus,
       intakeSource: grantHighValue.entity.intakeSource,
       giftIntent: 'grant',
       opportunityId,
@@ -201,7 +201,7 @@ async function main(): Promise<void> {
       notes: 'Corporate in-kind test fixture',
       companyId,
       statuses: {
-        promotionStatus: 'pending',
+        processingStatus: 'pending',
         validationStatus: 'pending',
         dedupeStatus: 'needs_review',
       },
@@ -210,7 +210,7 @@ async function main(): Promise<void> {
       id: corporateInKind.entity.id,
       donorId: corporateInKind.preparedPayload.donorId,
       scenario: 'Corporate in-kind',
-      status: corporateInKind.entity.promotionStatus,
+      status: corporateInKind.entity.processingStatus,
       intakeSource: corporateInKind.entity.intakeSource,
       giftIntent: 'corporateInKind',
       receiptStatus: corporateInKind.entity.receiptStatus,
@@ -232,7 +232,7 @@ async function main(): Promise<void> {
         expectedAt: today,
       },
       statuses: {
-        promotionStatus: 'ready_for_commit',
+        processingStatus: 'ready_for_process',
         validationStatus: 'passed',
         dedupeStatus: 'passed',
       },
@@ -243,7 +243,7 @@ async function main(): Promise<void> {
       id: recurringRow.entity.id,
       donorId: recurringRow.preparedPayload.donorId,
       scenario: recurringAgreementId ? 'Recurring linked' : 'Recurring (unlinked)',
-      status: recurringRow.entity.promotionStatus,
+      status: recurringRow.entity.processingStatus,
       intakeSource: recurringRow.entity.intakeSource,
       recurringAgreementId: recurringRow.entity.recurringAgreementId,
       provider: recurringRow.entity.provider,
@@ -263,7 +263,7 @@ async function main(): Promise<void> {
       notes: 'Seeded test fixture (missing email/name for receipt warning)',
       giftIntent: 'standard',
       statuses: {
-        promotionStatus: 'pending',
+        processingStatus: 'pending',
         validationStatus: 'pending',
         dedupeStatus: 'pending',
       },
@@ -272,28 +272,28 @@ async function main(): Promise<void> {
       id: missingEmail.entity.id,
       donorId: missingEmail.preparedPayload.donorId,
       scenario: 'Missing email/name',
-      status: missingEmail.entity.promotionStatus,
+      status: missingEmail.entity.processingStatus,
       intakeSource: missingEmail.entity.intakeSource,
       giftIntent: missingEmail.preparedPayload.giftIntent,
       receiptStatus: missingEmail.entity.receiptStatus,
       receiptWarnings: missingEmail.entity.receiptWarnings,
     });
 
-  const committedGift = await giftService.createGift({
-    amount: {
-      currencyCode: 'GBP',
-      amountMicros: 45_000_000,
-    },
-    giftDate: today,
-    name: `Seeded committed gift ${runId}`,
-    autoPromote: true,
-    contact: {
-      firstName: 'Seeded',
-      lastName: `Donor${runId}`,
-      email: `seeded.donor+${runId}@example.org`,
-    },
-    notes: 'Seeded committed gift for manual verification',
-  });
+    const processedGift = await giftService.createGift({
+      amount: {
+        currencyCode: 'GBP',
+        amountMicros: 45_000_000,
+      },
+      giftDate: today,
+      name: `Seeded processed gift ${runId}`,
+      autoProcess: true,
+      contact: {
+        firstName: 'Seeded',
+        lastName: `Donor${runId}`,
+        email: `seeded.donor+${runId}@example.org`,
+      },
+      notes: 'Seeded processed gift for manual verification',
+    });
 
     const payoutInfo = await seedGiftPayout({
       twentyApiService,
@@ -315,14 +315,14 @@ async function main(): Promise<void> {
         },
         giftDate: today,
         name: `Seeded payout gift ${runId}`,
-        autoPromote: true,
+        autoProcess: true,
         giftPayoutId: payoutInfo.id,
         contact: {
           firstName: `PayoutDonor${runId}`,
           lastName: 'Linked',
           email: `payout.linked+${runId}@example.org`,
         },
-        notes: 'Seeded payout-linked committed gift',
+        notes: 'Seeded payout-linked processed gift',
       });
 
       const payoutStaging = await seedManualStaging({
@@ -335,7 +335,7 @@ async function main(): Promise<void> {
         runId,
         giftPayoutId: payoutInfo.id,
         statuses: {
-          promotionStatus: 'pending',
+          processingStatus: 'pending',
           validationStatus: 'pending',
           dedupeStatus: 'needs_review',
         },
@@ -345,7 +345,7 @@ async function main(): Promise<void> {
         id: payoutStaging.entity.id,
         donorId: payoutStaging.preparedPayload.donorId,
         scenario: 'Payout-linked staging',
-        status: payoutStaging.entity.promotionStatus,
+        status: payoutStaging.entity.processingStatus,
         intakeSource: payoutStaging.entity.intakeSource,
         giftPayoutId: payoutInfo.id,
       });
@@ -370,7 +370,7 @@ async function main(): Promise<void> {
     }
 
     console.log('\nCommitted gift response snippet:');
-    console.dir(committedGift, { depth: 2 });
+    console.dir(processedGift, { depth: 2 });
 
     if (payoutSummaries.length > 0) {
       console.log('\nPayouts seeded:');
@@ -457,7 +457,7 @@ async function seedManualStaging(options: {
         ? undefined
         : `seeded.${label.replace(/[^a-z0-9]/gi, '').toLowerCase()}+${runId}@example.org`,
     },
-    autoPromote: false,
+    autoProcess: false,
     notes,
     intakeSource: providerMetadata.intakeSource ?? 'manual_ui',
     recurringAgreementId,
@@ -490,7 +490,8 @@ async function seedManualStaging(options: {
   }
 
   const prepared = await giftService.normalizeCreateGiftPayload(payload);
-  prepared.autoPromote = false;
+  prepared.autoProcess = false;
+  prepared.autoProcess = false;
   const staged = await giftStagingService.stageGift(prepared);
 
   if (!staged?.id) {
@@ -546,7 +547,7 @@ async function seedRecurringAgreement(args: {
     },
     startDate: today,
     nextExpectedAt: today,
-    autoPromoteEnabled: true,
+    autoProcessEnabled: true,
     provider: 'seed_script',
     providerAgreementId: `seed_agreement_${runId}`,
     providerPaymentMethodId: `seed_pm_${runId}`,

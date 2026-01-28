@@ -61,7 +61,7 @@ For the full auth flow and client refresh behavior, see `docs/ARCHITECTURE.md` (
   `npm run setup:schema` boots `scripts/setup-schema.mjs`, seeding the custom objects/fields outlined in `docs/TWENTY_METADATA_API.md` and `docs/data-model/fundraising.md`. Lookup fields still require manual setup in Twenty until metadata API gaps close.
 
 - **Smoke test**  
-  `npm run smoke:gifts` exercises staging (auto-promote off), manual processing, and the proxy CRUD flow end-to-end against Twenty; see script comments for behaviour.
+  `npm run smoke:gifts` exercises staging (auto-process off), manual processing, and the proxy CRUD flow end-to-end against Twenty; see script comments for behaviour.
 
 ### Environment Variables
 | Variable | Purpose | Default / Notes |
@@ -71,7 +71,7 @@ For the full auth flow and client refresh behavior, see `docs/ARCHITECTURE.md` (
 | `STRIPE_API_KEY` | API key used by the Stripe SDK | Required for webhook signature verification; can be a restricted key |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for `/webhooks/stripe` | If missing, service returns HTTP 503 |
 | `FUNDRAISING_ENABLE_GIFT_STAGING` | Toggle staging flow (`true`/`false`) | Defaults to disabled; align with `docs/features/donation-staging.md` |
-| `FUNDRAISING_STAGING_AUTO_PROMOTE_DEFAULT` | Default auto-promote behaviour for staged rows | Defaults to `true`; set to `false` for manual review-first workflows |
+| `FUNDRAISING_STAGING_AUTO_PROCESS_DEFAULT` | Default auto-process behaviour for staged rows | Defaults to `true`; set to `false` for manual review-first workflows |
 | `PORT` | HTTP port for the Nest server | Defaults to `3000` (proxied to `:4500` in docker compose) |
 | `TWENTY_METADATA_BASE_URL` | Used by `setup-schema.mjs` when provisioning metadata | Optional |
 

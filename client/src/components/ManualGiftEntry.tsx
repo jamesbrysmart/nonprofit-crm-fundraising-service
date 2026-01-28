@@ -330,7 +330,7 @@ export function ManualGiftEntry(): JSX.Element {
         <ManualGiftStatus
           status={
             status.state === 'success'
-              ? { state: 'success', message: `Gift committed in Twenty (gift id ${status.giftId}).`, link: giftLink }
+              ? { state: 'success', message: `Gift processed in Twenty (gift id ${status.giftId}).`, link: giftLink }
               : status.state === 'error'
               ? { state: 'error', message: status.message }
               : { state: status.state }

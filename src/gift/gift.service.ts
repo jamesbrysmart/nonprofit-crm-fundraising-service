@@ -26,6 +26,10 @@ import {
   GiftDedupeDiagnostics,
   GiftStagingRecord,
   NormalizedGiftCreatePayload,
+  ProcessingDiagnostics,
+  ProcessingBlocker,
+  ProcessingWarning,
+  IdentityConfidence,
 } from './gift.types';
 import { ReceiptPolicyService } from '../receipt/receipt-policy.service';
 
@@ -35,6 +39,9 @@ interface ExistingPersonMatch {
   confidence?: number;
   candidateIds?: string[];
 }
+
+const ORG_INTENTS = new Set(['grant', 'corporateInKind']);
+const RECURRING_INTENTS = new Set(['recurring']);
 
 @Injectable()
 export class GiftService {
@@ -52,7 +59,9 @@ export class GiftService {
     payload: unknown,
   ): Promise<NormalizedGiftCreatePayload> {
     const sanitizedPayload = validateCreateGiftPayload(payload);
-    return this.prepareGiftPayload(sanitizedPayload);
+    const prepared = await this.prepareGiftPayload(sanitizedPayload);
+    prepared.processingDiagnostics = this.buildProcessingDiagnostics(prepared);
+    return prepared;
   }
 
   async createGift(payload: unknown): Promise<unknown> {
@@ -60,16 +69,22 @@ export class GiftService {
     const preparedPayload = await this.prepareGiftPayload(sanitizedPayload);
 
     let stagingRecord: GiftStagingRecord | undefined;
-    let shouldPromoteImmediately = true;
+    let shouldProcessImmediately = true;
     try {
+      if (this.giftStagingService.isEnabled()) {
+        const processingDiagnostics =
+          this.buildProcessingDiagnostics(preparedPayload);
+        preparedPayload.processingDiagnostics = processingDiagnostics;
+        this.applyAutoProcessDecision(preparedPayload, processingDiagnostics);
+      }
       stagingRecord = await this.giftStagingService.stageGift(preparedPayload);
       if (this.giftStagingService.isEnabled() && stagingRecord) {
         await this.applyDedupeStatusToStaging(
           stagingRecord.id,
           preparedPayload,
         );
-        if (!stagingRecord.autoPromote) {
-          shouldPromoteImmediately = false;
+        if (!stagingRecord.autoProcess) {
+          shouldProcessImmediately = false;
         }
       }
     } catch (error) {
@@ -78,12 +93,15 @@ export class GiftService {
       );
     }
 
-    if (!shouldPromoteImmediately && stagingRecord) {
+    if (!shouldProcessImmediately && stagingRecord) {
       this.loggerInstance.log(
-        `Gift staged without auto-promote; returning acknowledgement for stagingId=${stagingRecord.id}`,
+        `Gift staged without auto-process; returning acknowledgement for stagingId=${stagingRecord.id}`,
         this.logContext,
       );
-      return this.buildStagingAcknowledgementResponse(stagingRecord);
+      return this.buildStagingAcknowledgementResponse(
+        stagingRecord,
+        preparedPayload.processingDiagnostics,
+      );
     }
 
     const response = await this.createGiftInTwenty(preparedPayload);
@@ -91,7 +109,7 @@ export class GiftService {
 
     const giftId = extractCreateGiftId(response);
     if (giftId) {
-      await this.giftStagingService.markCommitted(stagingRecord, giftId);
+      await this.giftStagingService.markProcessed(stagingRecord, giftId);
     }
 
     return response;
@@ -235,9 +253,6 @@ export class GiftService {
           confidence: existingPersonMatch.confidence,
           candidateDonorIds: existingPersonMatch.candidateIds,
         };
-        if (existingPersonMatch.matchedBy !== 'email') {
-          prepared.autoPromote = false;
-        }
       } else {
         const personId = await this.createPerson(contactInput);
         prepared.donorId = personId;
@@ -650,6 +665,153 @@ export class GiftService {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
 
+  private applyAutoProcessDecision(
+    payload: NormalizedGiftCreatePayload,
+    diagnostics: ProcessingDiagnostics,
+  ): void {
+    const autoProcessIntent =
+      this.giftStagingService.resolveAutoProcessIntent(payload);
+    const trustLevel = this.resolveTrustLevel(payload.intakeSource);
+    const eligible = diagnostics.processingEligibility === 'eligible';
+    let allowAutoProcess = false;
+
+    if (autoProcessIntent && eligible) {
+      if (trustLevel === 'high') {
+        allowAutoProcess = true;
+      } else if (trustLevel === 'medium') {
+        allowAutoProcess =
+          diagnostics.identityConfidence === 'strong' ||
+          diagnostics.identityConfidence === 'explicit';
+      } else if (trustLevel === 'low') {
+        allowAutoProcess = diagnostics.identityConfidence === 'strong';
+      }
+    }
+
+    payload.autoProcess = allowAutoProcess;
+  }
+
+  private buildProcessingDiagnostics(
+    payload: NormalizedGiftCreatePayload,
+  ): ProcessingDiagnostics {
+    const blockers: ProcessingBlocker[] = [];
+    const warnings: ProcessingWarning[] = [];
+
+    const identityConfidence = this.resolveIdentityConfidence(payload);
+    const giftIntent = this.normalizeOptionalString(payload.giftIntent);
+    const hasCompanyId = this.hasNonEmptyString(payload.companyId);
+    const hasDonorId = this.hasNonEmptyString(payload.donorId);
+    const isOrgIntent = giftIntent ? ORG_INTENTS.has(giftIntent) : false;
+
+    if (isOrgIntent) {
+      if (!hasCompanyId) {
+        blockers.push('company_missing_for_org_intent');
+      }
+    } else if (!hasDonorId) {
+      blockers.push('identity_missing');
+    }
+
+    if (
+      this.isRecurringIntent(payload) &&
+      !this.hasNonEmptyString(payload.recurringAgreementId)
+    ) {
+      blockers.push('recurring_agreement_missing');
+    }
+
+    if (identityConfidence === 'weak') {
+      warnings.push('identity_low_confidence');
+    }
+
+    if (!this.hasNonEmptyString(payload.appealId)) {
+      warnings.push('appeal_missing');
+    }
+    if (!this.hasNonEmptyString(payload.fundId)) {
+      warnings.push('fund_missing');
+    }
+    if (!this.hasNonEmptyString(payload.opportunityId)) {
+      warnings.push('opportunity_missing');
+    }
+    if (!this.hasNonEmptyString(payload.giftPayoutId)) {
+      warnings.push('payout_missing');
+    }
+    if (!this.hasNonEmptyString(payload.paymentMethod)) {
+      warnings.push('payment_method_missing');
+    }
+    if (!this.hasNonEmptyString(payload.giftDate)) {
+      warnings.push('gift_date_missing');
+    }
+
+    return {
+      processingEligibility: blockers.length > 0 ? 'blocked' : 'eligible',
+      processingBlockers: blockers,
+      processingWarnings: warnings,
+      identityConfidence,
+    };
+  }
+
+  private resolveIdentityConfidence(
+    payload: NormalizedGiftCreatePayload,
+  ): IdentityConfidence {
+    if (payload.dedupeDiagnostics) {
+      return payload.dedupeDiagnostics.matchType === 'email'
+        ? 'strong'
+        : 'weak';
+    }
+
+    const hasIdentity =
+      this.hasNonEmptyString(payload.donorId) ||
+      this.hasNonEmptyString(payload.companyId);
+    return hasIdentity ? 'explicit' : 'none';
+  }
+
+  private isRecurringIntent(payload: NormalizedGiftCreatePayload): boolean {
+    const giftIntent = this.normalizeOptionalString(payload.giftIntent);
+    if (giftIntent && RECURRING_INTENTS.has(giftIntent)) {
+      return true;
+    }
+
+    if (this.hasNonEmptyString(payload.recurringStatus)) {
+      return true;
+    }
+
+    if (
+      payload.recurringMetadata &&
+      typeof payload.recurringMetadata === 'object'
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private resolveTrustLevel(
+    intakeSource?: string,
+  ): 'high' | 'medium' | 'low' {
+    const normalized =
+      typeof intakeSource === 'string' && intakeSource.trim().length > 0
+        ? intakeSource.trim().toLowerCase()
+        : 'manual_ui';
+
+    if (normalized === 'manual_ui') {
+      return 'high';
+    }
+    if (normalized === 'csv_import') {
+      return 'low';
+    }
+    return 'medium';
+  }
+
+  private hasNonEmptyString(value: unknown): boolean {
+    return typeof value === 'string' && value.trim().length > 0;
+  }
+
+  private normalizeOptionalString(value: unknown): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
   private async applyDedupeStatusToStaging(
     stagingId: string,
     payload: NormalizedGiftCreatePayload,
@@ -678,24 +840,30 @@ export class GiftService {
 
   private buildStagingAcknowledgementResponse(
     record: GiftStagingRecord,
+    processingDiagnostics?: ProcessingDiagnostics,
   ): Record<string, unknown> {
-    const promotionStatus = record.promotionStatus
-      ? record.promotionStatus
-      : record.autoPromote
-        ? 'committing'
+    const processingStatus = record.processingStatus
+      ? record.processingStatus
+      : record.autoProcess
+        ? 'processing'
         : 'pending';
+
+    const meta: Record<string, unknown> = {
+      stagedOnly: true,
+    };
+    if (processingDiagnostics) {
+      meta.processingDiagnostics = processingDiagnostics;
+    }
 
     return {
       data: {
         giftStaging: {
           id: record.id,
-          autoPromote: record.autoPromote,
-          promotionStatus,
+          autoProcess: record.autoProcess,
+          processingStatus,
         },
       },
-      meta: {
-        stagedOnly: true,
-      },
+      meta,
     } as Record<string, unknown>;
   }
 }

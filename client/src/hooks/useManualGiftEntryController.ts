@@ -638,7 +638,7 @@ export function useManualGiftEntryController() {
       }
       const payload: GiftCreatePayload = {
         ...buildGiftPayload(formState, contactId ?? undefined),
-        autoPromote: true,
+        autoProcess: true,
       };
 
       if (isRecurring && selectedRecurringId) {

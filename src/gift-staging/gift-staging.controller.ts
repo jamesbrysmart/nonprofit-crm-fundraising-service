@@ -28,6 +28,7 @@ import {
   ProcessGiftResult,
 } from './gift-staging-processing.service';
 import { GiftService } from '../gift/gift.service';
+import type { ProcessingDiagnostics } from '../gift/gift.types';
 import { GiftStagingListQueryDto } from './dtos/gift-staging-list.dto';
 import { GiftStagingRecordModel } from './gift-staging.service';
 
@@ -35,10 +36,11 @@ interface GiftStagingCreateResponse {
   data: {
     giftStaging: {
       id: string;
-      autoPromote: boolean;
-      promotionStatus: string;
+      autoProcess: boolean;
+      processingStatus: string;
       validationStatus: string;
       dedupeStatus: string;
+      processingDiagnostics?: ProcessingDiagnostics | Record<string, unknown>;
     };
   };
   meta: {
@@ -126,7 +128,7 @@ export class GiftStagingController {
     const normalizedPayload = await this.giftService.normalizeCreateGiftPayload(
       body ?? {},
     );
-    normalizedPayload.autoPromote = false;
+    normalizedPayload.autoProcess = false;
 
     const stagedRecord =
       await this.giftStagingService.stageGift(normalizedPayload);
@@ -140,27 +142,31 @@ export class GiftStagingController {
       stagedRecord.id,
     );
 
-    const promotionStatus =
-      stagingEntity?.promotionStatus?.trim() ??
-      stagedRecord.promotionStatus ??
-      (stagedRecord.autoPromote ? 'committing' : 'pending');
+    const processingStatus =
+      stagingEntity?.processingStatus?.trim() ??
+      stagedRecord.processingStatus ??
+      (stagedRecord.autoProcess ? 'processing' : 'pending');
 
     const validationStatus = stagingEntity?.validationStatus ?? 'pending';
     const dedupeStatus = stagingEntity?.dedupeStatus ?? 'pending';
     const rawPayload = stagingEntity?.rawPayload;
+    const processingDiagnostics =
+      stagingEntity?.processingDiagnostics ??
+      normalizedPayload.processingDiagnostics;
 
     return {
       data: {
         giftStaging: {
           id: stagedRecord.id,
-          autoPromote: stagedRecord.autoPromote,
-          promotionStatus,
+          autoProcess: stagedRecord.autoProcess,
+          processingStatus,
           validationStatus,
           dedupeStatus,
+          processingDiagnostics,
         },
       },
       meta: {
-        stagedOnly: !stagedRecord.autoPromote,
+        stagedOnly: !stagedRecord.autoProcess,
         rawPayload,
         rawPayloadAvailable:
           typeof rawPayload === 'string' && rawPayload.length > 0,

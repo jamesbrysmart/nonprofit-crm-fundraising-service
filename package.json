@@ -13,6 +13,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main.js",
     "smoke:gifts": "node scripts/smoke-gifts.mjs",
+    "smoke:gifts:docker": "bash scripts/smoke-gifts-docker.sh",
     "seed:test-fixtures": "ts-node -r tsconfig-paths/register scripts/seed-test-fixtures.ts",
     "client:dev": "vite",
     "client:build": "vite build",

@@ -5,8 +5,8 @@ interface SummaryProps {
     total: number;
     needsReview: number;
     ready: number;
-    commitFailed: number;
-    committed: number;
+    processFailed: number;
+    processed: number;
   };
   intakeSummary: Array<{ label: string; count: number }>;
   batchSummary: Array<{ label: string; count: number }>;
@@ -61,8 +61,8 @@ export function StagingQueueSummary({
       { label: 'Total', value: statusSummary.total },
       { label: 'Needs review', value: statusSummary.needsReview },
       { label: 'Ready', value: statusSummary.ready },
-      { label: 'Failed', value: statusSummary.commitFailed },
-      { label: 'Committed', value: statusSummary.committed },
+      { label: 'Failed', value: statusSummary.processFailed },
+      { label: 'Processed', value: statusSummary.processed },
     ],
     [statusSummary],
   );

@@ -63,19 +63,19 @@ export function mapQueueRows(items: GiftStagingListItem[]): QueueRow[] {
 function getProcessingStatusMeta(
   item: GiftStagingListItem,
 ): { label: string; tone: StagingStatusTone } {
-  const promotionStatus = item.processingStatus ?? item.promotionStatus ?? 'pending';
+  const processingStatus = item.processingStatus ?? 'pending';
   const validationStatus = item.validationStatus ?? 'pending';
   const dedupeStatus = item.dedupeStatus ?? 'pending';
 
-  if (promotionStatus === 'commit_failed') {
-    return { label: 'Commit failed', tone: 'danger' };
+  if (processingStatus === 'process_failed') {
+    return { label: 'Process failed', tone: 'danger' };
   }
 
-  if (promotionStatus === 'committed') {
-    return { label: 'Committed', tone: 'success' };
+  if (processingStatus === 'processed') {
+    return { label: 'Processed', tone: 'success' };
   }
 
-  if (promotionStatus === 'ready_for_commit') {
+  if (processingStatus === 'ready_for_process') {
     return { label: 'Ready to process', tone: 'info' };
   }
 

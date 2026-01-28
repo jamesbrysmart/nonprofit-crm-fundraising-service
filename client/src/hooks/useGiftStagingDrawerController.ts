@@ -277,7 +277,7 @@ export function useGiftStagingDrawerController(
     setActionNotice(null);
     try {
       await updateGiftStagingStatus(detail.id, {
-        promotionStatus: 'ready_for_commit',
+        processingStatus: 'ready_for_process',
         validationStatus: detail.validationStatus === 'passed' ? detail.validationStatus : 'passed',
       });
       await reload();
@@ -299,7 +299,7 @@ export function useGiftStagingDrawerController(
     setActionNotice(null);
     try {
       const response = await processGiftStaging(detail.id);
-      if (response.status !== 'committed') {
+      if (response.status !== 'processed') {
         const description =
           response.status === 'deferred'
             ? `Processing deferred (${response.reason ?? 'not ready'})`
@@ -308,7 +308,7 @@ export function useGiftStagingDrawerController(
       } else {
         await reload();
         onRefreshList();
-        setActionNotice('Gift committed in Twenty.');
+        setActionNotice('Gift processed in Twenty.');
       }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Unable to process staging record.');

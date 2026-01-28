@@ -73,7 +73,7 @@ const buildPayloadFromEntity = (
     providerContext: entity.providerContext,
     recurringAgreementId: entity.recurringAgreementId,
     giftBatchId: entity.giftBatchId,
-    autoPromote: entity.autoPromote,
+    autoProcess: entity.autoProcess,
     opportunityId: entity.opportunityId,
     giftIntent: entity.giftIntent,
     isInKind: entity.isInKind,

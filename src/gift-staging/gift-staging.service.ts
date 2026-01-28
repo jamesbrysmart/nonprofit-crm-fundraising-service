@@ -19,7 +19,7 @@ import { CreateGiftStagingDto } from './dtos/create-gift-staging.dto';
 export { GiftStagingRecordModel } from './domain/staging-record.model';
 
 export interface GiftStagingStatusUpdate {
-  promotionStatus?: string;
+  processingStatus?: string;
   validationStatus?: string;
   dedupeStatus?: string;
   errorDetail?: string;
@@ -50,7 +50,7 @@ export interface GiftStagingUpdateInput {
   estimatedValue?: number | null;
   notes?: string | null;
   giftAidEligible?: boolean;
-  promotionStatus?: string;
+  processingStatus?: string;
   validationStatus?: string;
   dedupeStatus?: string;
   errorDetail?: string | null;
@@ -81,7 +81,7 @@ export interface GiftStagingListItem {
   sourceFingerprint?: string;
   externalId?: string;
   giftBatchId?: string;
-  autoPromote: boolean;
+  autoProcess: boolean;
   amountMicros?: number;
   currencyCode?: string;
   feeAmountMicros?: number;
@@ -119,6 +119,7 @@ export interface GiftStagingListItem {
   receiptDedupeKey?: string;
   receiptSentAt?: string;
   receiptWarnings?: string[];
+  processingDiagnostics?: Record<string, unknown>;
 }
 
 export interface GiftStagingListResult {
@@ -133,8 +134,8 @@ interface GiftStagingCreateResponse {
   data?: {
     createGiftStaging?: {
       id?: string;
-      autoPromote?: boolean;
-      promotionStatus?: string;
+      autoProcess?: boolean;
+      processingStatus?: string;
     };
   };
 }
@@ -142,7 +143,7 @@ interface GiftStagingCreateResponse {
 @Injectable()
 export class GiftStagingService {
   private readonly enabled: boolean;
-  private readonly autoPromoteDefault: boolean;
+  private readonly autoProcessDefault: boolean;
 
   constructor(
     private readonly configService: ConfigService,
@@ -154,9 +155,9 @@ export class GiftStagingService {
       this.configService.get<string>('FUNDRAISING_ENABLE_GIFT_STAGING'),
       false,
     );
-    this.autoPromoteDefault = this.resolveBooleanFlag(
+    this.autoProcessDefault = this.resolveBooleanFlag(
       this.configService.get<string>(
-        'FUNDRAISING_STAGING_AUTO_PROMOTE_DEFAULT',
+        'FUNDRAISING_STAGING_AUTO_PROCESS_DEFAULT',
       ),
       false,
     );
@@ -166,6 +167,15 @@ export class GiftStagingService {
     return this.enabled;
   }
 
+  resolveAutoProcessIntent(
+    payload: NormalizedGiftCreatePayload,
+  ): boolean {
+    if (typeof payload.autoProcess === 'boolean') {
+      return payload.autoProcess;
+    }
+    return this.autoProcessDefault;
+  }
+
   async stageGift(
     payload: NormalizedGiftCreatePayload,
   ): Promise<GiftStagingRecord | undefined> {
@@ -173,12 +183,9 @@ export class GiftStagingService {
       return undefined;
     }
 
-    const autoPromote =
-      typeof payload.autoPromote === 'boolean'
-        ? payload.autoPromote
-        : this.autoPromoteDefault;
+    const autoProcess = this.resolveAutoProcessIntent(payload);
 
-    const requestBody = mapCreateGiftStagingPayload(payload, autoPromote);
+    const requestBody = mapCreateGiftStagingPayload(payload, autoProcess);
     const dto = plainToInstance(CreateGiftStagingDto, requestBody);
     const errors = validateSync(dto as object, {
       whitelist: true,
@@ -209,16 +216,16 @@ export class GiftStagingService {
 
       const created = response?.data?.createGiftStaging;
       const stagingId = created?.id;
-      const resolvedAutoPromote =
-        typeof created?.autoPromote === 'boolean'
-          ? created.autoPromote
-          : autoPromote;
-      const resolvedPromotionStatus =
-        typeof created?.promotionStatus === 'string' &&
-        created.promotionStatus.trim().length > 0
-          ? created.promotionStatus
-          : resolvedAutoPromote
-            ? 'committing'
+      const resolvedAutoProcess =
+        typeof created?.autoProcess === 'boolean'
+          ? created.autoProcess
+          : autoProcess;
+      const resolvedProcessingStatus =
+        typeof created?.processingStatus === 'string' &&
+        created.processingStatus.trim().length > 0
+          ? created.processingStatus
+          : resolvedAutoProcess
+            ? 'processing'
             : 'pending';
 
       if (!stagingId) {
@@ -226,7 +233,7 @@ export class GiftStagingService {
           'Gift staging create response missing id',
           {
             event: 'gift_staging_stage_missing_id',
-            autoPromote: resolvedAutoPromote,
+            autoProcess: resolvedAutoProcess,
           },
           GiftStagingService.name,
         );
@@ -238,8 +245,8 @@ export class GiftStagingService {
         {
           event: 'gift_staging_stage',
           stagingId,
-          autoPromote: resolvedAutoPromote,
-          promotionStatus: resolvedPromotionStatus,
+          autoProcess: resolvedAutoProcess,
+          processingStatus: resolvedProcessingStatus,
           source: requestBody.intakeSource,
           externalId: requestBody.externalId,
         },
@@ -248,8 +255,8 @@ export class GiftStagingService {
 
       return {
         id: stagingId,
-        autoPromote: resolvedAutoPromote,
-        promotionStatus: resolvedPromotionStatus,
+        autoProcess: resolvedAutoProcess,
+        processingStatus: resolvedProcessingStatus,
         payload,
       };
     } catch (error) {
@@ -324,7 +331,7 @@ export class GiftStagingService {
     };
   }
 
-  async markCommitted(
+  async markProcessed(
     record: GiftStagingRecord | undefined,
     giftId: string,
   ): Promise<void> {
@@ -332,10 +339,10 @@ export class GiftStagingService {
       return;
     }
 
-    await this.markCommittedById(record.id, giftId);
+    await this.markProcessedById(record.id, giftId);
   }
 
-  async markCommittedById(stagingId: string, giftId: string): Promise<void> {
+  async markProcessedById(stagingId: string, giftId: string): Promise<void> {
     if (
       !this.enabled ||
       typeof stagingId !== 'string' ||
@@ -344,7 +351,7 @@ export class GiftStagingService {
       return;
     }
 
-    await this.patchCommitted(stagingId, giftId);
+    await this.patchProcessed(stagingId, giftId);
   }
 
   async updateStatusById(
@@ -369,7 +376,7 @@ export class GiftStagingService {
     }
 
     const payload = this.pruneUndefinedValues({
-      promotionStatus: resolvedUpdates.promotionStatus,
+      processingStatus: resolvedUpdates.processingStatus,
       validationStatus: resolvedUpdates.validationStatus,
       dedupeStatus: resolvedUpdates.dedupeStatus,
       errorDetail: resolvedUpdates.errorDetail,
@@ -426,22 +433,22 @@ export class GiftStagingService {
     return this.getGiftStagingById(stagingId);
   }
 
-  private async patchCommitted(
+  private async patchProcessed(
     stagingId: string,
     giftId: string,
   ): Promise<void> {
     try {
       await this.giftStagingApiClient.patch(stagingId, {
-        promotionStatus: 'committed',
+        processingStatus: 'processed',
         validationStatus: 'passed',
         dedupeStatus: 'passed',
         giftId,
       });
 
       this.structuredLogger.info(
-        'Gift staging record committed',
+        'Gift staging record processed',
         {
-          event: 'gift_staging_committed',
+          event: 'gift_staging_processed',
           stagingId,
           giftId,
         },
@@ -449,9 +456,9 @@ export class GiftStagingService {
       );
     } catch (error) {
       this.structuredLogger.warn(
-        'Failed to update gift staging record after commit',
+        'Failed to update gift staging record after processing',
         {
-          event: 'gift_staging_commit_failed',
+          event: 'gift_staging_process_failed',
           stagingId,
           giftId,
           message: error instanceof Error ? error.message : String(error),
@@ -498,7 +505,7 @@ export class GiftStagingService {
         updates.giftBatchId !== undefined
           ? this.normalizeNullableString(updates.giftBatchId)
           : (payload.giftBatchId ?? existing.giftBatchId),
-      promotionStatus: updates.promotionStatus,
+      processingStatus: updates.processingStatus,
       validationStatus: updates.validationStatus,
       dedupeStatus: updates.dedupeStatus,
       errorDetail: updates.errorDetail,
@@ -603,7 +610,7 @@ export class GiftStagingService {
       id: entity.id,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
-      processingStatus: entity.promotionStatus,
+      processingStatus: entity.processingStatus,
       validationStatus: entity.validationStatus,
       dedupeStatus: entity.dedupeStatus,
       errorDetail: entity.errorDetail,
@@ -611,7 +618,7 @@ export class GiftStagingService {
       sourceFingerprint: entity.sourceFingerprint,
       externalId: entity.externalId,
       giftBatchId: entity.giftBatchId,
-      autoPromote: entity.autoPromote ?? false,
+      autoProcess: entity.autoProcess ?? false,
       amountMicros: entity.amountMicros,
       currencyCode: entity.currencyCode,
       feeAmountMicros: entity.feeAmountMicros,
@@ -650,6 +657,7 @@ export class GiftStagingService {
       receiptDedupeKey: receiptMeta?.receiptDedupeKey,
       receiptSentAt: receiptMeta?.receiptSentAt,
       receiptWarnings: receiptMeta?.receiptWarnings,
+      processingDiagnostics: entity.processingDiagnostics,
     };
   }
 

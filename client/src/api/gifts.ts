@@ -29,7 +29,7 @@ export interface GiftCreatePayload {
   };
   contactId?: string;
   companyId?: string;
-  autoPromote?: boolean;
+  autoProcess?: boolean;
   opportunityId?: string;
   giftIntent?: string;
   isInKind?: boolean;

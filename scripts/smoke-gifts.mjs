@@ -161,7 +161,7 @@ async function main() {
   const stagedResponse = await httpJson('POST', '/gifts', {
     amount: { currencyCode: 'GBP', amountMicros: 15_500_000 },
     name: `Smoke Test Staged Gift ${uniqueSuffix}`,
-    autoPromote: false,
+    autoProcess: false,
     appealId: createdAppeal.id,
     contact: {
       firstName: 'Smoke',
@@ -177,6 +177,15 @@ async function main() {
 
   console.log(`Staged gift row created with id ${stagedGift.id}`);
 
+  const stagedRecordResponse = await httpJson('GET', `/gift-staging/${stagedGift.id}`);
+  const stagedDiagnostics = stagedRecordResponse?.data?.giftStaging?.processingDiagnostics;
+  assert(stagedDiagnostics?.processingEligibility, 'staging diagnostics missing eligibility');
+  assert(stagedDiagnostics?.identityConfidence, 'staging diagnostics missing identity confidence');
+  assert(
+    stagedDiagnostics?.processingWarnings?.includes('payment_method_missing'),
+    'expected payment_method_missing warning for staged gift',
+  );
+
   const rawPayloadString = stagedMeta?.rawPayload ?? stagedGift.rawPayload;
   if (!rawPayloadString) {
     console.warn('Smoke test: staging response missing raw payload, continuing');
@@ -184,7 +193,7 @@ async function main() {
 
   console.log('Marking staging row ready for manual processing');
   await httpJson('PATCH', `/gift-staging/${stagedGift.id}/status`, {
-    promotionStatus: 'ready_for_commit',
+    processingStatus: 'ready_for_process',
     validationStatus: 'passed',
     dedupeStatus: 'passed',
     rawPayload: rawPayloadString,
@@ -192,27 +201,56 @@ async function main() {
 
   const processResponse = await httpJson('POST', `/gift-staging/${stagedGift.id}/process`);
   console.log('Processing response:', processResponse);
-  assert(processResponse?.status === 'committed', 'processing did not commit gift');
+  assert(processResponse?.status === 'processed', 'processing did not process gift');
   assert(processResponse?.giftId, 'processing response missing giftId');
 
   const processedGiftId = processResponse.giftId;
-  console.log(`Processing committed gift ${processedGiftId}`);
+  console.log(`Processing created gift ${processedGiftId}`);
 
   const processedGiftResponse = await httpJson('GET', `/gifts/${processedGiftId}`);
   const processedGift = processedGiftResponse?.data?.gift;
   assert(processedGift?.id === processedGiftId, 'processed gift not retrievable');
 
-  console.log('Cleaning up promoted gift');
+  console.log('Cleaning up processed gift');
   await httpJson('DELETE', `/gifts/${processedGiftId}`);
 
   console.log('✅ Staging processing smoke test succeeded');
+
+  console.log('\n--- Auto-process gating (low trust) ---');
+  const lowTrustResponse = await httpJson('POST', '/gifts', {
+    amount: { currencyCode: 'GBP', amountMicros: 12_500_000 },
+    name: `Smoke Test Low Trust Gift ${uniqueSuffix}`,
+    autoProcess: true,
+    intakeSource: 'csv_import',
+    appealId: createdAppeal.id,
+    contact: {
+      firstName: 'Low',
+      lastName: `Trust${uniqueSuffix}`,
+    },
+  });
+
+  const lowTrustMeta = lowTrustResponse?.meta;
+  const lowTrustStaged = lowTrustResponse?.data?.giftStaging;
+  assert(lowTrustMeta?.stagedOnly === true, 'expected low-trust gift to remain staged');
+  assert(lowTrustStaged?.id, 'low-trust staged gift missing id');
+
+  const lowTrustRecord = await httpJson('GET', `/gift-staging/${lowTrustStaged.id}`);
+  const lowTrustDiagnostics = lowTrustRecord?.data?.giftStaging?.processingDiagnostics;
+  assert(
+    lowTrustDiagnostics?.processingEligibility === 'eligible',
+    'expected low-trust diagnostics to be eligible',
+  );
+  assert(
+    lowTrustDiagnostics?.identityConfidence === 'explicit',
+    'expected explicit identity confidence for low-trust staging',
+  );
 
   console.log('\n--- Gift proxy CRUD flow ---');
   console.log('Creating gift via fundraising-service → Twenty proxy');
   const createResponse = await httpJson('POST', '/gifts', {
     amount: { currencyCode: 'USD', amountMicros: 42_000_000 },
     name: 'Smoke Test Gift',
-    autoPromote: true,
+    autoProcess: true,
     appealId: createdAppeal.id,
     contact: {
       firstName: 'Smoke',
@@ -223,7 +261,7 @@ async function main() {
   const createdGift = createResponse?.data?.createGift;
   if (!createdGift && createResponse?.meta?.stagedOnly) {
     throw new Error(
-      'createGift missing because gift was staged (autoPromote overridden by dedupe)',
+      'createGift missing because gift was staged (autoProcess blocked by eligibility)',
     );
   }
   assert(createdGift, 'createGift payload missing');
@@ -260,7 +298,7 @@ async function main() {
   const persistentCreateResponse = await httpJson('POST', '/gifts', {
     amount: { currencyCode: 'EUR', amountMicros: 99_000_000 },
     name: 'Persistent Smoke Test Gift',
-    autoPromote: true,
+    autoProcess: true,
     appealId: createdAppeal.id,
     contact: {
       firstName: 'Persistent',

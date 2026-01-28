@@ -73,12 +73,12 @@ describe('gift.validation', () => {
         contact: { firstName: 'Pat', lastName: 'Lee' },
         intakeSource: 'portal',
         sourceFingerprint: 'fingerprint-123',
-        autoPromote: false,
+        autoProcess: true,
       });
 
       expect(result.intakeSource).toBe('portal');
       expect(result.sourceFingerprint).toBe('fingerprint-123');
-      expect(result.autoPromote).toBe(false);
+      expect(result.autoProcess).toBe(true);
     });
   });
 

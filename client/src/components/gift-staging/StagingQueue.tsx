@@ -161,15 +161,15 @@ export function StagingQueue(): JSX.Element {
   const statusSummary = useMemo(() => {
     let needsReview = 0;
     let ready = 0;
-    let commitFailed = 0;
-    let committed = 0;
+    let processFailed = 0;
+    let processed = 0;
     derivedRows.forEach((row) => {
       const tone = row.statusMeta.tone;
       const label = row.statusMeta.label;
-      if (label === 'Commit failed') {
-        commitFailed += 1;
-      } else if (label === 'Committed') {
-        committed += 1;
+      if (label === 'Process failed') {
+        processFailed += 1;
+      } else if (label === 'Processed') {
+        processed += 1;
       } else if (label === 'Ready to process') {
         ready += 1;
       } else if (tone === 'warning') {
@@ -180,8 +180,8 @@ export function StagingQueue(): JSX.Element {
       total: derivedRows.length,
       needsReview,
       ready,
-      commitFailed,
-      committed,
+      processFailed,
+      processed,
     };
   }, [derivedRows]);
 
@@ -214,7 +214,7 @@ export function StagingQueue(): JSX.Element {
       setActionError(null);
       try {
         await updateGiftStagingStatus(stagingId, {
-          promotionStatus: 'ready_for_commit',
+          processingStatus: 'ready_for_process',
           validationStatus: 'passed',
         });
         await refresh();
@@ -239,7 +239,7 @@ export function StagingQueue(): JSX.Element {
       setActionError(null);
       try {
         const response = await processGiftStaging(stagingId);
-        if (response.status !== 'committed') {
+        if (response.status !== 'processed') {
           const summary =
             response.status === 'deferred'
               ? `Processing deferred (${response.reason ?? 'not ready'})`

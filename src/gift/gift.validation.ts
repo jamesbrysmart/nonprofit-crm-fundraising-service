@@ -32,7 +32,7 @@ const ALLOWED_NUMBER_FIELDS = new Set(['estimatedValue']);
 
 const ALLOWED_BOOLEAN_FIELDS = new Set([
   'giftAidEligible',
-  'autoPromote',
+  'autoProcess',
   'isInKind',
 ]);
 
@@ -54,7 +54,7 @@ export type GiftCreatePayload = Writable<
   paymentMethod?: string;
   intakeSource?: string;
   sourceFingerprint?: string;
-  autoPromote?: boolean;
+  autoProcess?: boolean;
   giftPayoutId?: string;
 };
 

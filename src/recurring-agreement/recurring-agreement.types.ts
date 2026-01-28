@@ -24,7 +24,7 @@ export interface RecurringAgreementPayload extends Record<string, unknown> {
   startDate?: string;
   endDate?: string;
   nextExpectedAt?: string;
-  autoPromoteEnabled?: boolean;
+  autoProcessEnabled?: boolean;
   defaultAppealId?: string;
   defaultFundId?: string;
   defaultSoftCreditJson?: Record<string, unknown>;

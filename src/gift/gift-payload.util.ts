@@ -41,7 +41,7 @@ export const buildTwentyGiftPayload = (
   delete body.date;
   delete body.intakeSource;
   delete body.sourceFingerprint;
-  delete body.autoPromote;
+  delete body.autoProcess;
 
   const giftDate =
     typeof payload.giftDate === 'string' ? payload.giftDate : undefined;
@@ -82,6 +82,7 @@ export const buildTwentyGiftPayload = (
 
   delete body.providerContext;
   delete body.dedupeDiagnostics;
+  delete body.processingDiagnostics;
 
   return body;
 };
