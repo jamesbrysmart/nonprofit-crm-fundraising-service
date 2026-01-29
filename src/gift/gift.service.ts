@@ -14,6 +14,7 @@ import {
   ensureGiftListResponse,
   ensureUpdateGiftResponse,
   validateCreateGiftPayload,
+  validateCreateGiftStagingPayload,
   validateUpdateGiftPayload,
 } from './gift.validation';
 import type { GiftCreatePayload } from './gift.validation';
@@ -59,14 +60,29 @@ export class GiftService {
     payload: unknown,
   ): Promise<NormalizedGiftCreatePayload> {
     const sanitizedPayload = validateCreateGiftPayload(payload);
-    const prepared = await this.prepareGiftPayload(sanitizedPayload);
+    const prepared = await this.prepareGiftPayload(sanitizedPayload, {
+      resolveContacts: true,
+    });
+    prepared.processingDiagnostics = this.buildProcessingDiagnostics(prepared);
+    return prepared;
+  }
+
+  async normalizeCreateGiftStagingPayload(
+    payload: unknown,
+  ): Promise<NormalizedGiftCreatePayload> {
+    const sanitizedPayload = validateCreateGiftStagingPayload(payload);
+    const prepared = await this.prepareGiftPayload(sanitizedPayload, {
+      resolveContacts: false,
+    });
     prepared.processingDiagnostics = this.buildProcessingDiagnostics(prepared);
     return prepared;
   }
 
   async createGift(payload: unknown): Promise<unknown> {
     const sanitizedPayload = validateCreateGiftPayload(payload);
-    const preparedPayload = await this.prepareGiftPayload(sanitizedPayload);
+    const preparedPayload = await this.prepareGiftPayload(sanitizedPayload, {
+      resolveContacts: true,
+    });
 
     let stagingRecord: GiftStagingRecord | undefined;
     let shouldProcessImmediately = true;
@@ -167,7 +183,9 @@ export class GiftService {
 
   private async prepareGiftPayload(
     payload: GiftCreatePayload,
+    options?: { resolveContacts?: boolean },
   ): Promise<NormalizedGiftCreatePayload> {
+    const resolveContacts = options?.resolveContacts !== false;
     let contactFirstName: string | undefined;
     let contactLastName: string | undefined;
     let contactEmail: string | undefined;
@@ -231,20 +249,50 @@ export class GiftService {
     }
 
     let dedupeDiagnostics: GiftDedupeDiagnostics | undefined;
+    let contactInput: Record<string, unknown> | undefined;
 
     if (prepared.contact && typeof prepared.contact === 'object') {
-      const contactInput = prepared.contact as Record<string, unknown>;
+      contactInput = prepared.contact as Record<string, unknown>;
       delete prepared.contact;
+    }
 
+    const resolvedFirstName =
+      typeof prepared.donorFirstName === 'string'
+        ? prepared.donorFirstName.trim()
+        : contactFirstName;
+    const resolvedLastName =
+      typeof prepared.donorLastName === 'string'
+        ? prepared.donorLastName.trim()
+        : contactLastName;
+    const resolvedEmail =
+      typeof prepared.donorEmail === 'string' &&
+      prepared.donorEmail.trim().length > 0
+        ? prepared.donorEmail.trim()
+        : contactEmail;
+
+    if (!contactInput && resolvedFirstName && resolvedLastName) {
+      contactInput = {
+        firstName: resolvedFirstName,
+        lastName: resolvedLastName,
+      };
+      if (resolvedEmail) {
+        contactInput.email = resolvedEmail;
+      }
+    }
+
+    if (
+      contactInput &&
+      !this.hasNonEmptyString(prepared.donorId) &&
+      !this.hasNonEmptyString(prepared.companyId)
+    ) {
       const existingPersonMatch =
         await this.findExistingPersonMatch(contactInput);
 
       if (existingPersonMatch) {
         this.loggerInstance.log(
-          `Reusing existing person ${existingPersonMatch.personId} for gift contact (match=${existingPersonMatch.matchedBy})`,
+          `Found existing person ${existingPersonMatch.personId} for gift contact (match=${existingPersonMatch.matchedBy})`,
           this.logContext,
         );
-        prepared.donorId = existingPersonMatch.personId;
         dedupeDiagnostics = {
           matchType:
             existingPersonMatch.matchedBy === 'email' ? 'email' : 'name',
@@ -253,7 +301,10 @@ export class GiftService {
           confidence: existingPersonMatch.confidence,
           candidateDonorIds: existingPersonMatch.candidateIds,
         };
-      } else {
+        if (resolveContacts) {
+          prepared.donorId = existingPersonMatch.personId;
+        }
+      } else if (resolveContacts) {
         const personId = await this.createPerson(contactInput);
         prepared.donorId = personId;
       }
@@ -700,13 +751,17 @@ export class GiftService {
     const giftIntent = this.normalizeOptionalString(payload.giftIntent);
     const hasCompanyId = this.hasNonEmptyString(payload.companyId);
     const hasDonorId = this.hasNonEmptyString(payload.donorId);
+    const hasDonorName =
+      this.hasNonEmptyString(payload.donorFirstName) &&
+      this.hasNonEmptyString(payload.donorLastName);
+    const hasDonorIdentity = hasDonorId || hasDonorName;
     const isOrgIntent = giftIntent ? ORG_INTENTS.has(giftIntent) : false;
 
     if (isOrgIntent) {
       if (!hasCompanyId) {
         blockers.push('company_missing_for_org_intent');
       }
-    } else if (!hasDonorId) {
+    } else if (!hasDonorIdentity) {
       blockers.push('identity_missing');
     }
 
@@ -715,6 +770,10 @@ export class GiftService {
       !this.hasNonEmptyString(payload.recurringAgreementId)
     ) {
       blockers.push('recurring_agreement_missing');
+    }
+
+    if (!this.hasNonEmptyString(payload.giftDate)) {
+      blockers.push('gift_date_missing');
     }
 
     if (identityConfidence === 'weak') {
@@ -736,9 +795,6 @@ export class GiftService {
     if (!this.hasNonEmptyString(payload.paymentMethod)) {
       warnings.push('payment_method_missing');
     }
-    if (!this.hasNonEmptyString(payload.giftDate)) {
-      warnings.push('gift_date_missing');
-    }
 
     return {
       processingEligibility: blockers.length > 0 ? 'blocked' : 'eligible',
@@ -757,10 +813,75 @@ export class GiftService {
         : 'weak';
     }
 
-    const hasIdentity =
+    if (
       this.hasNonEmptyString(payload.donorId) ||
-      this.hasNonEmptyString(payload.companyId);
-    return hasIdentity ? 'explicit' : 'none';
+      this.hasNonEmptyString(payload.companyId)
+    ) {
+      return 'explicit';
+    }
+
+    if (
+      this.hasNonEmptyString(payload.donorFirstName) &&
+      this.hasNonEmptyString(payload.donorLastName)
+    ) {
+      return 'weak';
+    }
+
+    return 'none';
+  }
+
+  async resolveDonorFromStagingPayload(
+    payload: NormalizedGiftCreatePayload,
+  ): Promise<NormalizedGiftCreatePayload> {
+    if (this.hasNonEmptyString(payload.donorId)) {
+      return payload;
+    }
+
+    const donorFirstName =
+      typeof payload.donorFirstName === 'string'
+        ? payload.donorFirstName.trim()
+        : undefined;
+    const donorLastName =
+      typeof payload.donorLastName === 'string'
+        ? payload.donorLastName.trim()
+        : undefined;
+    const donorEmail =
+      typeof payload.donorEmail === 'string' &&
+      payload.donorEmail.trim().length > 0
+        ? payload.donorEmail.trim()
+        : undefined;
+
+    if (!donorFirstName || !donorLastName) {
+      return payload;
+    }
+
+    const contactInput: Record<string, unknown> = {
+      firstName: donorFirstName,
+      lastName: donorLastName,
+    };
+    if (donorEmail) {
+      contactInput.email = donorEmail;
+    }
+
+    const existingPersonMatch =
+      await this.findExistingPersonMatch(contactInput);
+
+    if (existingPersonMatch) {
+      this.loggerInstance.log(
+        `Reusing existing person ${existingPersonMatch.personId} for staged gift (match=${existingPersonMatch.matchedBy})`,
+        this.logContext,
+      );
+      return {
+        ...payload,
+        donorId: existingPersonMatch.personId,
+      };
+    }
+
+    const personId = await this.createPerson(contactInput);
+    return {
+      ...payload,
+      donorId: personId,
+    };
   }
 
   private isRecurringIntent(payload: NormalizedGiftCreatePayload): boolean {

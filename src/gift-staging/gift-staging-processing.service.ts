@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  forwardRef,
+} from '@nestjs/common';
 import { StructuredLoggerService } from '../logging/structured-logger.service';
 import {
   GiftStagingService,
@@ -12,6 +17,7 @@ import {
 } from '../gift/gift-payload.util';
 import { ensureCreateGiftResponse } from '../gift/gift.validation';
 import type { NormalizedGiftCreatePayload } from '../gift/gift.types';
+import { GiftService } from '../gift/gift.service';
 import { RecurringAgreementService } from '../recurring-agreement/recurring-agreement.service';
 import { ReceiptPolicyService } from '../receipt/receipt-policy.service';
 
@@ -42,6 +48,8 @@ export class GiftStagingProcessingService {
     private readonly giftStagingService: GiftStagingService,
     private readonly twentyApiService: TwentyApiService,
     private readonly structuredLogger: StructuredLoggerService,
+    @Inject(forwardRef(() => GiftService))
+    private readonly giftService: GiftService,
     private readonly recurringAgreementService: RecurringAgreementService,
     private readonly receiptPolicyService: ReceiptPolicyService,
   ) {}
@@ -156,7 +164,56 @@ export class GiftStagingProcessingService {
       };
     }
 
-    if (!this.isValidPreparedPayload(parsedPayload)) {
+    let resolvedPayload = parsedPayload;
+    try {
+      resolvedPayload =
+        await this.giftService.resolveDonorFromStagingPayload(parsedPayload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await this.setProcessingError(
+        stagingId,
+        message || 'Failed to resolve staging donor identity',
+      );
+      this.structuredLogger.warn(
+        'Failed to resolve donor identity for staging payload',
+        {
+          event: 'gift_staging_process_identity_failed',
+          stagingId,
+        },
+        this.logContext,
+      );
+      return {
+        status: 'error',
+        stagingId,
+        error: 'gift_api_failed',
+      };
+    }
+
+    if (
+      resolvedPayload.donorId &&
+      resolvedPayload.donorId !== parsedPayload.donorId
+    ) {
+      try {
+        await this.giftStagingService.updateGiftStagingPayload(stagingId, {
+          donorId: resolvedPayload.donorId,
+          donorFirstName: resolvedPayload.donorFirstName,
+          donorLastName: resolvedPayload.donorLastName,
+          donorEmail: resolvedPayload.donorEmail,
+        });
+      } catch (error) {
+        this.structuredLogger.warn(
+          'Failed to persist resolved donor identity for staging payload',
+          {
+            event: 'gift_staging_process_identity_persist_failed',
+            stagingId,
+            message: error instanceof Error ? error.message : String(error),
+          },
+          this.logContext,
+        );
+      }
+    }
+
+    if (!this.isValidPreparedPayload(resolvedPayload)) {
       this.structuredLogger.warn(
         'Parsed staging payload missing required fields',
         {
@@ -181,7 +238,7 @@ export class GiftStagingProcessingService {
     });
 
     const enrichedPayload =
-      this.receiptPolicyService.applyReceiptMetadata(parsedPayload);
+      this.receiptPolicyService.applyReceiptMetadata(resolvedPayload);
 
     const requestBody = buildTwentyGiftPayload(enrichedPayload);
 

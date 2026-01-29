@@ -7,6 +7,7 @@ import {
 import { TwentyApiService } from '../twenty/twenty-api.service';
 import { StructuredLoggerService } from '../logging/structured-logger.service';
 import { NormalizedGiftCreatePayload } from '../gift/gift.types';
+import { GiftService } from '../gift/gift.service';
 import { RecurringAgreementService } from '../recurring-agreement/recurring-agreement.service';
 import { ReceiptPolicyService } from '../receipt/receipt-policy.service';
 
@@ -16,6 +17,7 @@ describe('GiftStagingProcessingService (manual processing)', () => {
   let twentyApiService: jest.Mocked<TwentyApiService>;
   let structuredLogger: jest.Mocked<StructuredLoggerService>;
   let recurringAgreementService: jest.Mocked<RecurringAgreementService>;
+  let giftService: jest.Mocked<GiftService>;
   let getGiftStagingByIdMock: jest.MockedFunction<
     GiftStagingService['getGiftStagingById']
   >;
@@ -25,9 +27,15 @@ describe('GiftStagingProcessingService (manual processing)', () => {
   let updateStatusByIdMock: jest.MockedFunction<
     GiftStagingService['updateStatusById']
   >;
+  let updateGiftStagingPayloadMock: jest.MockedFunction<
+    GiftStagingService['updateGiftStagingPayload']
+  >;
   let twentyRequestMock: jest.MockedFunction<TwentyApiService['request']>;
   let updateRecurringAgreementMock: jest.MockedFunction<
     RecurringAgreementService['updateAgreement']
+  >;
+  let resolveDonorFromStagingPayloadMock: jest.MockedFunction<
+    GiftService['resolveDonorFromStagingPayload']
   >;
   let receiptPolicyService: {
     applyReceiptMetadata: jest.MockedFunction<
@@ -54,11 +62,13 @@ describe('GiftStagingProcessingService (manual processing)', () => {
     getGiftStagingByIdMock = jest.fn();
     markProcessedByIdMock = jest.fn().mockResolvedValue(undefined);
     updateStatusByIdMock = jest.fn().mockResolvedValue(undefined);
+    updateGiftStagingPayloadMock = jest.fn().mockResolvedValue(undefined);
 
     giftStagingService = {
       getGiftStagingById: getGiftStagingByIdMock,
       markProcessedById: markProcessedByIdMock,
       updateStatusById: updateStatusByIdMock,
+      updateGiftStagingPayload: updateGiftStagingPayloadMock,
     } as unknown as jest.Mocked<GiftStagingService>;
 
     twentyRequestMock = jest.fn();
@@ -78,6 +88,11 @@ describe('GiftStagingProcessingService (manual processing)', () => {
       updateAgreement: updateRecurringAgreementMock,
     } as unknown as jest.Mocked<RecurringAgreementService>;
 
+    resolveDonorFromStagingPayloadMock = jest.fn(async (payload) => payload);
+    giftService = {
+      resolveDonorFromStagingPayload: resolveDonorFromStagingPayloadMock,
+    } as unknown as jest.Mocked<GiftService>;
+
     receiptPolicyService = {
       applyReceiptMetadata: jest.fn((payload) => payload),
     };
@@ -86,6 +101,7 @@ describe('GiftStagingProcessingService (manual processing)', () => {
       giftStagingService,
       twentyApiService,
       structuredLogger,
+      giftService,
       recurringAgreementService,
       receiptPolicyService as unknown as ReceiptPolicyService,
     );
@@ -344,6 +360,56 @@ describe('GiftStagingProcessingService (manual processing)', () => {
       processingStatus: 'processing',
     });
     expect(updateRecurringAgreementMock).not.toHaveBeenCalled();
+  });
+
+  it('resolves donor identity during processing when missing', async () => {
+    const donorPayload: NormalizedGiftCreatePayload = {
+      amount: { currencyCode: 'GBP', amountMicros: 50_000_000 },
+      donorFirstName: 'James',
+      donorLastName: 'Bryant',
+      donorEmail: 'james.bryant@example.org',
+      intakeSource: 'manual_ui',
+      sourceFingerprint: 'fp-456',
+    };
+
+    getGiftStagingByIdMock.mockResolvedValue({
+      ...baseStaging,
+      rawPayload: JSON.stringify(donorPayload),
+    });
+
+    resolveDonorFromStagingPayloadMock.mockResolvedValue({
+      ...donorPayload,
+      donorId: 'person-456',
+    });
+
+    twentyRequestMock.mockResolvedValue({
+      data: { createGift: { id: 'gift-200' } },
+    });
+
+    const result = await service.processGift({ stagingId: 'stg-123' });
+
+    expect(result).toEqual({
+      status: 'processed',
+      stagingId: 'stg-123',
+      giftId: 'gift-200',
+    });
+    expect(resolveDonorFromStagingPayloadMock).toHaveBeenCalledWith(
+      donorPayload,
+    );
+    expect(updateGiftStagingPayloadMock).toHaveBeenCalledWith('stg-123', {
+      donorId: 'person-456',
+      donorFirstName: 'James',
+      donorLastName: 'Bryant',
+      donorEmail: 'james.bryant@example.org',
+    });
+    expect(twentyRequestMock).toHaveBeenCalledWith(
+      'POST',
+      '/gifts',
+      expect.objectContaining({
+        donorId: 'person-456',
+      }),
+      'GiftStagingProcessingService',
+    );
   });
 
   it('updates recurring agreement when staging is linked', async () => {

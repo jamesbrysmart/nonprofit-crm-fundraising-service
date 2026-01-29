@@ -125,9 +125,8 @@ export class GiftStagingController {
   ): Promise<GiftStagingCreateResponse> {
     this.ensureEnabled();
 
-    const normalizedPayload = await this.giftService.normalizeCreateGiftPayload(
-      body ?? {},
-    );
+    const normalizedPayload =
+      await this.giftService.normalizeCreateGiftStagingPayload(body ?? {});
     normalizedPayload.autoProcess = false;
 
     const stagedRecord =

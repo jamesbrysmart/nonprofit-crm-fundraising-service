@@ -66,7 +66,8 @@ export type IdentityConfidence = 'explicit' | 'strong' | 'weak' | 'none';
 export type ProcessingBlocker =
   | 'identity_missing'
   | 'company_missing_for_org_intent'
-  | 'recurring_agreement_missing';
+  | 'recurring_agreement_missing'
+  | 'gift_date_missing';
 
 export type ProcessingWarning =
   | 'identity_low_confidence'
@@ -74,8 +75,7 @@ export type ProcessingWarning =
   | 'fund_missing'
   | 'opportunity_missing'
   | 'payout_missing'
-  | 'payment_method_missing'
-  | 'gift_date_missing';
+  | 'payment_method_missing';
 
 export interface ProcessingDiagnostics {
   processingEligibility: ProcessingEligibility;

@@ -59,6 +59,12 @@ export type GiftCreatePayload = Writable<
 };
 
 export type GiftUpdatePayload = Partial<GiftCreatePayload>;
+export type GiftStagingCreatePayload = GiftCreatePayload & {
+  donorId?: string;
+  donorFirstName?: string;
+  donorLastName?: string;
+  donorEmail?: string;
+};
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -311,6 +317,77 @@ export const validateCreateGiftPayload = (body: unknown): GiftCreatePayload => {
   }
 
   return sanitized as GiftCreatePayload;
+};
+
+export const validateCreateGiftStagingPayload = (
+  body: unknown,
+): GiftStagingCreatePayload => {
+  if (!isPlainObject(body)) {
+    throw new BadRequestException('payload must be an object');
+  }
+
+  if (body.amount === undefined) {
+    throw new BadRequestException('amount is required');
+  }
+
+  const sanitized: Record<string, unknown> = collectAllowedFields(
+    body,
+    'create',
+  );
+
+  const parsedAmount = parseAmount(body.amount, 'create');
+  sanitized.amount = parsedAmount;
+
+  if (body.donorId !== undefined) {
+    normalizeStringField(sanitized, 'donorId', body.donorId);
+  }
+  if (body.donorFirstName !== undefined) {
+    normalizeStringField(sanitized, 'donorFirstName', body.donorFirstName);
+  }
+  if (body.donorLastName !== undefined) {
+    normalizeStringField(sanitized, 'donorLastName', body.donorLastName);
+  }
+  if (body.donorEmail !== undefined) {
+    normalizeStringField(sanitized, 'donorEmail', body.donorEmail);
+  }
+
+  const giftIntent =
+    typeof sanitized.giftIntent === 'string' ? sanitized.giftIntent : undefined;
+  const companyId =
+    typeof sanitized.companyId === 'string' ? sanitized.companyId : undefined;
+  const hasContactId =
+    typeof sanitized.contactId === 'string' &&
+    sanitized.contactId.trim().length > 0;
+  const hasInlineContact = sanitized.contact !== undefined;
+  const hasDonorId =
+    typeof sanitized.donorId === 'string' && sanitized.donorId.trim().length > 0;
+  const hasDonorName =
+    typeof sanitized.donorFirstName === 'string' &&
+    sanitized.donorFirstName.trim().length > 0 &&
+    typeof sanitized.donorLastName === 'string' &&
+    sanitized.donorLastName.trim().length > 0;
+  const isOrgIntent =
+    giftIntent !== undefined && COMPANY_ORG_INTENTS.has(giftIntent);
+
+  if (isOrgIntent) {
+    if (!companyId) {
+      throw new BadRequestException(
+        'companyId is required when giftIntent is grant or corporateInKind',
+      );
+    }
+    if (hasContactId) {
+      delete sanitized.contactId;
+    }
+    if (hasInlineContact) {
+      delete sanitized.contact;
+    }
+  } else if (!hasContactId && !hasInlineContact && !hasDonorId && !hasDonorName) {
+    throw new BadRequestException(
+      'contact, contactId, or donor name is required unless giftIntent is grant or corporateInKind with companyId',
+    );
+  }
+
+  return sanitized as GiftStagingCreatePayload;
 };
 
 export const validateUpdateGiftPayload = (body: unknown): GiftUpdatePayload => {

@@ -6,6 +6,7 @@ export const mapCreateGiftStagingPayload = (
   autoProcess: boolean,
 ): CreateGiftStagingDto & { rawPayload: string } => {
   const processingStatus = autoProcess ? 'processing' : 'pending';
+  const dedupeStatus = resolveDedupeStatus(payload);
 
   const amountMicros =
     typeof payload.amount?.amountMicros === 'number'
@@ -24,6 +25,7 @@ export const mapCreateGiftStagingPayload = (
   const body: CreateGiftStagingDto & { rawPayload: string } = {
     autoProcess,
     processingStatus,
+    dedupeStatus,
     amount: {
       amountMicros,
       currencyCode,
@@ -63,6 +65,18 @@ export const mapCreateGiftStagingPayload = (
   };
 
   return body;
+};
+
+const resolveDedupeStatus = (
+  payload: NormalizedGiftCreatePayload,
+): string | undefined => {
+  const diagnostics = payload.dedupeDiagnostics;
+  if (!diagnostics) {
+    return undefined;
+  }
+  return diagnostics.matchType === 'email'
+    ? 'matched_existing'
+    : 'needs_review';
 };
 
 const safeParseJson = (value: string): Record<string, unknown> | undefined => {

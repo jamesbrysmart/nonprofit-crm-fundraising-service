@@ -35,7 +35,7 @@ describe('GiftStagingController', () => {
     GiftStagingProcessingService['processGift']
   >;
   let normalizeGiftPayloadMock: jest.MockedFunction<
-    GiftService['normalizeCreateGiftPayload']
+    GiftService['normalizeCreateGiftStagingPayload']
   >;
 
   beforeEach(() => {
@@ -60,7 +60,7 @@ describe('GiftStagingController', () => {
     } as unknown as jest.Mocked<GiftStagingProcessingService>;
 
     giftService = {
-      normalizeCreateGiftPayload: normalizeGiftPayloadMock,
+      normalizeCreateGiftStagingPayload: normalizeGiftPayloadMock,
     } as unknown as jest.Mocked<GiftService>;
 
     controller = new GiftStagingController(
