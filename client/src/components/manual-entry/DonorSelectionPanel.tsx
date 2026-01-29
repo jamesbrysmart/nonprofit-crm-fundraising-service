@@ -24,6 +24,7 @@ interface DonorSelectionPanelProps {
   onOpenSearch(): void;
   potentialDuplicateMessage: string | null;
   disableActions: boolean;
+  showEmptyState?: boolean;
 }
 
 export function DonorSelectionPanel({
@@ -38,6 +39,7 @@ export function DonorSelectionPanel({
   onOpenSearch,
   potentialDuplicateMessage,
   disableActions,
+  showEmptyState = true,
 }: DonorSelectionPanelProps): JSX.Element {
   return (
     <>
@@ -95,7 +97,7 @@ export function DonorSelectionPanel({
             Clear selection
           </button>
         </div>
-      ) : (
+      ) : showEmptyState ? (
         <div className="f-rounded-xl f-border f-border-dashed f-border-slate-300 f-bg-slate-50 f-p-4 f-space-y-3">
           <div className="f-flex f-justify-between f-items-center f-gap-3">
             <h4 className="f-text-base f-font-semibold f-text-ink f-m-0">Donor selection</h4>
@@ -112,7 +114,7 @@ export function DonorSelectionPanel({
             No donor selected. A new donor record will be created when you submit this gift.
           </p>
         </div>
-      )}
+      ) : null}
 
       {duplicateLookupError ? (
         <div className="f-alert f-alert--error" role="alert">

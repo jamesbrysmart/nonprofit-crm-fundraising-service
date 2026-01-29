@@ -13,6 +13,16 @@ export interface GiftStagingCreateResponse {
   };
 }
 
+export type ProcessingEligibility = 'eligible' | 'blocked';
+export type IdentityConfidence = 'explicit' | 'strong' | 'weak' | 'none';
+
+export interface ProcessingDiagnostics {
+  processingEligibility?: ProcessingEligibility;
+  processingBlockers?: string[];
+  processingWarnings?: string[];
+  identityConfidence?: IdentityConfidence;
+}
+
 export async function createGiftStaging(
   payload: GiftCreatePayload,
 ): Promise<GiftStagingCreateResponse> {
@@ -90,6 +100,7 @@ export interface GiftStagingListItem {
   processingStatus?: string;
   validationStatus?: string;
   dedupeStatus?: string;
+  processingDiagnostics?: ProcessingDiagnostics;
   intakeSource?: string;
   sourceFingerprint?: string;
   externalId?: string;
@@ -190,6 +201,7 @@ export interface GiftStagingDetailResponse {
       processingStatus?: string;
       validationStatus?: string;
       dedupeStatus?: string;
+      processingDiagnostics?: ProcessingDiagnostics;
       errorDetail?: string;
       rawPayload?: string;
       giftBatchId?: string;

@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DrawerHeader } from './DrawerHeader';
-import { DrawerStatusDetails } from './DrawerStatusDetails';
 import { DrawerReviewSection } from './DrawerReviewSection';
 import { GiftDrawerFocus } from './types';
 import { useGiftStagingDrawerController } from '../../hooks/useGiftStagingDrawerController';
@@ -9,6 +8,10 @@ import { fallbackCompanyDisplay } from '../../utils/donorAdapters';
 import { DonorDisplay } from '../../types/donor';
 import { useDonorSearch } from '../../hooks/useDonorSearch';
 import { DonorSearchModal } from '../manual-entry/DonorSearchModal';
+import {
+  getProcessingDiagnosticsDisplay,
+  getTrustPostureLabel,
+} from './processingDiagnosticsUtils';
 
 interface GiftStagingDrawerProps {
   stagingId: string | null;
@@ -24,6 +27,7 @@ export function GiftStagingDrawer({
   onRefreshList,
 }: GiftStagingDrawerProps): JSX.Element | null {
   const [showRawPayload, setShowRawPayload] = useState(false);
+  const [donorPanelExpanded, setDonorPanelExpanded] = useState(true);
   const {
     detail,
     loading,
@@ -45,7 +49,6 @@ export function GiftStagingDrawer({
     actionNotice,
     dedupeStatusLabel,
     dedupeDiagnostics,
-    intentLabel,
     intentOptions,
   } = useGiftStagingDrawerController(stagingId, focus, onRefreshList);
 
@@ -69,6 +72,39 @@ export function GiftStagingDrawer({
     }
   }
 
+  const diagnostics = useMemo(
+    () => getProcessingDiagnosticsDisplay(detail?.processingDiagnostics),
+    [detail?.processingDiagnostics],
+  );
+  const trustLabel = getTrustPostureLabel(detail?.intakeSource);
+  const donorMatchLabel = useMemo(() => {
+    if (!detail) {
+      return 'Donor status unknown';
+    }
+    if (!detail.donorId) {
+      return 'Donor missing';
+    }
+    if (detail.dedupeStatus === 'needs_review') {
+      return 'Possible donor match';
+    }
+    if (dedupeDiagnostics?.matchType === 'email') {
+      return 'Auto-matched donor';
+    }
+    if (dedupeDiagnostics) {
+      return 'Donor matched';
+    }
+    return 'Donor confirmed';
+  }, [detail, dedupeDiagnostics]);
+
+  useEffect(() => {
+    if (!detail) {
+      return;
+    }
+    const shouldExpand =
+      !detail.donorId || detail.dedupeStatus === 'needs_review';
+    setDonorPanelExpanded(shouldExpand);
+  }, [detail?.id, detail?.donorId, detail?.dedupeStatus]);
+
   if (!stagingId) {
     return null;
   }
@@ -78,13 +114,8 @@ export function GiftStagingDrawer({
       <div className="drawer drawer--wide">
         <DrawerHeader
           stagingId={stagingId}
-          loading={loading}
-          actionBusy={actionBusy}
-          actionError={actionError}
           title="Review staging"
           onClose={onClose}
-          onMarkReady={handleMarkReady}
-          onProcess={handleProcessNow}
         />
 
         {loading ? (
@@ -111,18 +142,26 @@ export function GiftStagingDrawer({
           <>
             <section className="drawer-section status-summary">
               <div className="f-flex f-flex-wrap f-gap-2 f-items-center">
-                <span className="f-badge f-bg-slate-200 f-text-ink">
-                  Donor: {detail.donorId ? <code>{detail.donorId}</code> : 'New donor'}
+                <span
+                  className={`f-badge ${
+                    diagnostics.hasBlockers
+                      ? 'f-bg-amber-100 f-text-amber-800'
+                      : 'f-bg-emerald-100 f-text-emerald-800'
+                  }`}
+                >
+                  {diagnostics.hasBlockers ? 'Needs attention' : 'Eligible now'}
                 </span>
+                {diagnostics.blockers.length > 0 ? (
+                  <span className="f-text-sm f-text-slate-700">
+                    {diagnostics.blockers[0]}
+                    {diagnostics.blockers.length > 1
+                      ? ` +${diagnostics.blockers.length - 1} more`
+                      : ''}
+                  </span>
+                ) : null}
                 {detail.giftBatchId ? (
                   <span className="f-badge f-bg-slate-200 f-text-ink">
                     Batch: <code>{detail.giftBatchId}</code>
-                  </span>
-                ) : null}
-                {detail.receiptStatus ? (
-                  <span className="f-badge f-bg-slate-200 f-text-ink">
-                    Receipt: {detail.receiptStatus}
-                    {detail.receiptPolicyApplied ? ` (${detail.receiptPolicyApplied})` : ''}
                   </span>
                 ) : null}
               </div>
@@ -138,12 +177,6 @@ export function GiftStagingDrawer({
               ) : null}
             </section>
 
-            <DrawerStatusDetails
-              detail={detail}
-              dedupeStatusLabel={dedupeStatusLabel}
-              intentLabel={intentLabel}
-            />
-
             <DrawerReviewSection
               detail={detail}
               editForm={editForm}
@@ -154,14 +187,11 @@ export function GiftStagingDrawer({
               appealOptions={appealOptions}
               actionBusy={actionBusy}
               loading={loading}
-              onSaveEdits={handleSaveEdits}
-              onResetEdits={handleResetEdits}
-              dedupeDiagnostics={dedupeDiagnostics}
               onAssignDonor={handleAssignDonor}
               intentOptions={intentOptions}
-              onAcknowledgeDuplicate={() => {
-                void handleMarkReady();
-              }}
+              donorMatchLabel={donorMatchLabel}
+              donorPanelExpanded={donorPanelExpanded}
+              onToggleDonorPanel={() => setDonorPanelExpanded((prev) => !prev)}
               donorPanel={{
                 selectedDonor,
                 classifiedDuplicates,
@@ -178,6 +208,80 @@ export function GiftStagingDrawer({
                 disableActions: loading || actionBusy === 'update',
               }}
             />
+
+            <details className="drawer-section">
+              <summary className="drawer-section-header">
+                <h4>Details & audit</h4>
+              </summary>
+              <div className="f-space-y-4">
+                <dl className="drawer-meta drawer-meta--single">
+                  <div>
+                    <dt>Processing status</dt>
+                    <dd>{detail.processingStatus ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Dedupe status</dt>
+                    <dd>{dedupeStatusLabel}</dd>
+                  </div>
+                  <div>
+                    <dt>Trust posture</dt>
+                    <dd>
+                      {trustLabel}
+                      {detail.intakeSource ? ` (${detail.intakeSource})` : ''}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Blockers</dt>
+                    <dd>
+                      {diagnostics.blockers.length > 0
+                        ? diagnostics.blockers.join(', ')
+                        : '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Warnings</dt>
+                    <dd>
+                      {diagnostics.warnings.length > 0
+                        ? diagnostics.warnings.join(', ')
+                        : '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Receipt status</dt>
+                    <dd>
+                      {detail.receiptStatus ?? '—'}
+                      {detail.receiptPolicyApplied
+                        ? ` (${detail.receiptPolicyApplied})`
+                        : ''}
+                    </dd>
+                  </div>
+                </dl>
+
+                <section>
+                  <div className="drawer-section-header">
+                    <h4>Raw payload</h4>
+                    <button
+                      type="button"
+                      className="f-btn--ghost"
+                      onClick={() => setShowRawPayload((prev) => !prev)}
+                    >
+                      {showRawPayload ? 'Hide JSON' : 'Show JSON'}
+                    </button>
+                  </div>
+                  {showRawPayload ? (
+                    detail.rawPayload ? (
+                      <pre className="drawer-json">{safePrettyJson(detail.rawPayload)}</pre>
+                    ) : (
+                      <div className="f-state-block">Raw payload not available.</div>
+                    )
+                  ) : (
+                    <p className="f-help-text">
+                      Raw staging JSON remains hidden. Toggle to show.
+                    </p>
+                  )}
+                </section>
+              </div>
+            </details>
 
             <DonorSearchModal
               isOpen={donorSearch.isOpen}
@@ -225,51 +329,48 @@ export function GiftStagingDrawer({
                 </p>
               </section>
             ) : null}
-
-            <section className="drawer-section">
-              <div className="drawer-section-header">
-                <h4>Raw payload</h4>
-                <button
-                  type="button"
-                  className="f-btn--ghost"
-                  onClick={() => setShowRawPayload((prev) => !prev)}
-                >
-                  {showRawPayload ? 'Hide JSON' : 'Show JSON'}
-                </button>
-              </div>
-              {showRawPayload ? (
-                detail.rawPayload ? (
-                  <pre className="drawer-json">{safePrettyJson(detail.rawPayload)}</pre>
-                ) : (
-                  <div className="f-state-block">Raw payload not available.</div>
-                )
-              ) : (
-                <p className="f-help-text">Raw staging JSON remains hidden. Toggle to show.</p>
-              )}
-            </section>
           </>
         )}
 
         <footer className="drawer-footer">
-          <button
-            type="button"
-            className="f-btn--secondary"
-            onClick={() => {
-              void reload();
-            }}
-            disabled={loading}
-          >
-            Reload record
-          </button>
-          <button
-            type="button"
-            className="f-btn--ghost"
-            onClick={() => {
-              onRefreshList();
-            }}
-          >
-            Refresh list
-          </button>
+          <div className="drawer-footer-group">
+            <button
+              type="button"
+              className="f-btn--ghost"
+              onClick={handleResetEdits}
+              disabled={actionBusy === 'update' || loading}
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              className="f-btn--secondary"
+              onClick={handleSaveEdits}
+              disabled={actionBusy === 'update' || loading}
+            >
+              {actionBusy === 'update' ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+          <div className="drawer-footer-group">
+            <button
+              type="button"
+              className="f-btn--ghost"
+              onClick={handleMarkReady}
+              disabled={actionBusy === 'mark-ready' || loading}
+              title="Marks this gift as reviewed and ready to process"
+            >
+              {actionBusy === 'mark-ready' ? 'Marking…' : 'Ready to process'}
+            </button>
+            <button
+              type="button"
+              className="f-btn--primary"
+              onClick={handleProcessNow}
+              disabled={actionBusy === 'process' || loading}
+              title="Processes this gift immediately"
+            >
+              {actionBusy === 'process' ? 'Processing…' : 'Process now'}
+            </button>
+          </div>
         </footer>
       </div>
     </div>

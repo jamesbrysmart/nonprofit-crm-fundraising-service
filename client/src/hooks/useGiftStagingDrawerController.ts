@@ -15,6 +15,9 @@ export type EditFormState = {
   amountMajor: string;
   currencyCode: string;
   giftDate: string;
+  donorFirstName: string;
+  donorLastName: string;
+  donorEmail: string;
   fundId: string;
   appealId: string;
   notes: string;
@@ -56,6 +59,9 @@ export function useGiftStagingDrawerController(
     amountMajor: '',
     currencyCode: '',
     giftDate: '',
+    donorFirstName: '',
+    donorLastName: '',
+    donorEmail: '',
     fundId: '',
     appealId: '',
     notes: '',
@@ -95,6 +101,9 @@ export function useGiftStagingDrawerController(
         amountMajor: '',
         currencyCode: '',
         giftDate: '',
+        donorFirstName: '',
+        donorLastName: '',
+        donorEmail: '',
         fundId: '',
         appealId: '',
         notes: '',
@@ -118,6 +127,9 @@ export function useGiftStagingDrawerController(
       amountMajor: derivedAmount,
       currencyCode: detail.currencyCode ?? '',
       giftDate: derivedDate,
+      donorFirstName: detail.donorFirstName ?? '',
+      donorLastName: detail.donorLastName ?? '',
+      donorEmail: detail.donorEmail ?? '',
       fundId: detail.fundId ?? '',
       appealId: detail.appealId ?? '',
       notes: detail.notes ?? '',
@@ -187,6 +199,27 @@ export function useGiftStagingDrawerController(
       payload.giftDate = dateValue;
     } else if (detail.giftDate) {
       payload.giftDate = null;
+    }
+
+    const donorFirstName = editForm.donorFirstName.trim();
+    if (donorFirstName.length > 0) {
+      payload.donorFirstName = donorFirstName;
+    } else if (detail.donorFirstName) {
+      payload.donorFirstName = null;
+    }
+
+    const donorLastName = editForm.donorLastName.trim();
+    if (donorLastName.length > 0) {
+      payload.donorLastName = donorLastName;
+    } else if (detail.donorLastName) {
+      payload.donorLastName = null;
+    }
+
+    const donorEmail = editForm.donorEmail.trim();
+    if (donorEmail.length > 0) {
+      payload.donorEmail = donorEmail;
+    } else if (detail.donorEmail) {
+      payload.donorEmail = null;
     }
 
     const fundValue = editForm.fundId.trim();

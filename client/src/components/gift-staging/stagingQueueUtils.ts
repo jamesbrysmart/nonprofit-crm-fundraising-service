@@ -1,5 +1,9 @@
 import { GiftStagingListItem } from '../../api';
 import { StagingStatusTone } from './queueStatusTone';
+import {
+  getIdentityConfidenceLabel,
+  getProcessingDiagnosticsDisplay,
+} from './processingDiagnosticsUtils';
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   year: 'numeric',
@@ -26,12 +30,18 @@ export type QueueRow = GiftStagingListItem & {
   donorSummary: string;
   dedupeStatusMeta: { label: string; tone: 'info' | 'success' | 'warning' };
   statusMeta: { label: string; tone: StagingStatusTone };
+  eligibilityMeta: { label: string; tone: StagingStatusTone };
   expectedAtDisplay: string;
   hasRecurringMetadata: boolean;
   hasGiftDuplicate: boolean;
   alertFlags: string[];
   isHighValue: boolean;
   intentLabel?: string;
+  hasBlockers: boolean;
+  blockerLabels: string[];
+  warningLabels: string[];
+  identityConfidenceLabel?: string | null;
+  isLowIdentityConfidence: boolean;
   receiptMeta?: {
     label: string;
     tone: 'info' | 'success' | 'warning' | 'danger';
@@ -40,24 +50,39 @@ export type QueueRow = GiftStagingListItem & {
 };
 
 export function mapQueueRows(items: GiftStagingListItem[]): QueueRow[] {
-  return items.map((item) => ({
-    ...item,
-    formattedDate: formatDate(item.updatedAt ?? item.createdAt),
-    formattedAmount: formatAmount(item),
-    donorSummary: resolveDonor(item),
-    dedupeStatusMeta: formatDedupeStatus(item.dedupeStatus),
-    statusMeta: getProcessingStatusMeta(item),
-    expectedAtDisplay: item.expectedAt ? formatDate(item.expectedAt) : '—',
-    hasRecurringMetadata: Boolean(
-      item.provider || item.providerPaymentId || item.recurringAgreementId || item.expectedAt,
-    ),
-    hasGiftDuplicate:
-      typeof item.errorDetail === 'string' && item.errorDetail.toLowerCase().includes('duplicate'),
-    alertFlags: getAlertFlags(item),
-    isHighValue: isHighValueAmount(item),
-    intentLabel: getIntentLabel(item.giftIntent),
-    receiptMeta: formatReceiptStatus(item),
-  }));
+  return items.map((item) => {
+    const diagnostics = getProcessingDiagnosticsDisplay(
+      item.processingDiagnostics,
+    );
+    const identityConfidenceLabel = getIdentityConfidenceLabel(
+      diagnostics.identityConfidence,
+    );
+    return {
+      ...item,
+      formattedDate: formatDate(item.updatedAt ?? item.createdAt),
+      formattedAmount: formatAmount(item),
+      donorSummary: resolveDonor(item),
+      dedupeStatusMeta: formatDedupeStatus(item.dedupeStatus),
+      statusMeta: getProcessingStatusMeta(item),
+      eligibilityMeta: getEligibilityMeta(item, diagnostics),
+      expectedAtDisplay: item.expectedAt ? formatDate(item.expectedAt) : '—',
+      hasRecurringMetadata: Boolean(
+        item.provider || item.providerPaymentId || item.recurringAgreementId || item.expectedAt,
+      ),
+      hasGiftDuplicate:
+        typeof item.errorDetail === 'string' &&
+        item.errorDetail.toLowerCase().includes('duplicate'),
+      alertFlags: getAlertFlags(item, diagnostics),
+      isHighValue: isHighValueAmount(item),
+      intentLabel: getIntentLabel(item.giftIntent),
+      hasBlockers: diagnostics.hasBlockers || !diagnostics.hasDiagnostics,
+      blockerLabels: diagnostics.blockers,
+      warningLabels: diagnostics.warnings,
+      identityConfidenceLabel,
+      isLowIdentityConfidence: diagnostics.isLowIdentityConfidence,
+      receiptMeta: formatReceiptStatus(item),
+    };
+  });
 }
 
 function getProcessingStatusMeta(
@@ -89,13 +114,40 @@ function getProcessingStatusMeta(
   return { label: 'Pending', tone: 'info' };
 }
 
-function getAlertFlags(item: GiftStagingListItem): string[] {
+function getEligibilityMeta(
+  item: GiftStagingListItem,
+  diagnostics: ReturnType<typeof getProcessingDiagnosticsDisplay>,
+): { label: string; tone: StagingStatusTone } {
+  const processingStatus = item.processingStatus ?? 'pending';
+
+  if (processingStatus === 'process_failed') {
+    return { label: 'Process failed', tone: 'danger' };
+  }
+
+  if (processingStatus === 'processed') {
+    return { label: 'Processed', tone: 'success' };
+  }
+
+  if (!diagnostics.hasDiagnostics || diagnostics.hasBlockers) {
+    return { label: 'Needs attention', tone: 'warning' };
+  }
+
+  return { label: 'Eligible now', tone: 'success' };
+}
+
+function getAlertFlags(
+  item: GiftStagingListItem,
+  diagnostics: ReturnType<typeof getProcessingDiagnosticsDisplay>,
+): string[] {
   const alerts = new Set<string>();
   if ((item.dedupeStatus ?? '') === 'needs_review') {
     alerts.add('Possible duplicate');
   }
   if (!item.donorId) {
     alerts.add('Donor unresolved');
+  }
+  if (diagnostics.isLowIdentityConfidence) {
+    alerts.add('Low identity confidence');
   }
   if (typeof item.errorDetail === 'string' && item.errorDetail.toLowerCase().includes('duplicate')) {
     alerts.add('Duplicate warning');

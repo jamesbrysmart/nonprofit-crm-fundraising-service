@@ -421,6 +421,10 @@ form {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 
+.drawer-meta.drawer-meta--single {
+  grid-template-columns: 1fr;
+}
+
 .drawer-meta dt {
   font-size: 0.8rem;
   text-transform: uppercase;
@@ -450,8 +454,20 @@ form {
 .drawer-footer {
   margin-top: auto;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 0.75rem;
+  position: sticky;
+  bottom: 0;
+  background: #ffffff;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.drawer-footer-group {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .primary-button {

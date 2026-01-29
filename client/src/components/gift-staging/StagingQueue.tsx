@@ -159,27 +159,26 @@ export function StagingQueue(): JSX.Element {
   }, [derivedRows, activeBatchId]);
 
   const statusSummary = useMemo(() => {
-    let needsReview = 0;
-    let ready = 0;
+    let needsAttention = 0;
+    let eligibleNow = 0;
     let processFailed = 0;
     let processed = 0;
     derivedRows.forEach((row) => {
-      const tone = row.statusMeta.tone;
       const label = row.statusMeta.label;
       if (label === 'Process failed') {
         processFailed += 1;
       } else if (label === 'Processed') {
         processed += 1;
-      } else if (label === 'Ready to process') {
-        ready += 1;
-      } else if (tone === 'warning') {
-        needsReview += 1;
+      } else if (row.eligibilityMeta.label === 'Needs attention') {
+        needsAttention += 1;
+      } else if (row.eligibilityMeta.label === 'Eligible now') {
+        eligibleNow += 1;
       }
     });
     return {
       total: derivedRows.length,
-      needsReview,
-      ready,
+      needsAttention,
+      eligibleNow,
       processFailed,
       processed,
     };
@@ -207,6 +206,41 @@ export function StagingQueue(): JSX.Element {
       .map(([label, count]) => ({ label, count }))
       .sort((a, b) => b.count - a.count);
   }, [derivedRows]);
+
+  const batchDiagnosticsSummary = useMemo(() => {
+    if (!activeBatchId) {
+      return null;
+    }
+    const batchRows = derivedRows.filter((row) => row.giftBatchId === activeBatchId);
+    if (batchRows.length === 0) {
+      return null;
+    }
+
+    const tally = (values: string[]) => {
+      const counts = new Map<string, number>();
+      values.forEach((value) => {
+        counts.set(value, (counts.get(value) ?? 0) + 1);
+      });
+      return Array.from(counts.entries())
+        .map(([label, count]) => ({ label, count }))
+        .sort((a, b) => b.count - a.count);
+    };
+
+    const blockers = tally(
+      batchRows.flatMap((row) => row.blockerLabels ?? []),
+    );
+    const warnings = tally(
+      batchRows.flatMap((row) => row.warningLabels ?? []),
+    );
+    const lowIdentityCount = batchRows.filter((row) => row.isLowIdentityConfidence).length;
+
+    return {
+      blockers: blockers.slice(0, 3),
+      warnings: warnings.slice(0, 3),
+      lowIdentityCount,
+      total: batchRows.length,
+    };
+  }, [derivedRows, activeBatchId]);
 
   const markReady = useCallback(
     async (stagingId: string) => {
@@ -277,6 +311,7 @@ export function StagingQueue(): JSX.Element {
           statusSummary={statusSummary}
           intakeSummary={intakeSummary}
           batchSummary={batchSummary}
+          batchDiagnosticsSummary={batchDiagnosticsSummary}
           activeIntakeSources={activeIntakeSources}
           activeBatchId={activeBatchId}
           hasActiveFilters={hasActiveFilters}

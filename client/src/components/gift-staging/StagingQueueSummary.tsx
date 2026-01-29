@@ -3,13 +3,19 @@ import { useMemo } from 'react';
 interface SummaryProps {
   statusSummary: {
     total: number;
-    needsReview: number;
-    ready: number;
+    needsAttention: number;
+    eligibleNow: number;
     processFailed: number;
     processed: number;
   };
   intakeSummary: Array<{ label: string; count: number }>;
   batchSummary: Array<{ label: string; count: number }>;
+  batchDiagnosticsSummary: {
+    blockers: Array<{ label: string; count: number }>;
+    warnings: Array<{ label: string; count: number }>;
+    lowIdentityCount: number;
+    total: number;
+  } | null;
   activeIntakeSources: string[];
   activeBatchId: string | null;
   hasActiveFilters: boolean;
@@ -41,6 +47,7 @@ export function StagingQueueSummary({
   statusSummary,
   intakeSummary,
   batchSummary,
+  batchDiagnosticsSummary,
   activeIntakeSources,
   activeBatchId,
   hasActiveFilters,
@@ -59,8 +66,8 @@ export function StagingQueueSummary({
   const statusPills = useMemo(
     () => [
       { label: 'Total', value: statusSummary.total },
-      { label: 'Needs review', value: statusSummary.needsReview },
-      { label: 'Ready', value: statusSummary.ready },
+      { label: 'Needs attention', value: statusSummary.needsAttention },
+      { label: 'Eligible now', value: statusSummary.eligibleNow },
       { label: 'Failed', value: statusSummary.processFailed },
       { label: 'Processed', value: statusSummary.processed },
     ],
@@ -169,6 +176,42 @@ export function StagingQueueSummary({
           </div>
         ) : null}
       </div>
+
+      {batchDiagnosticsSummary ? (
+        <div className="f-rounded-lg f-border f-border-slate-200 f-bg-slate-50/60 f-px-3 f-py-2 f-text-xs f-text-slate-600">
+          <div className="f-flex f-flex-wrap f-gap-2 f-items-center">
+            <span className="f-font-semibold">Batch diagnostics</span>
+            <span className="f-text-slate-500">({batchDiagnosticsSummary.total} gifts)</span>
+          </div>
+          <div className="f-flex f-flex-col gap-1 f-mt-1">
+            {batchDiagnosticsSummary.blockers.length > 0 ? (
+              <span>
+                Blockers:{' '}
+                {batchDiagnosticsSummary.blockers
+                  .map(({ label, count }) => `${label} (${count})`)
+                  .join(', ')}
+              </span>
+            ) : (
+              <span>Blockers: none</span>
+            )}
+            {batchDiagnosticsSummary.warnings.length > 0 ? (
+              <span>
+                Warnings:{' '}
+                {batchDiagnosticsSummary.warnings
+                  .map(({ label, count }) => `${label} (${count})`)
+                  .join(', ')}
+              </span>
+            ) : (
+              <span>Warnings: none</span>
+            )}
+            {batchDiagnosticsSummary.lowIdentityCount > 0 ? (
+              <span>
+                Low identity confidence: {batchDiagnosticsSummary.lowIdentityCount}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <div className="f-flex f-flex-wrap f-gap-2">
         <button

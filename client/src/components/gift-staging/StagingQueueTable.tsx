@@ -71,7 +71,7 @@ export function StagingQueueTable({
               Updated
             </th>
             <th scope="col" className={headerCell}>
-              Status
+              Eligibility / needs
             </th>
             <th scope="col" className={headerCell}>
               Source
@@ -109,14 +109,32 @@ export function StagingQueueTable({
               <td className={dataCell}>{row.formattedDate}</td>
               <td className={dataCell}>
                 <div className="f-flex f-flex-col f-gap-1">
-                  <span className={statusToneClass(row.statusMeta.tone)}>
-                    {row.statusMeta.label}
+                  <span className={statusToneClass(row.eligibilityMeta.tone)}>
+                    {row.eligibilityMeta.label}
                   </span>
-                  {row.statusMeta.label === 'Process failed' && row.errorDetail ? (
+                  {row.eligibilityMeta.label === 'Process failed' && row.errorDetail ? (
                     <span className={statusToneClass('danger')}>
                       {typeof row.errorDetail === 'string'
                         ? row.errorDetail
                         : JSON.stringify(row.errorDetail)}
+                    </span>
+                  ) : null}
+                  {row.blockerLabels.length > 0 ? (
+                    <span className="f-text-xs f-text-slate-600">
+                      Blockers: {row.blockerLabels.slice(0, 2).join(', ')}
+                      {row.blockerLabels.length > 2
+                        ? ` +${row.blockerLabels.length - 2} more`
+                        : ''}
+                    </span>
+                  ) : null}
+                  {row.warningLabels.length > 0 ? (
+                    <span className="f-text-xs f-text-slate-600">
+                      Warnings: {row.warningLabels.length}
+                    </span>
+                  ) : null}
+                  {row.identityConfidenceLabel ? (
+                    <span className="f-text-xs f-text-slate-500">
+                      {row.identityConfidenceLabel}
                     </span>
                   ) : null}
                   {row.receiptMeta ? (
