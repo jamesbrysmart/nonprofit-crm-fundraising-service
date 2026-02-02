@@ -17,6 +17,7 @@ export interface GiftStagingListFetchOptions {
   minAmountMinor?: number;
   maxAmountMinor?: number;
   giftBatchId?: string;
+  sort?: string;
 }
 
 export function useGiftStagingList(filters: GiftStagingListFetchOptions = {}): UseGiftStagingListResult {
@@ -34,6 +35,7 @@ export function useGiftStagingList(filters: GiftStagingListFetchOptions = {}): U
   const maxAmountKey =
     typeof filters.maxAmountMinor === 'number' ? filters.maxAmountMinor.toString() : 'none';
   const batchKey = typeof filters.giftBatchId === 'string' ? filters.giftBatchId.trim() : '';
+  const sortKey = typeof filters.sort === 'string' ? filters.sort.trim() : '';
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh' = 'initial') => {
@@ -47,7 +49,7 @@ export function useGiftStagingList(filters: GiftStagingListFetchOptions = {}): U
       try {
         const response = await fetchGiftStagingList({
           limit: 50,
-          sort: 'updatedAt:desc',
+          sort: filters.sort ?? 'updatedAt:desc',
           recurringAgreementId: activeRecurringAgreementId,
           statuses: filters.statuses,
           intakeSources: filters.intakeSources,
@@ -70,7 +72,16 @@ export function useGiftStagingList(filters: GiftStagingListFetchOptions = {}): U
         }
       }
     },
-    [activeRecurringAgreementId, statusesKey, intakeSourcesKey, searchKey, minAmountKey, maxAmountKey, batchKey],
+    [
+      activeRecurringAgreementId,
+      statusesKey,
+      intakeSourcesKey,
+      searchKey,
+      minAmountKey,
+      maxAmountKey,
+      batchKey,
+      sortKey,
+    ],
   );
 
   useEffect(() => {

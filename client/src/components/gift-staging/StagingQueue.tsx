@@ -11,8 +11,33 @@ import { StagingQueueSummary } from './StagingQueueSummary';
 import { StagingQueueTable } from './StagingQueueTable';
 import { mapQueueRows, HIGH_VALUE_THRESHOLD } from './stagingQueueUtils';
 
+const COLUMN_OPTIONS = [
+  { key: 'stagingId', label: 'Staging ID', required: true },
+  { key: 'donor', label: 'Donor' },
+  { key: 'amount', label: 'Amount' },
+  { key: 'updated', label: 'Updated' },
+  { key: 'eligibility', label: 'Eligibility / needs' },
+  { key: 'source', label: 'Source' },
+  { key: 'alerts', label: 'Alerts' },
+  { key: 'actions', label: 'Actions', required: true },
+];
+
+const DEFAULT_VISIBLE_COLUMNS = COLUMN_OPTIONS.map((column) => column.key);
+const COLUMN_STORAGE_KEY = 'fundraising-gift-staging-columns';
+
+const SORT_OPTIONS = [
+  { value: 'updatedAt:desc', label: 'Updated (newest)' },
+  { value: 'updatedAt:asc', label: 'Updated (oldest)' },
+  { value: 'giftDate:desc', label: 'Gift date (newest)' },
+  { value: 'giftDate:asc', label: 'Gift date (oldest)' },
+  { value: 'amount.amountMicros:desc', label: 'Amount (high → low)' },
+  { value: 'amount.amountMicros:asc', label: 'Amount (low → high)' },
+];
+
 export function StagingQueue(): JSX.Element {
-  const [activeFilters, setActiveFilters] = useState<GiftStagingListFetchOptions>({});
+  const [activeFilters, setActiveFilters] = useState<GiftStagingListFetchOptions>({
+    sort: 'updatedAt:desc',
+  });
   const { items, loading, isRefreshing, error, refresh } = useGiftStagingList(activeFilters);
   const [selectedStagingId, setSelectedStagingId] = useState<string | null>(null);
   const [drawerFocus, setDrawerFocus] = useState<GiftDrawerFocus>('overview');
@@ -23,6 +48,8 @@ export function StagingQueue(): JSX.Element {
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [highValueOnly, setHighValueOnly] = useState(false);
+  const [searchValue, setSearchValue] = useState('');
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE_COLUMNS);
 
   const openDrawer = useCallback((stagingId: string, focus: GiftDrawerFocus = 'overview') => {
     setSelectedStagingId(stagingId);
@@ -118,6 +145,9 @@ export function StagingQueue(): JSX.Element {
     if (activeFilters.search) {
       clearFilterKey('search');
     }
+    if (activeFilters.sort) {
+      clearFilterKey('sort');
+    }
     if (typeof activeFilters.giftBatchId === 'string') {
       clearFilterKey('giftBatchId');
     }
@@ -130,9 +160,54 @@ export function StagingQueue(): JSX.Element {
     setActiveBatchId(null);
     setShowDuplicatesOnly(false);
     setHighValueOnly(false);
+    setSearchValue('');
   };
 
   const derivedRows = useMemo(() => mapQueueRows(items), [items]);
+
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? window.localStorage.getItem(COLUMN_STORAGE_KEY) : null;
+    if (!stored) {
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+      const validKeys = parsed.filter(
+        (key) => typeof key === 'string' && COLUMN_OPTIONS.some((option) => option.key === key),
+      );
+      const requiredKeys = COLUMN_OPTIONS.filter((option) => option.required).map((option) => option.key);
+      const merged = Array.from(new Set([...validKeys, ...requiredKeys]));
+      if (merged.length > 0) {
+        setVisibleColumns(merged);
+      }
+    } catch {
+      // ignore invalid stored state
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      const trimmed = searchValue.trim();
+      if (trimmed.length > 0) {
+        applyFilter({ search: trimmed });
+      } else {
+        clearFilterKey('search');
+      }
+    }, 350);
+    return () => window.clearTimeout(handle);
+  }, [searchValue, applyFilter, clearFilterKey]);
+
+  const sortValue = activeFilters.sort ?? 'updatedAt:desc';
 
   const filteredRows = useMemo(() => {
     let rows = derivedRows;
@@ -157,6 +232,19 @@ export function StagingQueue(): JSX.Element {
       setActiveBatchId(null);
     }
   }, [derivedRows, activeBatchId]);
+
+  const toggleColumn = useCallback((key: string) => {
+    const column = COLUMN_OPTIONS.find((option) => option.key === key);
+    if (!column || column.required) {
+      return;
+    }
+    setVisibleColumns((prev) => {
+      if (prev.includes(key)) {
+        return prev.filter((value) => value !== key);
+      }
+      return [...prev, key];
+    });
+  }, []);
 
   const statusSummary = useMemo(() => {
     let needsAttention = 0;
@@ -309,6 +397,14 @@ export function StagingQueue(): JSX.Element {
       <section className="section-unstyled f-space-y-6">
         <StagingQueueSummary
           statusSummary={statusSummary}
+          searchValue={searchValue}
+          onSearchChange={setSearchValue}
+          sortValue={sortValue}
+          sortOptions={SORT_OPTIONS}
+          onSortChange={(value) => applyFilter({ sort: value })}
+          columnOptions={COLUMN_OPTIONS}
+          visibleColumns={visibleColumns}
+          onToggleColumn={toggleColumn}
           intakeSummary={intakeSummary}
           batchSummary={batchSummary}
           batchDiagnosticsSummary={batchDiagnosticsSummary}
@@ -328,7 +424,7 @@ export function StagingQueue(): JSX.Element {
           onToggleHighValue={toggleHighValueFilter}
         />
 
-      <StagingQueueTable
+        <StagingQueueTable
         rows={filteredRows}
         loading={loading}
         error={error}
@@ -343,6 +439,7 @@ export function StagingQueue(): JSX.Element {
           void retryProcessing(id);
         }}
         processingIds={processingIds}
+        visibleColumns={visibleColumns}
       />
     </section>
 
